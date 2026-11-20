@@ -236,6 +236,7 @@ h1, h2, p { margin: 0; }
 }
 
 .assembly-view canvas { touch-action: none; }
+#wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 #full-photo { max-width: 96vw; max-height: 96dvh; border: 1px solid var(--line); border-radius: 12px; padding: .7rem; background: var(--surface); }
 #full-photo::backdrop { background: #101510df; }
 #full-photo canvas { width: min(86vw, 119dvh, 1440px); height: auto; display: block; }
