@@ -1,0 +1,20 @@
+[
+	{
+		"id": "first-level",
+		"title": "Первый уровень",
+		"description": "Завершите любой уровень любой игры",
+		"condition": {}
+	},
+	{
+		"id": "confident-start",
+		"title": "Уверенный старт",
+		"description": "Завершите уровень easy не ниже 50 процентов очков",
+		"condition": { "levelId": "easy", "minScorePercent": 50 }
+	},
+	{
+		"id": "hard-champion",
+		"title": "Гроза сложности",
+		"description": "Завершите уровень hard не ниже 80 процентов очков",
+		"condition": { "levelId": "hard", "minScorePercent": 80 }
+	}
+]
