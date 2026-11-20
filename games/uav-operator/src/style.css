@@ -233,3 +233,22 @@ h1, h2, p { margin: 0; }
 #full-photo::backdrop { background: #101510df; }
 #full-photo canvas { width: min(86vw, 119dvh, 1440px); height: auto; display: block; }
 #full-photo form { margin-top: .5rem; text-align: end; }
+
+.camera-glass { overflow: hidden; }
+.camera-glass::before, .camera-glass::after { content: ''; position: absolute; pointer-events: none; }
+.camera-glass::before { inset: -16px; background: url('./assets/video-grain.png') repeat; opacity: .095; }
+.camera-glass::after { inset: -24% 0 100%; background: linear-gradient(transparent, #dadbd81a 72%, #40484912 80%, transparent); }
+.flight-view .clean-feed .canvas-slot { filter: none; }
+.flight-view .flight-hud .camera-clock { display: block; color: white; background: #152123a8; font-variant-numeric: tabular-nums; }
+.flight-view .flight-metrics > div { border-radius: 2px; background: #142322b8; border-width: 0 0 1px; }
+#camera-effects[aria-pressed="true"] { border-color: #738d77; }
+@media (prefers-reduced-motion: no-preference) {
+	.camera-glass::before { animation: film-grain .47s steps(1) infinite; }
+	.camera-glass::after { animation: video-sweep 6.4s linear infinite; }
+}
+@keyframes film-grain {
+	25% { transform: translate(-6px, 3px); }
+	50% { transform: translate(4px, -8px); }
+	75% { transform: translate(8px, 5px); }
+}
+@keyframes video-sweep { to { transform: translateY(530%); } }

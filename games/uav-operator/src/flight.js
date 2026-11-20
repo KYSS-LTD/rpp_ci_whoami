@@ -65,7 +65,7 @@ export function start_Flight({ mount, complete, coast, renderer, signal }) {
 	photoCamera.up.set(0, 0, -1);
 	const trackedPosition = new THREE.Vector3();
 	const markerLayer = `<div id="waypoints" aria-hidden="true">${points.map(point => `<span class="world-marker" id="marker-${point.label}">${point.label}</span>`).join('')}</div>`;
-	const sceneMarkup = scene_Frame(`<div class="camera-glass"></div><output id="navigation-osd" class="navigation-osd" aria-live="off"></output><div class="flight-hud"><span class="view-label">${copy.view}</span>
+	const sceneMarkup = scene_Frame(`<div class="camera-glass" aria-hidden="true"></div><output id="navigation-osd" class="navigation-osd" aria-live="off"></output><div class="flight-hud"><span class="view-label camera-clock">${copy.view} · <time id="airtime">00:00</time></span>
 		<div class="flight-metrics"><div>${copy.battery}<strong id="battery">100%</strong></div><div>${copy.height}<strong id="altitude">0 м</strong></div></div></div>
 		<div class="mini-map"><span>${copy.map}</span><canvas id="map" width="150" height="139" aria-label="${copy.map}"></canvas></div>${markerLayer}`);
 	const footer = `<div class="flight-controls">
@@ -76,6 +76,7 @@ export function start_Flight({ mount, complete, coast, renderer, signal }) {
 	const panel = `<div class="diagram"><p class="micro">${copy.sector}</p><div class="sector-list">
 		${sectors.map(point => `<span id="sector-${point.label}">${point.label}</span>`).join('')}
 		</div></div><p class="lesson">${text.stages[1].lesson}</p>
+		<button type="button" class="button button-quiet" aria-pressed="true" id="camera-effects">${copy.effects}</button>
 		<figure class="flight-photo" id="flight-photo" hidden><canvas id="photo-preview" width="1440" height="900" aria-label="${copy.capture}"></canvas><figcaption id="photo-caption"></figcaption><button type="button" id="expand-photo" class="button button-quiet">${copy.expand}</button></figure>
 		<dialog id="full-photo" aria-label="${copy.capture}"><canvas width="1440" height="900"></canvas><form method="dialog"><button class="button button-primary">${copy.close}</button></form></dialog>
 		<p class="keyboard-note">${copy.keys}</p><p class="joystick-note">${copy.joysticks}</p>`;
@@ -86,6 +87,15 @@ export function start_Flight({ mount, complete, coast, renderer, signal }) {
 		flightInputs.reset();
 		viewer.showModal();
 	}, { signal });
+	const effects = query('#camera-effects');
+	const glass = query('.camera-glass');
+	effects.addEventListener('click', () => {
+		glass.hidden = !glass.hidden;
+		effects.setAttribute('aria-pressed', String(!glass.hidden));
+		glass.closest('.scene-frame').classList.toggle('clean-feed', glass.hidden);
+	}, { signal });
+	const clock = query('#airtime');
+	let flightSeconds = 0;
 	const button = query('#flight-action');
 	const map = query('#map').getContext('2d');
 	const navigation = query('#navigation-osd');
@@ -228,6 +238,9 @@ export function start_Flight({ mount, complete, coast, renderer, signal }) {
 					return;
 				}
 			} else update_Motion(delta);
+			if (airborne && !failed) flightSeconds += delta;
+			const stamp = [Math.floor(flightSeconds / 60), Math.floor(flightSeconds % 60)].map(value => String(value).padStart(2, '0')).join(':');
+			if (clock.textContent !== stamp) clock.textContent = stamp;
 			seaTime.value = time;
 			const { x, z, height, heading } = motion;
 			const ground = Math.max(0, terrain_Height(x, z));

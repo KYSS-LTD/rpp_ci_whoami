@@ -96,9 +96,10 @@ function create_Sea(scene) {
 
 function pine_Material() {
 	const canvas = document.createElement('canvas');
-	canvas.width = 180;
-	canvas.height = 256;
+	canvas.width = 360;
+	canvas.height = 512;
 	const ink = canvas.getContext('2d');
+	ink.scale(2, 2);
 	const random = seeded_Random(589);
 	ink.fillStyle = '#6d5944';
 	ink.fillRect(87, 22, 5, 230);
@@ -126,19 +127,54 @@ function pine_Material() {
 	return new THREE.MeshStandardMaterial({ map: texture, alphaTest: .42, side: THREE.DoubleSide, roughness: 1 });
 }
 
+// Группы ветвей образуют ярусы вокруг ствола, чтобы крона сохраняла объём при облёте.
+function create_BoughGeometry() {
+	const random = seeded_Random(586);
+	const vertices = [];
+	const texcoords = [];
+	const indices = [];
+	for (let tier = 0; tier < 8; tier++) {
+		const fraction = tier / 8;
+		for (let limb = 0; limb < 5; limb++) {
+			const angle = limb * Math.PI * .4 + tier * .83 + random() * .34;
+			const reach = (.30 + 1.28 * (1 - fraction)) * (.78 + random() * .38);
+			const y = .95 + fraction * 4.72;
+			const dx = Math.cos(angle), dz = Math.sin(angle);
+			const first = vertices.length / 3;
+			for (const [distance, side, height] of [[0,0,.42],[.47,-.32,.03],[.5,.31,-.03],[1,0,-.27]]) {
+				vertices.push((distance * dx - side * dz) * reach, y + height * reach, (distance * dz + side * dx) * reach);
+			}
+			texcoords.push(.5,1, 0,.36, 1,.36, .5,.05);
+			indices.push(first, first+1, first+2, first+1, first+3, first+2);
+		}
+	}
+	const geometry = new THREE.BufferGeometry();
+	geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+	geometry.setAttribute('uv', new THREE.Float32BufferAttribute(texcoords, 2));
+	geometry.setIndex(indices);
+	geometry.computeVertexNormals();
+	return geometry;
+}
+
 function create_Vegetation(scene) {
 	const random = seeded_Random(197);
 	const stock = new THREE.Object3D();
-	const conifers = 290;
-	const bark = new THREE.InstancedMesh(new THREE.CylinderGeometry(.09, .19, 1.9, 5), new THREE.MeshStandardMaterial({ color: 0x876344 }), conifers);
-	const crowns = new THREE.InstancedMesh(new THREE.PlaneGeometry(3.3, 5.2), pine_Material(), conifers * 2);
+	const conifers = 1260;
+	const bark = new THREE.InstancedMesh(new THREE.CylinderGeometry(.035, .18, 4.5, 7), new THREE.MeshStandardMaterial({ color: 0x876344 }), conifers);
+	const needles = pine_Material();
+	const branches = new THREE.InstancedMesh(create_BoughGeometry(), needles, conifers);
+	const crowns = new THREE.InstancedMesh(new THREE.PlaneGeometry(3.3, 5.2), needles, conifers * 2);
 	for (let index = 0; index < conifers; index++) {
 		const z = random() * 330 - 165;
 		const x = shore(z) - 27 - random() * 77;
 		const y = terrain_Height(x, z);
-		const scale = .66 + random() * 1.13;
+		const scale = .63 + random() ** .8 * 2.05;
 		stock.rotation.y = random() * Math.PI;
-		stock.position.set(x, y + .82 * scale, z);
+		stock.position.set(x, y, z);
+		stock.scale.setScalar(scale);
+		stock.updateMatrix();
+		branches.setMatrixAt(index, stock.matrix);
+		stock.position.y += 2.25 * scale;
 		stock.scale.setScalar(scale);
 		stock.updateMatrix();
 		bark.setMatrixAt(index, stock.matrix);
@@ -163,7 +199,7 @@ function create_Vegetation(scene) {
 		stock.updateMatrix();
 		rocks.setMatrixAt(index, stock.matrix);
 	}
-	for (const element of [bark, crowns, rocks]) {
+	for (const element of [bark, branches, crowns, rocks]) {
 		element.castShadow = true;
 		element.receiveShadow = true;
 		scene.add(element);
