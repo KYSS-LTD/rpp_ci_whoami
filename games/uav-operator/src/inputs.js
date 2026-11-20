@@ -37,10 +37,11 @@ export function bind_Joystick(root, signal) {
 	return { vector, reset };
 }
 
-export function bind_FlightInputs(left, right, action, signal) {
+export function bind_FlightInputs(attitudeStick, throttleStick, action, signal) {
 	const keys = new Set();
 	window.addEventListener('keydown', event => {
 		if (!flightKeys.has(event.code) || event.altKey || event.ctrlKey || event.metaKey) return;
+		if (event.target instanceof Element && event.target.closest('input, select, textarea, dialog, [contenteditable="true"]')) return;
 		if (event.code === 'Space' && event.target instanceof HTMLButtonElement) return;
 		event.preventDefault();
 		if (event.code === 'Space' && !event.repeat) action();
@@ -49,8 +50,8 @@ export function bind_FlightInputs(left, right, action, signal) {
 	window.addEventListener('keyup', event => keys.delete(event.code), { signal });
 	function reset() {
 		keys.clear();
-		left.reset();
-		right.reset();
+		attitudeStick.reset();
+		throttleStick.reset();
 	}
 	window.addEventListener('blur', reset, { signal });
 	document.addEventListener('visibilitychange', reset, { signal });
@@ -59,10 +60,10 @@ export function bind_FlightInputs(left, right, action, signal) {
 		reset,
 		axes() {
 			return {
-				x: has('KeyD', 'ArrowRight') - has('KeyA', 'ArrowLeft') + left.vector.x,
-				z: has('KeyS', 'ArrowDown') - has('KeyW', 'ArrowUp') + left.vector.y,
-				yaw: has('KeyE') - has('KeyQ') + right.vector.x,
-				y: has('KeyR') - has('KeyF') - right.vector.y,
+				x: has('KeyD', 'ArrowRight') - has('KeyA', 'ArrowLeft') + attitudeStick.vector.x,
+				z: has('KeyS', 'ArrowDown') - has('KeyW', 'ArrowUp') + attitudeStick.vector.y,
+				yaw: has('KeyE') - has('KeyQ') + throttleStick.vector.x,
+				y: has('KeyR') - has('KeyF') - throttleStick.vector.y,
 			};
 		},
 	};

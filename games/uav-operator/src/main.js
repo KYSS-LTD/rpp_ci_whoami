@@ -61,7 +61,8 @@ function render_Loop(time) {
 		resize_Frame(renderer, mode);
 		mode.update?.(delta, time / 1000);
 		if (activeMode !== mode) return;
-		renderer.render(mode.scene, mode.camera);
+		if (mode.render) mode.render(time / 1000);
+		else renderer.render(mode.scene, mode.camera);
 	}
 	if (animate) schedule_Frame();
 }
@@ -230,6 +231,7 @@ try {
 	});
 	canvas.addEventListener('webglcontextrestored', () => {
 		graphicsLost = false;
+		coast.sun.shadow.needsUpdate = true;
 		resume_Screen();
 	});
 	show_Home(false);

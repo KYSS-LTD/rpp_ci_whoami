@@ -1,4 +1,5 @@
 import { connections, componentColors, create_Bench, partOrder } from './scenes.js';
+import { fpvKit } from './fpv.js';
 import { bind_Click, query, scene_Frame, set_Status, stage_Shell } from './ui.js';
 import { text } from './text.js';
 
@@ -7,7 +8,7 @@ export function start_Assembly({ mount, complete, signal }) {
 	const copy = text.assembly;
 	const color = type => `#${componentColors[type].toString(16).padStart(6,'0')}`;
 	const scene = scene_Frame(`<canvas id="wires" aria-hidden="true"></canvas><span class="view-label">${copy.view}</span><button type="button" class="scene-button" id="rotate">${copy.rotate}</button>`);
-	const panel = `<button class="button button-primary" id="driver" type="button">${copy.tool}</button><div class="diagram"><p class="micro">${copy.diagram}</p><div class="diagram-grid">
+	const panel = `<div class="kit-profile"><h2>${fpvKit.name}</h2><p>${copy.profile}</p></div><button class="button button-primary" id="driver" type="button">${copy.tool}</button><div class="diagram"><p class="micro">${copy.diagram}</p><div class="diagram-grid">
 		${Object.entries(connections).map(([type, port]) => `<div><span class="part-dot" style="--part:${color(type)}"></span><b>${port}</b><span>${copy.labels[port]}</span></div>`).join('')}
 		</div></div>
 		<h2>${copy.parts}</h2><div class="part-grid">
@@ -63,6 +64,10 @@ export function start_Assembly({ mount, complete, signal }) {
 	update_Controls();
 	for (const [type, port] of Object.entries(connections)) {
 		bind_Click(`#part-${type}`, () => {
+			if (type !== 'battery' && bench.installed.has('battery')) {
+				set_Status(copy.disconnectPower, 'warn');
+				return;
+			}
 			if (bench.installed.delete(type)) {
 				bench.selected = null;
 				set_Status(copy.unplugged);
@@ -79,7 +84,7 @@ export function start_Assembly({ mount, complete, signal }) {
 				set_Status(copy.wrong, 'warn');
 				return;
 			}
-			if (type === 'battery' && bench.installed.size < 3) {
+			if (type === 'battery' && bench.installed.size < partOrder.length - 1) {
 				errors++;
 				set_Status(copy.last, 'warn');
 				return;
@@ -89,7 +94,7 @@ export function start_Assembly({ mount, complete, signal }) {
 			update_Controls();
 			const nextPart = query('.part-button:not(:disabled)') || query('#check');
 			nextPart.focus({ preventScroll: true });
-			set_Status(bench.installed.size === partOrder.length ? copy.good : `${copy.installed} ${bench.installed.size} / 4`, 'success');
+			set_Status(bench.installed.size === partOrder.length ? copy.good : `${copy.installed} ${bench.installed.size} / ${partOrder.length}`, 'success');
 		}, signal);
 	}
 	const wires = query('#wires');

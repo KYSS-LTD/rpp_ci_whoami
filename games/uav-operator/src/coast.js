@@ -74,16 +74,23 @@ function create_Sea(scene) {
 		void main() {
 			float shore = 13.0 + 6.0 * cos(world.y * .044) - 6.0 * sin(world.y * .069);
 			float depth = world.x - shore;
-			float wave = sin(depth * 1.05 + time * 1.45 + .18 * sin(world.y * .43));
-			float foam = smoothstep(.73, .98, wave) * (1.0 - smoothstep(1.0, 23.0, depth));
-			foam *= .42 + .24 * sin(world.y * .49 + time) + .17 * cos(world.y * 1.07);
-			vec3 col = mix(vec3(.185, .72, .60), vec3(.016, .227, .296), smoothstep(-1.0, 59.0, depth));
-			float ripple = sin(world.x * .55 + world.y * .22 + time) * sin(world.y * .82 - world.x * .42 - time);
-			float detail = 1.0 - smoothstep(70.0, 143.0, distance(world, cameraPosition.xz));
-			col += detail * (.029 * ripple + .016 * sin(world.x * 2.8 + world.y * .65));
-			foam *= detail;
-			col = mix(col, vec3(.92, .99, .83), clamp(foam + .62 * exp(-abs(depth - .25) * 1.4), 0.0, 1.0));
+			vec3 view = normalize(cameraPosition - vec3(world.x, 0.0, world.y));
+			float swell = sin(dot(world, vec2(.7, .23)) + time * 1.05);
+			float chop = sin(dot(world, vec2(1.72, -.69)) - time * 1.9 + swell * .44);
+			float ripples = sin(dot(world, vec2(3.19, .82)) + time * 2.2 + chop * .7);
+			float range = distance(world, cameraPosition.xz);
+			float detail = 1.0 - smoothstep(40.0, 185.0, range);
+			vec3 normal = normalize(vec3(.09 * swell + .07 * chop, 1.0, .09 * chop + .046 * ripples));
+			float fresnel = .07 + .85 * pow(1.0 - clamp(dot(view, normal), 0.0, 1.0), 4.0);
+			vec3 col = mix(vec3(.22, .36, .28), vec3(.013, .095, .115), smoothstep(-1.0, 46.0, depth));
+			vec3 reflected = mix(vec3(.14, .25, .34), vec3(.36, .47, .51), smoothstep(16.0, 240.0, range));
+			col = mix(col, reflected, fresnel) + detail * (.010 * ripples + .016 * chop);
+			float surf = sin(depth * 1.11 + time * 1.35 + .44 * sin(world.y * .48) + .24 * chop);
+			float foam = smoothstep(.84, 1.0, surf) * (1.0 - smoothstep(1.0, 12.0, depth));
+			foam *= smoothstep(-.68, .75, ripples * .55 + swell * .62) * detail;
+			col = mix(col, vec3(.76, .82, .76), clamp(foam * .51 + .48 * exp(-abs(depth - .24 + .17 * chop) * 3.1), 0.0, 1.0));
 			gl_FragColor = vec4(col, 1.0);
+			#include <tonemapping_fragment>
 			#include <colorspace_fragment>
 		}`,
 	});
@@ -94,13 +101,44 @@ function create_Sea(scene) {
 	return uniforms.time;
 }
 
-function pine_Material() {
+function pine_Material(spray = false) {
 	const canvas = document.createElement('canvas');
 	canvas.width = 360;
 	canvas.height = 512;
 	const ink = canvas.getContext('2d');
 	ink.scale(2, 2);
 	const random = seeded_Random(589);
+	if (spray) {
+		// Прозрачная текстура отдельной ветви с хвоей и мелкими побегами.
+		for (let twig = 0; twig < 54; twig++) {
+			const start = twig / 54;
+			const side = twig % 2 ? -1 : 1;
+			const reach = (1 - start) * (.55 + random() * .44);
+			const endX = 90 + side * 86 * reach;
+			const endY = 252 - start * 222 - reach * 80;
+			ink.strokeStyle = '#695640';
+			ink.lineWidth = 1.3;
+			ink.beginPath();
+			ink.moveTo(90, 252 - start * 222);
+			ink.lineTo(endX, endY);
+			ink.stroke();
+			for (let needle = 0; needle < 32; needle++) {
+				const t = needle / 32;
+				const x = 90 + (endX - 90) * t;
+				const y = 252 - start * 222 + (endY - 252 + start * 222) * t;
+				ink.strokeStyle = 'hsl(' + (86 + random() * 42) + ' 30% ' + (21 + random() * 22) + '%)';
+				ink.lineWidth = .95 + random() * 1.9;
+				ink.beginPath();
+				ink.moveTo(x, y);
+				ink.lineTo(x + (random() - .5) * 16 * reach, y - 3 - random() * 21 * reach);
+				ink.stroke();
+			}
+		}
+		const texture = new THREE.CanvasTexture(canvas);
+		texture.colorSpace = THREE.SRGBColorSpace;
+		texture.anisotropy = 4;
+		return new THREE.MeshStandardMaterial({ map: texture, alphaTest: .35, side: THREE.DoubleSide, roughness: 1 });
+	}
 	ink.fillStyle = '#6d5944';
 	ink.fillRect(87, 22, 5, 230);
 	for (let row = 0; row < 68; row++) {
@@ -128,23 +166,23 @@ function pine_Material() {
 }
 
 // Группы ветвей образуют ярусы вокруг ствола, чтобы крона сохраняла объём при облёте.
-function create_BoughGeometry() {
-	const random = seeded_Random(586);
+function create_BoughGeometry(seed) {
+	const random = seeded_Random(seed);
 	const vertices = [];
 	const texcoords = [];
 	const indices = [];
-	for (let tier = 0; tier < 8; tier++) {
-		const fraction = tier / 8;
-		for (let limb = 0; limb < 5; limb++) {
-			const angle = limb * Math.PI * .4 + tier * .83 + random() * .34;
-			const reach = (.30 + 1.28 * (1 - fraction)) * (.78 + random() * .38);
+	for (let tier = 0; tier < 10; tier++) {
+		const fraction = tier / 10;
+		for (let limb = 0; limb < 7; limb++) {
+			const angle = limb * Math.PI * 2 / 7 + tier * .83 + random() * .34;
+			const reach = (.30 + 1.78 * (1 - fraction) ** .8) * (.78 + random() * .38);
 			const y = .95 + fraction * 4.72;
 			const dx = Math.cos(angle), dz = Math.sin(angle);
 			const first = vertices.length / 3;
-			for (const [distance, side, height] of [[0,0,.42],[.47,-.32,.03],[.5,.31,-.03],[1,0,-.27]]) {
+			for (const [distance, side, height] of [[0, 0, .08], [.48, -.45, -.05], [.50, .43, .15], [1, 0, .26]]) {
 				vertices.push((distance * dx - side * dz) * reach, y + height * reach, (distance * dz + side * dx) * reach);
 			}
-			texcoords.push(.5,1, 0,.36, 1,.36, .5,.05);
+			texcoords.push(.5, 0, 0, .49, 1, .49, .5, 1);
 			indices.push(first, first+1, first+2, first+1, first+3, first+2);
 		}
 	}
@@ -159,33 +197,67 @@ function create_BoughGeometry() {
 function create_Vegetation(scene) {
 	const random = seeded_Random(197);
 	const stock = new THREE.Object3D();
-	const conifers = 1260;
-	const bark = new THREE.InstancedMesh(new THREE.CylinderGeometry(.035, .18, 4.5, 7), new THREE.MeshStandardMaterial({ color: 0x876344 }), conifers);
-	const needles = pine_Material();
-	const branches = new THREE.InstancedMesh(create_BoughGeometry(), needles, conifers);
-	const crowns = new THREE.InstancedMesh(new THREE.PlaneGeometry(3.3, 5.2), needles, conifers * 2);
-	for (let index = 0; index < conifers; index++) {
-		const z = random() * 330 - 165;
-		const x = shore(z) - 27 - random() * 77;
-		const y = terrain_Height(x, z);
-		const scale = .63 + random() ** .8 * 2.05;
-		stock.rotation.y = random() * Math.PI;
-		stock.position.set(x, y, z);
-		stock.scale.setScalar(scale);
-		stock.updateMatrix();
-		branches.setMatrixAt(index, stock.matrix);
-		stock.position.y += 2.25 * scale;
-		stock.scale.setScalar(scale);
-		stock.updateMatrix();
-		bark.setMatrixAt(index, stock.matrix);
-		for (let layer = 0; layer < 2; layer++) {
-			stock.position.y = y + 2.68 * scale;
-			stock.rotation.y += layer * Math.PI / 2;
-			stock.scale.setScalar(scale);
-			stock.updateMatrix();
-			crowns.setMatrixAt(index * 2 + layer, stock.matrix);
-			const green = new THREE.Color(0xf4f8eb);
-			crowns.setColorAt(index * 2 + layer, green.multiplyScalar(.8 + random() * .38));
+	const cells = new Map();
+	const cellSize = 23;
+	const cellId = (x, z) => Math.floor(x / cellSize) + ':' + Math.floor(z / cellSize);
+	for (let index = 0; index < 5800; index++) {
+		const z = random() * 368 - 184;
+		const margin = 18 + Math.cos(z * .071) * 7 + Math.sin(z * .031) * 5;
+		const x = shore(z) - margin - random() ** 1.28 * 138;
+		const launchPath = x > base.x - 2 && Math.abs(z - base.z + (x - base.x) * .55) < 7;
+		if (x < -157 || launchPath || Math.hypot(x - base.x, z - base.z) < 8 || Math.hypot(x + 25, z - 42) < 7.4 ||
+			sectors.some(point => Math.hypot(x - point.x, z - point.z) < 9)) continue;
+		const key = cellId(x, z);
+		if (!cells.has(key)) cells.set(key, []);
+		cells.get(key).push({
+			x, y: terrain_Height(x, z), z,
+			scale: 1.05 + random() ** 1.4 * 2.28,
+			width: .66 + random() * .57, angle: random() * Math.PI,
+			lean: (random() - .5) * .11, hue: random(),
+		});
+	}
+	const trunkGeometry = new THREE.CylinderGeometry(.025, .14, 5.4, 6);
+	const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x574332, roughness: 1 });
+	const needles = pine_Material(true);
+	const silhouette = pine_Material();
+	const variants = [create_BoughGeometry(586), create_BoughGeometry(643), create_BoughGeometry(787)];
+	const crownGeometry = new THREE.PlaneGeometry(3.8, 6.1);
+	const green = new THREE.Color();
+	for (const trees of cells.values()) {
+		const cell = trees[0];
+		const detailed = cell.x > limits.minX - 16;
+		const crowns = new THREE.InstancedMesh(crownGeometry, silhouette, trees.length * 2);
+		const bark = detailed ? new THREE.InstancedMesh(trunkGeometry, trunkMaterial, trees.length) : null;
+		const branches = detailed ? new THREE.InstancedMesh(variants[Math.floor(random() * variants.length)], needles, trees.length) : null;
+		for (const [index, tree] of trees.entries()) {
+			const { x, y, z, scale, width, angle, lean, hue } = tree;
+			stock.scale.set(scale * width, scale, scale * width);
+			stock.rotation.set(0, angle, lean);
+			green.setRGB(.63 + hue * .27, .72 + hue * .25, .43 + hue * .39);
+			if (detailed) {
+				stock.position.set(x, y, z);
+				stock.updateMatrix();
+				branches.setMatrixAt(index, stock.matrix);
+				branches.setColorAt(index, green);
+				stock.position.y += 2.68 * scale;
+				stock.updateMatrix();
+				bark.setMatrixAt(index, stock.matrix);
+			}
+			for (let plane = 0; plane < 2; plane++) {
+				stock.position.set(x, y + 2.94 * scale, z);
+				stock.rotation.y = angle + plane * Math.PI / 2;
+				stock.updateMatrix();
+				crowns.setMatrixAt(index * 2 + plane, stock.matrix);
+				crowns.setColorAt(index * 2 + plane, green);
+			}
+		}
+		crowns.receiveShadow = detailed;
+		crowns.castShadow = detailed;
+		scene.add(crowns);
+		if (detailed) {
+			bark.castShadow = true;
+			bark.receiveShadow = branches.receiveShadow = true;
+			scene.add(bark, branches);
 		}
 	}
 	const rocks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0x9d9b87, flatShading: true }), 66);
@@ -199,11 +271,21 @@ function create_Vegetation(scene) {
 		stock.updateMatrix();
 		rocks.setMatrixAt(index, stock.matrix);
 	}
-	for (const element of [bark, branches, crowns, rocks]) {
-		element.castShadow = true;
-		element.receiveShadow = true;
-		scene.add(element);
-	}
+	rocks.castShadow = rocks.receiveShadow = true;
+	scene.add(rocks);
+	return (x, y, z) => {
+		for (let dx = -1; dx <= 1; dx++) {
+			for (let dz = -1; dz <= 1; dz++) {
+				for (const tree of cells.get(cellId(x + dx * cellSize, z + dz * cellSize)) ?? []) {
+					const above = (y - tree.y) / tree.scale;
+					if (above < 0 || above > 5.8) continue;
+					const radius = above < .9 ? .22 : Math.max(.2, 1.34 * (5.8 - above) / 4.9);
+					if (Math.hypot(x - tree.x, z - tree.z) < radius * tree.scale * tree.width + .16) return true;
+				}
+			}
+		}
+		return false;
+	};
 }
 
 function create_Lighthouse(scene) {
@@ -252,7 +334,7 @@ function create_Station(scene) {
 	const landing = group(scene, base.x, terrain_Height(base.x, base.z) + .52, base.z);
 	cylinder(landing, 0x728274, 3.40, 3.59, 1.22, 0, -.56, 0, 32);
 	cylinder(landing, 0x39494a, 3.35, 3.52, .16, 0, 0, 0, 32);
-	ring(landing, palette.lime, 2.97, .065, 0, .12, 0);
+	ring(landing, 0xb5baae, 2.97, .035, 0, .085, 0);
 	for (const side of [-1, 1]) box(landing, palette.shell, .22, .035, 1.73, side * .53, .107, 0);
 	box(landing, palette.shell, 1.04, .035, .22, 0, .107, 0);
 }
@@ -303,13 +385,17 @@ export function create_Coast() {
 		scene.background = panorama;
 	});
 	scene.fog = new THREE.FogExp2(0xb6caca, .005);
-	create_Lighting(scene, 69);
+	const sun = create_Lighting(scene, 69);
+	// Декорации стоят на месте, поэтому карту теней достаточно построить один раз.
+	sun.shadow.autoUpdate = false;
+	sun.shadow.needsUpdate = true;
 	create_Terrain(scene);
 	const seaTime = create_Sea(scene);
-	create_Vegetation(scene);
+	const touchesTree = create_Vegetation(scene);
 	create_Lighthouse(scene);
 	create_Station(scene);
 	create_SectorDetails(scene);
 	const fieldDrone = create_Drone(scene);
-	return { scene, fieldDrone, seaTime };
+	fieldDrone.drone.traverse(object => { object.castShadow = false; });
+	return { scene, fieldDrone, seaTime, touchesTree, sun };
 }

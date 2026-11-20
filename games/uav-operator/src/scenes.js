@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { beach_Texture, base, create_Coast, create_Lighting, seeded_Random, terrain_Height } from './coast.js';
-import { box, cylinder, create_Component, group, palette, ring } from './models.js';
+import { box, cylinder, create_Component, create_Propeller, group, palette, ring } from './models.js';
 
-export const connections = { camera: 'CAM', gps: 'GPS', speed: 'MOT', battery: 'PWR' };
-export const componentColors = { camera: palette.blue, gps: palette.mint, speed: palette.coral, battery: palette.lime };
-export const partOrder = ['speed', 'camera', 'battery', 'gps'];
+export const connections = { camera: 'CAM', gps: 'GPS', speed: 'ESC', receiver: 'RX', transmitter: 'VTX', battery: 'PWR' };
+export const componentColors = { camera: palette.blue, gps: palette.mint, speed: palette.coral, receiver: 0xdab179, transmitter: 0xc3a5ed, battery: palette.lime };
+export const partOrder = ['speed', 'camera', 'receiver', 'transmitter', 'gps', 'battery'];
 
 export function create_Renderer(canvas) {
 	const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -65,19 +65,24 @@ export function create_Bench() {
 	scene.add(grid);
 	const frame = group(scene);
 	box(frame, palette.ink, 2.42, .24, 2.85, 0, .08);
-	box(frame, 0x247058, 1.97, .12, 2.24, 0, .26);
-	box(frame, 0x1a2727, .52, .1, .52, 0, .37);
+	box(frame, 0x243c39, 1.97, .12, 2.24, 0, .26);
+	box(frame, 0x151b20, .43, .1, .43, 0, .37);
+	for (const x of [-.83, .83]) for (const z of [-.92, .92]) cylinder(frame, palette.metal, .062, .062, .08, x, .36, z);
+	for (const side of [-1, 1]) for (let index = 0; index < 7; index++) {
+		box(frame, 0xc7a465, .043, .022, .08, side * (.25 + index * .079), .334, 0);
+	}
 	for (const x of [-1, 1]) {
 		for (const z of [-1, 1]) {
 			box(frame, palette.dark, 1.57, .16, .32, x * 1.59, .045, z * 1.06).rotation.y = -x * z * .42;
-			cylinder(frame, palette.dark, .35, .40, .38, x * 2.18, .19, z * 1.34);
-			cylinder(frame, palette.metal, .24, .30, .11, x * 2.18, .42, z * 1.34);
-			box(frame, palette.shell, 1.32, .037, .13, x * 2.18, .49, z * 1.34).rotation.y = z * x * .43;
+			cylinder(frame, 0x23262a, .35, .39, .38, x * 2.18, .19, z * 1.34, 20);
+			cylinder(frame, 0x8e7052, .34, .34, .067, x * 2.18, .269, z * 1.34, 20);
+			cylinder(frame, 0x485055, .24, .35, .11, x * 2.18, .42, z * 1.34, 20);
+			create_Propeller(frame, x * 2.18, .49, z * 1.34, .82, x * z > 0).rotation.y = z * x * .43;
 			cylinder(frame, palette.ink, .32, .32, .1, x * .95, -.08, z * 1.13);
 		}
 	}
-	const sockets = [[-.65, -.69], [.65, -.69], [.65, .69], [-.65, .69]];
-	const bayPositions = [[-3.52, -1.43], [3.52, -1.43], [3.52, 1.43], [-3.52, 1.43]];
+	const sockets = [[-.65, -.69], [.65, -.69], [.65, .69], [-.65, 0], [.65, 0], [-.65, .69]];
+	const bayPositions = [[-3.63, -2.27], [3.63, -2.27], [3.63, 2.30], [-3.63, .02], [3.63, .02], [-3.63, 2.30]];
 	const parts = {};
 	const selectable = [];
 	Object.keys(connections).forEach((type, index) => {
@@ -97,8 +102,11 @@ export function create_Bench() {
 		parts[type] = { model, socketX, socketZ, bayX, bayZ };
 	});
 	const lid = group(scene, 0, .56, 0);
-	box(lid, palette.dark, 2.17, .13, 2.42);
-	for (const side of [-1, 1]) box(lid, palette.lime, .045, .025, 1.6, side * .84, .08);
+	box(lid, 0x2e3438, 2.17, .13, 2.42);
+	for (const side of [-1, 1]) {
+		box(lid, 0x4b5258, .055, .025, 1.72, side * .91, .08);
+		for (const z of [-.88, .88]) cylinder(lid, 0x84837a, .074, .074, .045, side * .8, .08, z, 6);
+	}
 	const screw = cylinder(lid, palette.metal, .16, .14, .10, 0, .11, .72);
 	box(screw, palette.ink, .19, .02, .04, 0, .054);
 	const driver = group(scene, 0, .75, .72);
@@ -108,6 +116,7 @@ export function create_Bench() {
 	driver.visible = false;
 	const ray = new THREE.Raycaster();
 	let angle = .20;
+	let lastAngle;
 	return {
 		turn: 0, tool: false, scene, camera, installed: new Set(), selected: null,
 		wireEnds(type) {
@@ -123,6 +132,8 @@ export function create_Bench() {
 			return ray.intersectObjects(selectable, false)[0]?.object.userData.control;
 		},
 		resize(aspect) {
+			if (aspect === camera.aspect && angle === lastAngle) return;
+			lastAngle = angle;
 			camera.aspect = aspect;
 			camera.updateProjectionMatrix();
 			const distance = Math.max(11.5, 15 / aspect);
@@ -139,7 +150,7 @@ export function create_Bench() {
 				const installed = this.installed.has(type);
 				const selected = this.selected === type;
 				const blend = 1 - Math.exp(-10 * delta);
-				part.model.position.x = THREE.MathUtils.lerp(part.model.position.x, installed ? part.socketX * 2.45 : part.bayX, blend);
+				part.model.position.x = THREE.MathUtils.lerp(part.model.position.x, installed ? part.socketX * 2.13 : part.bayX, blend);
 				part.model.position.z = THREE.MathUtils.lerp(part.model.position.z, installed ? part.socketZ : part.bayZ, blend);
 				part.model.position.y = THREE.MathUtils.lerp(part.model.position.y, installed ? .55 : selected ? .58 + Math.sin(time * 4) * .12 : .02, blend);
 				part.model.rotation.y = installed ? 0 : selected ? time * .66 : -.25;
