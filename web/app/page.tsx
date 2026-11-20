@@ -1,19 +1,32 @@
+import Image from "next/image";
 import Link from "next/link";
 import { landingTexts } from "@/texts/landing";
 import styles from "./page.module.css";
+
+// Кадры для коллажа на первом экране: превью игр из библиотеки. Только для вида, поэтому alt пустой.
+const heroFrames = ["/game-previews/city-builder/frame-1.svg", "/game-previews/pixel-lab/frame-1.svg", "/game-previews/demo/frame-1.svg"];
 
 // Лендинг: описание проекта и кнопка перехода к играм.
 export default function LandingPage() {
 	return (
 		<div className={styles.landing}>
 			<section className={styles.hero}>
-				<h1>{landingTexts.heading}</h1>
-				<p className={styles.intro}>{landingTexts.intro}</p>
-				<div className={styles.actions}>
-					<Link href="/games" className={`button-primary ${styles.cta}`}>
-						{landingTexts.gamesButton}
-					</Link>
-					<p className={styles.privacy}>{landingTexts.privacyNote}</p>
+				<div className={styles.heroText}>
+					<h1>{landingTexts.heading}</h1>
+					<p className={styles.intro}>{landingTexts.intro}</p>
+					<div className={styles.actions}>
+						<Link href="/games" className={`button-primary ${styles.cta}`}>
+							{landingTexts.gamesButton}
+						</Link>
+						<p className={styles.privacy}>{landingTexts.privacyNote}</p>
+					</div>
+				</div>
+				<div className={styles.collage} aria-hidden="true">
+					{heroFrames.map((frame, index) => (
+						<div key={frame} className={styles.collageFrame} data-position={index + 1}>
+							<Image src={frame} alt="" fill sizes="(max-width: 860px) 70vw, 360px" priority={index === 0} />
+						</div>
+					))}
 				</div>
 			</section>
 			<section className={styles.benefits}>

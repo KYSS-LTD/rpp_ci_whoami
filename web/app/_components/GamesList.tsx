@@ -1,11 +1,12 @@
 "use client";
 
-import Link from "next/link";
+import { useCallback, useState } from "react";
 import { readGameRatings, readLevelResults, saveGameRating } from "@/core/progress";
-import { useState } from "react";
-import type { GameManifest } from "@/core/contract/types";
+import { gameFormats, type GameFormat, type GameManifest, type LevelId } from "@/core/contract/types";
 import { gamesTexts } from "@/texts/games";
 import { useProgressVersion } from "../_hooks/useProgressVersion";
+import { GamePreview } from "./GamePreview";
+import { GameSheet } from "./GameSheet";
 import styles from "./GamesList.module.css";
 import ui from "./ui.module.css";
 
@@ -13,14 +14,27 @@ interface GamesListProps {
 	games: GameManifest[];
 }
 
-// Список всех зарегистрированных игр с тремя уровнями и отметкой о прохождении.
+// Значение фильтра: все игры или один формат.
+type FormatFilter = "all" | GameFormat;
+
+// Библиотека игр: лента карточек с фильтром по формату. Кнопка "Играть" открывает карточку игры
+// с превью, сводкой и выбором сложности.
 export function GamesList({ games }: GamesListProps) {
 	const progressVersion = useProgressVersion();
 	const results = readLevelResults();
 	const ratings = readGameRatings();
+	const [formatFilter, setFormatFilter] = useState<FormatFilter>("all");
+	const [openGameId, setOpenGameId] = useState<string | null>(null);
 	const [ratingMessage, setRatingMessage] = useState("");
-	const isLevelCompleted = (gameId: string, levelId: string) =>
-		results.some((result) => result.gameId === gameId && result.levelId === levelId && result.completed);
+
+	// Стабильная ссылка на функцию закрытия: от неё зависит эффект внутри карточки игры.
+	const closeSheet = useCallback(() => {
+		setOpenGameId(null);
+		setRatingMessage("");
+	}, []);
+
+	const completedLevelIds = (gameId: string): LevelId[] =>
+		results.filter((result) => result.gameId === gameId && result.completed).map((result) => result.levelId);
 
 	if (games.length === 0) {
 		return (
@@ -34,62 +48,90 @@ export function GamesList({ games }: GamesListProps) {
 		);
 	}
 
+	// Фильтр показывается, только если в библиотеке есть игры разных форматов. Порядок форматов как в контракте.
+	const presentFormats = gameFormats.filter((format) => games.some((game) => game.format === format));
+	const visibleGames = formatFilter === "all" ? games : games.filter((game) => game.format === formatFilter);
+	const openGame = games.find((game) => game.gameId === openGameId);
+
 	return (
 		<section data-progress-version={progressVersion} className={ui.page}>
-			<div className={ui.pageHeader}>
-				<h1>{gamesTexts.title}</h1>
-				<p className={ui.lead}>{gamesTexts.intro}</p>
-			</div>
-			{games.map((game) => (
-				<article key={game.gameId} className={styles.gameCard}>
-					<div className={styles.gameHead}>
-						<h2>{game.title}</h2>
-						<p>{game.description}</p>
+			<div className={styles.header}>
+				<div className={ui.pageHeader}>
+					<h1>{gamesTexts.title}</h1>
+					<p className={ui.lead}>{gamesTexts.intro}</p>
+				</div>
+				{presentFormats.length > 1 ? (
+					<div role="group" aria-label={gamesTexts.filterLabel} className={styles.filters}>
+						{(["all", ...presentFormats] as FormatFilter[]).map((format) => (
+							<button
+								key={format}
+								type="button"
+								className={styles.filter}
+								aria-pressed={formatFilter === format}
+								onClick={() => setFormatFilter(format)}
+							>
+								{format === "all" ? gamesTexts.filterAll : gamesTexts.formats[format]}
+							</button>
+						))}
 					</div>
-					<ul className={styles.levels}>
-						{game.levels.map((level, levelIndex) => {
-							const completed = isLevelCompleted(game.gameId, level.id);
-							return (
-								<li key={level.id} className={styles.level} data-completed={completed ? "true" : "false"}>
-									<span className={styles.levelTitle}>{level.title}</span>{" "}
-									{/* Полоски сложности по порядку уровня, только для вида */}
-									<span className={styles.bars} data-difficulty={levelIndex + 1} aria-hidden="true">
-										<span />
-										<span />
-										<span />
-									</span>
-									<span className={styles.status}>{completed ? gamesTexts.levelDone : gamesTexts.levelOpen}</span>{" "}
-									<Link href={`/games/${game.gameId}/${level.id}`} className={`button-primary ${styles.play}`}>
-										{gamesTexts.playLevel}
-									</Link>
-								</li>
-							);
-						})}
-					</ul>
-					<fieldset className={styles.rating}>
-						<legend>{gamesTexts.ratingTitle}</legend>
-						<div className={styles.ratingButtons}>
-							{[1, 2, 3, 4, 5].map((value) => (
-								<button
-									key={value}
-									type="button"
-									aria-pressed={ratings[game.gameId] === value}
-									onClick={() => {
-										const saveResult = saveGameRating(game.gameId, value);
-										setRatingMessage(saveResult.ok ? gamesTexts.ratingSaved : gamesTexts.ratingUnavailable);
-									}}
-								>
-									{value}
-								</button>
-							))}
-						</div>
-					</fieldset>
-				</article>
-			))}
-			{ratingMessage ? (
-				<p role="status" className={styles.ratingMessage}>
-					{ratingMessage}
-				</p>
+				) : null}
+			</div>
+
+			{visibleGames.length === 0 ? <p className={ui.empty}>{gamesTexts.filterEmpty}</p> : null}
+
+			<ul className={styles.feed}>
+				{visibleGames.map((game, gameIndex) => {
+					const completedCount = new Set(completedLevelIds(game.gameId)).size;
+					return (
+						<li key={game.gameId}>
+							<article className={styles.card} data-in-development={game.inDevelopment ? "true" : "false"}>
+								{/* Клик по обложке тоже открывает карточку игры; с клавиатуры для этого есть кнопка "Играть" */}
+								<div className={styles.cover} onClick={() => setOpenGameId(game.gameId)}>
+									<GamePreview frames={game.preview?.frames ?? []} title={game.title} variant="card" priority={gameIndex < 2} />
+								</div>
+								<div className={styles.info}>
+									<div className={styles.badges}>
+										{game.format ? <span className={styles.badge}>{gamesTexts.formats[game.format]}</span> : null}
+										{game.inDevelopment ? (
+											<span className={`${styles.badge} ${styles.badgeWarning}`}>{gamesTexts.inDevelopment}</span>
+										) : null}
+									</div>
+									<h2>{game.title}</h2>
+									<p className={styles.description}>{game.description}</p>
+									<div className={styles.footer}>
+										<p className={styles.progress}>
+											<span>
+												{gamesTexts.progressLabel}: {completedCount} / {game.levels.length}
+											</span>
+											<span className={styles.progressDots} aria-hidden="true">
+												{game.levels.map((level, levelIndex) => (
+													<span key={level.id} data-done={levelIndex < completedCount ? "true" : "false"} />
+												))}
+											</span>
+										</p>
+										<button type="button" className={`button-primary ${styles.play}`} onClick={() => setOpenGameId(game.gameId)}>
+											{gamesTexts.playLevel}
+										</button>
+									</div>
+								</div>
+							</article>
+						</li>
+					);
+				})}
+			</ul>
+
+			{openGame ? (
+				<GameSheet
+					game={openGame}
+					completedLevelIds={completedLevelIds(openGame.gameId)}
+					rating={ratings[openGame.gameId]}
+					ratingMessage={ratingMessage}
+					onRate={(value) => {
+						const saveResult = saveGameRating(openGame.gameId, value);
+						setRatingMessage(saveResult.ok ? gamesTexts.ratingSaved : gamesTexts.ratingUnavailable);
+					}}
+					onClose={closeSheet}
+				/>
 			) : null}
 		</section>
 	);

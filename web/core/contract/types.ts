@@ -21,7 +21,35 @@ export interface ProfessionWeight {
 	weight: number;
 }
 
+// Форматы игр. По формату библиотека игр показывает метку и фильтрует ленту.
+export const gameFormats = ["quiz", "2d", "3d", "simulation"] as const;
+
+export type GameFormat = (typeof gameFormats)[number];
+
+// Превью игры: кадры из игры, которые библиотека листает с плавным приближением.
+// Пути указываются от папки public, например "/game-previews/demo/frame-1.svg".
+// Кадр может быть анимированным (SVG с анимацией, GIF, анимированный WebP).
+export interface GamePreview {
+	frames: string[];
+}
+
+// Время ожидания сообщения о готовности от iframe-игры по умолчанию, в секундах.
+export const defaultReadyTimeoutSec = 30;
+
+// Папка, в которой лежат сборки iframe-игр (public/game-builds). Путь к сборке обязан начинаться с /game-builds/<gameId>/.
+export const gameBuildsPath = "/game-builds";
+
+// Запуск игры из готовой веб-сборки (Unity WebGL, three.js и другие) во фрейме, см. capability game-iframe-bridge.
+export interface IframeRuntime {
+	kind: "iframe";
+	// Стартовая страница сборки, например "/game-builds/my-game/index.html".
+	entry: string;
+	// Сколько секунд ждать сообщения о готовности. Без поля используется defaultReadyTimeoutSec.
+	readyTimeoutSec?: number;
+}
+
 // Манифест игры: данные, по которым платформа регистрирует игру.
+// Поля после professionTags необязательные: они нужны только витрине библиотеки игр.
 export interface GameManifest {
 	gameId: string;
 	title: string;
@@ -29,6 +57,18 @@ export interface GameManifest {
 	contractVersion: number;
 	levels: LevelDefinition[];
 	professionTags: ProfessionWeight[];
+	// Формат игры. Без него игра показывается без метки формата и попадает только в фильтр "Все".
+	format?: GameFormat;
+	// Краткая сводка для карточки игры в библиотеке. Без неё показывается description.
+	summary?: string;
+	// Кадры из игры. Без них библиотека рисует обложку-заглушку.
+	preview?: GamePreview;
+	// Примерное время одного уровня в минутах.
+	estimatedMinutes?: number;
+	// Игра ещё в разработке: библиотека показывает метку "В разработке".
+	inDevelopment?: boolean;
+	// Готовая веб-сборка вместо React-компонентов уровней. Без поля игра запускается через levelComponents.
+	runtime?: IframeRuntime;
 }
 
 // Стандартный результат уровня, который игра передает платформе.

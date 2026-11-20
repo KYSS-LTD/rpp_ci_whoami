@@ -1,0 +1,98 @@
+/* Уровень iframe-игры: заголовок с кнопкой выхода и сцена 16:9, которая помещается в экран. */
+
+.level {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	width: 100%;
+}
+
+.header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 10px 16px;
+}
+
+.titles h1 {
+	margin: 0;
+}
+
+.gameTitle {
+	font-size: 0.9rem;
+	font-weight: 700;
+	color: var(--color-accent);
+}
+
+/* Сцена: 16:9, но не выше экрана за вычетом шапки сайта и заголовка уровня */
+.stage {
+	position: relative;
+	width: 100%;
+	max-width: calc((100vh - 220px) * 16 / 9);
+	min-height: 220px;
+	margin: 0 auto;
+	aspect-ratio: 16 / 9;
+	overflow: hidden;
+	background: #0b130f;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-large);
+	box-shadow: var(--shadow-card);
+}
+
+.frame {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	border: 0;
+	display: block;
+}
+
+.frame:focus-visible {
+	outline: 3px solid var(--color-accent);
+	outline-offset: -3px;
+}
+
+/* Индикатор загрузки поверх фрейма, пока игра не прислала ready */
+.loading {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 14px;
+	font-weight: 600;
+	color: #e4efe8;
+	background: radial-gradient(circle at 50% 40%, #1d6a41, #0b130f 70%);
+}
+
+.spinner {
+	width: 44px;
+	height: 44px;
+	border: 4px solid rgb(255 255 255 / 0.2);
+	border-top-color: var(--color-highlight);
+	border-radius: 50%;
+	animation: spin 0.9s linear infinite;
+}
+
+@media (max-width: 600px) {
+	/* На телефоне сцена 16:9 слишком низкая для интерфейса игры: занимаем почти весь экран по высоте */
+	.stage {
+		max-width: none;
+		aspect-ratio: auto;
+		height: max(420px, calc(100svh - 240px));
+		border-radius: var(--radius);
+	}
+
+	.header > a {
+		width: 100%;
+	}
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}

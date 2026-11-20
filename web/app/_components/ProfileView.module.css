@@ -21,7 +21,7 @@
 	background:
 		radial-gradient(circle at 50% 38%, rgb(255 255 255 / 0.85) 0 5px, transparent 5.5px),
 		radial-gradient(circle at 50% 100%, rgb(255 255 255 / 0.85) 0 10px, transparent 10.5px),
-		linear-gradient(135deg, var(--color-accent), #ec4899);
+		var(--gradient-brand);
 }
 
 .analysis h2 {
@@ -111,7 +111,7 @@
 }
 
 .profession[data-top="true"] .barFill {
-	background: linear-gradient(90deg, var(--color-accent), #ec4899);
+	background: linear-gradient(90deg, var(--color-accent), var(--color-highlight));
 }
 
 .columns {

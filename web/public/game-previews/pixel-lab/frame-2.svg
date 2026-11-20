@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" shape-rendering="crispEdges">
+<rect width="640" height="400" fill="#0f2318"/>
+<path d="M0 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M32 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M64 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M96 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M128 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M160 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M192 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M224 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M256 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M288 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M320 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M352 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M384 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M416 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M448 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M480 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M512 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M544 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M576 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M608 0 V400" stroke="#1a3a28" stroke-width="1"/>
+<path d="M0 0 H640" stroke="#1a3a28" stroke-width="1"/>
+<path d="M0 32 H640" stroke="#1a3a28" stroke-width="1"/>
+<path d="M0 64 H640" stroke="#1a3a28" stroke-width="1"/>
+<path d="M0 96 H640" stroke="#1a3a28" stroke-width="1"/>
+<path d="M0 128 H640" stroke="#1a3a28" stroke-width="1"/>
+<path d="M0 160 H640" stroke="#1a3a28" stroke-width="1"/>
+<path d="M0 192 H640" stroke="#1a3a28" stroke-width="1"/>
+<path d="M0 224 H640" stroke="#1a3a28" stroke-width="1"/>
+<path d="M0 256 H640" stroke="#1a3a28" stroke-width="1"/>
+<path d="M0 288 H640" stroke="#1a3a28" stroke-width="1"/>
+<path d="M0 320 H640" stroke="#1a3a28" stroke-width="1"/>
+<path d="M0 352 H640" stroke="#1a3a28" stroke-width="1"/>
+<path d="M0 384 H640" stroke="#1a3a28" stroke-width="1"/>
+<path d="M64 96 H224 V192 H320" stroke="#2d7a4a" stroke-width="8" fill="none"/>
+<path d="M64 96 H224 V192 H320" stroke="#a6e3bb" stroke-width="8" fill="none" stroke-dasharray="24 400"><animate attributeName="stroke-dashoffset" values="24;-400" dur="2.4s" repeatCount="indefinite"/></path>
+<path d="M64 288 H192 V224 H320" stroke="#2d7a4a" stroke-width="8" fill="none"/>
+<path d="M64 288 H192 V224 H320" stroke="#a6e3bb" stroke-width="8" fill="none" stroke-dasharray="24 400"><animate attributeName="stroke-dashoffset" values="24;-400" dur="2.7s" repeatCount="indefinite"/></path>
+<path d="M384 208 H480 V112 H576" stroke="#2d7a4a" stroke-width="8" fill="none"/>
+<path d="M384 208 H480 V112 H576" stroke="#a6e3bb" stroke-width="8" fill="none" stroke-dasharray="24 400"><animate attributeName="stroke-dashoffset" values="24;-400" dur="3.0s" repeatCount="indefinite"/></path>
+<path d="M384 208 H480 V304 H576" stroke="#2d7a4a" stroke-width="8" fill="none"/>
+<path d="M384 208 H480 V304 H576" stroke="#a6e3bb" stroke-width="8" fill="none" stroke-dasharray="24 400"><animate attributeName="stroke-dashoffset" values="24;-400" dur="3.3s" repeatCount="indefinite"/></path>
+<rect x="320" y="168" width="64" height="80" fill="#2d7a4a"/><rect x="328" y="176" width="48" height="64" fill="#1a5f3a"/>
+<rect x="344" y="196" width="16" height="24" fill="#f2c94c"><animate attributeName="opacity" values="1;0.4;1" dur="1s" repeatCount="indefinite"/></rect>
+<rect x="48" y="80" width="32" height="32" fill="#56675d"/><rect x="56" y="88" width="16" height="16" fill="#a6e3bb"/>
+<rect x="48" y="272" width="32" height="32" fill="#56675d"/><rect x="56" y="280" width="16" height="16" fill="#a6e3bb"/>
+<rect x="576" y="96" width="32" height="32" fill="#56675d"/><rect x="582" y="102" width="20" height="20" fill="#f2c94c"><animate attributeName="fill" values="#3a4a40;#f2c94c;#f2c94c;#3a4a40" keyTimes="0;0.3;0.8;1" dur="3s" begin="0.0s" repeatCount="indefinite"/></rect>
+<rect x="576" y="288" width="32" height="32" fill="#56675d"/><rect x="582" y="294" width="20" height="20" fill="#f2c94c"><animate attributeName="fill" values="#3a4a40;#f2c94c;#f2c94c;#3a4a40" keyTimes="0;0.3;0.8;1" dur="3s" begin="0.6s" repeatCount="indefinite"/></rect>
+</svg>

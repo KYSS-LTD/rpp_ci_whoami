@@ -47,4 +47,20 @@ describe("реестр игр", () => {
 		expect(result.games).toHaveLength(0);
 		expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("несовместимая версия контракта"));
 	});
+
+	it("iframe-игра регистрируется без компонентов уровней", () => {
+		const result = buildRegistry([
+			{ manifest: createManifest("unity-game", { runtime: { kind: "iframe", entry: "/game-builds/unity-game/index.html" } }) },
+		]);
+		expect(result.games.map((game) => game.manifest.gameId)).toEqual(["unity-game"]);
+		expect("levelComponents" in result.games[0].module).toBe(false);
+	});
+
+	it("iframe-игра со сборкой вне своей папки не регистрируется", () => {
+		const result = buildRegistry([
+			{ manifest: createManifest("unity-game", { runtime: { kind: "iframe", entry: "https://example.com/index.html" } }) },
+		]);
+		expect(result.games).toHaveLength(0);
+		expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("путь к сборке должен вести внутрь /game-builds/unity-game/"));
+	});
 });

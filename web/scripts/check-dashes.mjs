@@ -8,10 +8,11 @@ import { extname, join, relative, resolve } from "node:path";
 const projectRoot = resolve(import.meta.dirname, "..");
 
 // Папки и файлы по умолчанию. AGENTS.md не входит: его генерирует next dev.
-const defaultTargets = ["app", "core", "games", "texts", "scripts", "docs", ".env.example", "README.md"];
+// sdk и public/game-builds - код моста и сборки iframe-игр; сторонние библиотеки в папках vendor пропускаются.
+const defaultTargets = ["app", "core", "games", "texts", "scripts", "docs", "sdk", "public/game-builds", ".env.example", "README.md"];
 
-const checkedExtensions = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs", ".json", ".css", ".md", ".html", ".example"]);
-const skippedDirectories = new Set(["node_modules", ".next", "out", "build", "coverage"]);
+const checkedExtensions = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs", ".json", ".css", ".md", ".html", ".example", ".cs", ".jslib"]);
+const skippedDirectories = new Set(["node_modules", ".next", "out", "build", "coverage", "vendor"]);
 const forbiddenDashes = new RegExp(`[${String.fromCharCode(0x2013)}${String.fromCharCode(0x2014)}]`);
 
 // Собирает пути файлов для проверки, обходя папки рекурсивно.

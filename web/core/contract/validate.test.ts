@@ -85,6 +85,68 @@ describe("валидация манифеста", () => {
 		}
 	});
 
+	it("принимает манифест с полями витрины", () => {
+		const result = validateManifest(
+			createManifest({
+				format: "3d",
+				summary: "Сводка",
+				preview: { frames: ["/game-previews/demo/frame-1.svg"] },
+				estimatedMinutes: 5,
+				inDevelopment: true,
+			}),
+		);
+		expect(result.ok).toBe(true);
+	});
+
+	it("отклоняет неверные поля витрины", () => {
+		const result = validateManifest(
+			createManifest({ format: "vr", preview: { frames: [] }, estimatedMinutes: 0, inDevelopment: "да" }),
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			const reasons = result.reasons.join(" ");
+			expect(reasons).toContain("неизвестный формат игры");
+			expect(reasons).toContain("preview.frames");
+			expect(reasons).toContain("время уровня");
+			expect(reasons).toContain("inDevelopment");
+		}
+	});
+
+	it("принимает объявление сборки внутри папки своей игры", () => {
+		const result = validateManifest(
+			createManifest({ runtime: { kind: "iframe", entry: "/game-builds/demo/index.html", readyTimeoutSec: 60 } }),
+		);
+		expect(result.ok).toBe(true);
+	});
+
+	it("отклоняет сборку вне папки своей игры, внешний адрес и неизвестный вид запуска", () => {
+		const badEntries = [
+			"/game-builds/other/index.html",
+			"/game-builds/demo/../other/index.html",
+			"https://example.com/game/index.html",
+			"//example.com/game-builds/demo/index.html",
+			"/game-builds/demo//index.html",
+			"/game-builds/demo/",
+			"",
+		];
+		for (const entry of badEntries) {
+			const result = validateManifest(createManifest({ runtime: { kind: "iframe", entry } }));
+			expect(result.ok, entry).toBe(false);
+		}
+		const wrongKind = validateManifest(createManifest({ runtime: { kind: "native", entry: "/game-builds/demo/index.html" } }));
+		expect(wrongKind.ok).toBe(false);
+		if (!wrongKind.ok) {
+			expect(wrongKind.reasons.join(" ")).toContain("неизвестный вид запуска");
+		}
+	});
+
+	it("отклоняет неположительное время ожидания сборки", () => {
+		const result = validateManifest(
+			createManifest({ runtime: { kind: "iframe", entry: "/game-builds/demo/index.html", readyTimeoutSec: 0 } }),
+		);
+		expect(result.ok).toBe(false);
+	});
+
 	it("отклоняет значение, которое не является объектом", () => {
 		expect(validateManifest(null).ok).toBe(false);
 	});

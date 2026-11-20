@@ -16,4 +16,8 @@ export const demoManifest: GameManifest = {
 		{ professionId: "analyst", weight: 0.8 },
 		{ professionId: "designer", weight: 0.4 },
 	],
+	format: "quiz",
+	summary: demoTexts.summary,
+	preview: { frames: ["/game-previews/demo/frame-1.svg", "/game-previews/demo/frame-2.svg"] },
+	estimatedMinutes: 2,
 };

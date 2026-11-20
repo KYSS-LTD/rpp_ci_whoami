@@ -1,0 +1,81 @@
+/* Подвал: тёмно-зелёная полоса во всю ширину. */
+
+.footer {
+	margin-top: 32px;
+	color: rgb(255 255 255 / 0.85);
+	background: var(--color-accent-deep);
+}
+
+.inner {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: 16px 32px;
+	max-width: var(--content-width);
+	margin: 0 auto;
+	padding: 32px 20px 28px;
+}
+
+.about {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.brand {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	font-weight: 800;
+	font-size: 1.05rem;
+	color: #ffffff;
+}
+
+/* Значок-логотип, как в шапке */
+.brand::before {
+	content: "";
+	width: 24px;
+	height: 24px;
+	border-radius: 8px;
+	background:
+		radial-gradient(circle at 70% 30%, var(--color-highlight) 0 22%, transparent 23%),
+		linear-gradient(135deg, #4aa86c, #2a8c55);
+}
+
+.about p {
+	font-size: 0.92rem;
+}
+
+.links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 18px;
+	font-size: 0.92rem;
+	font-weight: 600;
+}
+
+.links a {
+	color: #ffffff;
+	opacity: 0.85;
+	transition: opacity 0.15s;
+}
+
+.links a:hover {
+	opacity: 1;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+.notice {
+	grid-column: 1 / -1;
+	padding-top: 16px;
+	font-size: 0.82rem;
+	color: rgb(255 255 255 / 0.6);
+	border-top: 1px solid rgb(255 255 255 / 0.12);
+}
+
+@media (max-width: 600px) {
+	.inner {
+		grid-template-columns: 1fr;
+		padding: 24px 16px;
+	}
+}
