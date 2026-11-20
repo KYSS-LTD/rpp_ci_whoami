@@ -4,7 +4,7 @@ import { create_Acro, fpvKit } from './fpv.js';
 import { bind_FlightInputs, bind_Joystick } from './inputs.js';
 import { add_Beacon } from './scenes.js';
 import { palette } from './models.js';
-import { query, scene_Frame, set_Status, stage_Shell } from './ui.js';
+import { close_StageMenu, query, scene_Frame, set_Status, stage_OverlayOpen, stage_Shell } from './ui.js';
 import { text } from './text.js';
 import { create_AnalogFeed } from './video.js';
 
@@ -62,7 +62,7 @@ function draw_Map(context, x, z, heading, scanned) {
 	context.restore();
 }
 
-export function start_Flight({ mount, complete, coast, renderer, signal }) {
+export function start_Flight({ mount, coast, renderer, signal }) {
 	const copy = text.flight;
 	const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 	const { scene, fieldDrone, seaTime, touchesTree } = coast;
@@ -78,25 +78,42 @@ export function start_Flight({ mount, complete, coast, renderer, signal }) {
 		<div class="fpv-reticle" aria-hidden="true"></div><div class="fpv-message" id="osd-state"></div>
 		<div class="fpv-bottom"><span><span id="battery"></span><br><span id="consumption"></span></span><span class="fpv-center"><span id="altitude">0.0 m</span><br><span id="throttle"></span></span><span class="fpv-right"><time id="airtime">00:00</time><br><span id="speed">0 km/h</span></span></div>
 	</div>${markerLayer}`);
-	const footer = `<div class="flight-controls">
+	const controls = `<div class="flight-controls">
 		<div class="joystick-group"><div class="joystick" id="stick-view" aria-hidden="true"><i></i></div><span id="stick-left-label">${copy.throttleYaw}</span></div>
 		<button class="button button-primary" id="flight-action" type="button">${copy.takeoff}</button>
 		<div class="joystick-group"><div class="joystick" id="stick-move" aria-hidden="true"><i></i></div><span id="stick-right-label">${copy.pitchRoll}</span></div>
-	</div>`;
-	const panel = `<div class="diagram"><p class="micro">${copy.sector}</p><div class="sector-list">
+	</div><aside class="flight-map" id="flight-map" aria-labelledby="map-title" hidden>
+		<div class="overlay-heading"><h2 id="map-title">${copy.map}</h2><button class="button button-quiet close-overlay" type="button" id="close-map" aria-label="${text.close}">×</button></div><div class="sector-list">
 		${sectors.map(point => `<span id="sector-${point.label}">${point.label}</span>`).join('')}
-		</div><canvas id="map" width="150" height="139" aria-label="${copy.map}"></canvas></div>
+		</div><canvas id="map" width="150" height="230" aria-label="${copy.map}"></canvas></aside>
+		<dialog id="full-photo" aria-label="${copy.capture}"><canvas width="1440" height="900"></canvas><form method="dialog"><button class="button button-primary">${copy.close}</button></form></dialog>`;
+	const panel = `<button class="button button-quiet" type="button" id="toggle-map" aria-controls="flight-map" aria-expanded="false">${copy.map}</button>
+		<button class="button button-quiet" type="button" id="flight-land" hidden>${copy.land}</button>
 		<div class="fpv-controls" aria-label="${copy.settings}">
 			<label>${copy.mode}<select id="flight-mode"><option value="acro">ACRO</option><option value="assisted">${copy.assisted}</option></select></label>
 			<label>${copy.filter}<select id="input-filter"><option value="12">12 Hz</option><option value="6" selected>6 Hz</option><option value="3">3 Hz</option></select></label>
 			<label>${copy.feed}<select id="camera-effects"><option value="1" selected>${copy.analog}</option><option value="2">${copy.soft}</option><option value="0">${copy.clean}</option></select></label>
 		</div>
 		<figure class="flight-photo" id="flight-photo" hidden><canvas id="photo-preview" width="1440" height="900" aria-label="${copy.capture}"></canvas><figcaption id="photo-caption"></figcaption><button type="button" id="expand-photo" class="button button-quiet">${copy.expand}</button></figure>
-		<dialog id="full-photo" aria-label="${copy.capture}"><canvas width="1440" height="900"></canvas><form method="dialog"><button class="button button-primary">${copy.close}</button></form></dialog>
 		<p class="keyboard-note" id="flight-keys">${copy.acroKeys}</p><p class="joystick-note" id="flight-sticks">${copy.acroSticks}</p>`;
-	mount(stage_Shell(1, sceneMarkup, panel, footer, true));
+	const tutorial = `<p class="keyboard-note">${copy.acroKeys}</p><p class="joystick-note">${copy.acroSticks}</p>`;
+	mount(stage_Shell(1, sceneMarkup, panel, controls, tutorial));
+	const frame = query('#scene-frame');
+	frame.tabIndex = -1;
+	const focus = () => frame.focus({ preventScroll: true });
+	const mapPanel = query('#flight-map');
+	const mapToggle = query('#toggle-map');
+	function toggle_Map() {
+		mapPanel.hidden = !mapPanel.hidden;
+		mapToggle.setAttribute('aria-expanded', String(!mapPanel.hidden));
+		if (!mapPanel.hidden) draw_Map(map, motion.x, motion.z, motion.heading, scanned);
+		focus();
+	}
+	mapToggle.addEventListener('click', () => { close_StageMenu(); toggle_Map(); }, { signal });
+	query('#close-map').addEventListener('click', toggle_Map, { signal });
 	const viewer = query('#full-photo');
 	query('#expand-photo').addEventListener('click', () => {
+		close_StageMenu();
 		viewer.querySelector('canvas').getContext('2d').drawImage(query('#photo-preview'), 0, 0);
 		flightInputs.reset();
 		viewer.showModal();
@@ -122,6 +139,8 @@ export function start_Flight({ mount, complete, coast, renderer, signal }) {
 	const clock = query('#airtime');
 	let flightSeconds = 0;
 	const button = query('#flight-action');
+	const flightControls = query('.flight-controls');
+	const landButton = query('#flight-land');
 	const map = query('#map').getContext('2d');
 	const navigation = query('#navigation-osd');
 	const altitudeText = query('#altitude');
@@ -142,6 +161,8 @@ export function start_Flight({ mount, complete, coast, renderer, signal }) {
 	let airborne = false;
 	let failed = false;
 	let landing = false;
+	let landed = false;
+	let paused = false;
 	let errors = 0;
 	let feedback = 0;
 	let flash = 0;
@@ -150,7 +171,7 @@ export function start_Flight({ mount, complete, coast, renderer, signal }) {
 	let hasLifted = false;
 	const attitudeStick = bind_Joystick(query('#stick-move'), signal);
 	const throttleStick = bind_Joystick(query('#stick-view'), signal);
-	const flightInputs = bind_FlightInputs(attitudeStick, throttleStick, perform_Action, signal);
+	const flightInputs = bind_FlightInputs(attitudeStick, throttleStick, { action: perform_Action, toggleMap: toggle_Map, blocked: stage_OverlayOpen, signal });
 	button.textContent = copy.arm;
 	set_Status(copy.waitingAcro);
 
@@ -163,7 +184,7 @@ export function start_Flight({ mount, complete, coast, renderer, signal }) {
 	}
 
 	function show_Message(message, state) {
-		set_Status(message, state);
+		set_Status(message, state, true);
 		feedback = 2.4;
 	}
 
@@ -193,24 +214,21 @@ export function start_Flight({ mount, complete, coast, renderer, signal }) {
 	}
 
 	function perform_Action() {
-		if (failed || landing || viewer.open) return;
+		if (failed || landing || landed || stage_OverlayOpen()) return;
 		if (!airborne) {
 			airborne = true;
 			if (manual()) acro.reset(motion.heading);
-			else motion.height = 7;
+			else {
+				motion.height = 7;
+				hasLifted = true;
+				landButton.hidden = false;
+			}
 			modeInput.disabled = true;
 			button.textContent = copy.photo;
+			focus();
 			return;
 		}
-		if (scanned.size === sectors.length) {
-			if (distance(base) > landRadius) return show_Message(copy.badLand, 'warn');
-			if (manual()) return show_Message(copy.manualLand);
-			if (motion.height > 4) return show_Message(copy.lower, 'warn');
-			landing = true;
-			button.disabled = true;
-			set_Status(copy.landing, 'success');
-			return;
-		}
+		if (scanned.size === sectors.length) return attempt_Landing();
 		const target = target_InRange();
 		if (!target || motion.height < 3 || motion.height > 12) {
 			errors++;
@@ -223,10 +241,24 @@ export function start_Flight({ mount, complete, coast, renderer, signal }) {
 		query(`#marker-${target.label}`).hidden = true;
 		flash = .24;
 		show_Message(scanned.size === sectors.length ? copy.comeback : copy.next, 'success');
-		if (scanned.size === sectors.length) button.textContent = copy.land;
+		if (scanned.size === sectors.length) {
+			if (manual()) button.hidden = true;
+			else button.textContent = copy.land;
+		}
+	}
+	function attempt_Landing() {
+		if (failed || landed || landing) return;
+		if (distance(base) > landRadius) return show_Message(copy.badLand, 'warn');
+		if (manual()) return show_Message(copy.manualLand);
+		if (motion.height > 4) return show_Message(copy.lower, 'warn');
+		landing = true;
+		button.disabled = true;
+		landButton.hidden = true;
+		set_Status(copy.landing, 'success');
 	}
 
 	button.addEventListener('click', perform_Action, { signal });
+	landButton.addEventListener('click', () => { close_StageMenu(); focus(); attempt_Landing(); }, { signal });
 	signal.addEventListener('abort', () => {
 		video.dispose();
 		fieldDrone.drone.visible = true;
@@ -237,7 +269,6 @@ export function start_Flight({ mount, complete, coast, renderer, signal }) {
 		}
 	}, { once: true });
 	viewer.addEventListener('close', flightInputs.reset, { signal });
-	const frame = query('#scene-frame');
 	function update_Motion(delta) {
 		if (!airborne || failed) return;
 		const axes = flightInputs.axes();
@@ -251,7 +282,7 @@ export function start_Flight({ mount, complete, coast, renderer, signal }) {
 			const upright = 1 - 2 * (acro.attitude.x ** 2 + acro.attitude.z ** 2);
 			if (collision || impact > 5 || (touchingDown && upright < .72)) fail_Flight(copy.crash);
 			else if (battery === 0) fail_Flight(copy.emergency);
-			else if (touchingDown && scanned.size === sectors.length && distance(base) < 3.25) {
+			else if (touchingDown && distance(base) < 3.25) {
 				finish_Flight();
 			}
 			return;
@@ -267,23 +298,30 @@ export function start_Flight({ mount, complete, coast, renderer, signal }) {
 		motion.x = THREE.MathUtils.clamp(motion.x + motion.vx * delta, limits.minX, limits.maxX);
 		motion.z = THREE.MathUtils.clamp(motion.z + motion.vz * delta, limits.minZ, limits.maxZ);
 		battery = acro.power(delta, .61 + .09 * Math.hypot(motion.vx, motion.vz) / 15);
-		if (battery === 0) fail_Flight(copy.emergency);
+		if (touchesTree(motion.x, groundAt(motion.x, motion.z) + motion.height, motion.z)) fail_Flight(copy.crash);
+		else if (battery === 0) fail_Flight(copy.emergency);
 	}
 	function fail_Flight(message) {
 		failed = true;
 		motion.vx = motion.vz = 0;
-		button.disabled = true;
+		flightControls.hidden = landButton.hidden = true;
+		frame.classList.add('signal-lost');
 		set_Status(message, 'warn');
 	}
 	function finish_Flight() {
-		landing = true;
-		complete(Math.max(55, 100 - errors * 5 - Math.floor((100 - battery) / 12)));
+		landing = airborne = false;
+		landed = true;
+		flightControls.hidden = landButton.hidden = true;
+		motion.vx = motion.vz = 0;
+		set_Status(copy.landed, 'success');
 	}
 
-	return { scene, camera,
+	return { scene, camera, focus,
+		score: () => Math.max(0, scanned.size * 25 + (hasLifted ? 10 : 0) + (landed ? 15 : 0) - errors * 5 - (failed ? 10 : 0)),
 		render(time) {
 			const effect = Number(effects.value);
-			if (!effect) renderer.render(scene, camera);
+			if (failed) video.render(scene, camera, reduceMotion.matches ? 0 : time, 1, 1, true);
+			else if (!effect) renderer.render(scene, camera);
 			else video.render(scene, camera, reduceMotion.matches ? 0 : time, videoLoss, reduceMotion.matches ? 0 : effect === 1 ? 1 : .27);
 		},
 		resize(aspect) {
@@ -293,19 +331,20 @@ export function start_Flight({ mount, complete, coast, renderer, signal }) {
 			camera.updateProjectionMatrix();
 		},
 		update(delta, time) {
-			if (viewer.open) return;
-			if (landing) {
+			const overlayOpen = stage_OverlayOpen();
+			if (overlayOpen && !paused) flightInputs.reset();
+			paused = overlayOpen;
+			if (paused) delta = 0;
+			if (!paused && landing) {
 				const blend = 1 - Math.exp(-6 * delta);
 				motion.x = THREE.MathUtils.lerp(motion.x, base.x, blend);
 				motion.z = THREE.MathUtils.lerp(motion.z, base.z, blend);
 				motion.height = Math.max(.72, motion.height - delta * 3.8);
 				if (motion.height === .72 && distance(base) < .08) {
 					finish_Flight();
-					return;
 				}
-			} else {
+			} else if (!paused) {
 				update_Motion(delta);
-				if (landing) return;
 			}
 			if (airborne && !failed) flightSeconds += delta;
 			const stamp = [Math.floor(flightSeconds / 60), Math.floor(flightSeconds % 60)].map(value => String(value).padStart(2, '0')).join(':');
@@ -345,7 +384,7 @@ export function start_Flight({ mount, complete, coast, renderer, signal }) {
 			telemetry -= delta;
 			if (telemetry <= 0) {
 				telemetry = .09;
-				draw_Map(map, x, z, heading, scanned);
+				if (!mapPanel.hidden) draw_Map(map, x, z, heading, scanned);
 				courseText.textContent = `${String(course).padStart(3, '0')}°`;
 				const next = sectors.reduce((nearest, point) => {
 					if (scanned.has(point)) return nearest;
@@ -353,14 +392,14 @@ export function start_Flight({ mount, complete, coast, renderer, signal }) {
 				}, null) ?? base;
 				const bearing = Math.atan2(next.x - x, z - next.z) + heading;
 				const arrow = directionArrows[THREE.MathUtils.euclideanModulo(Math.round(bearing * 4 / Math.PI), 8)];
-				navigation.textContent = `VID ${Math.round(100 - videoLoss * 62)}%\nH ${Math.round(distance(base))} m\n${arrow} ${next.label} ${Math.round(distance(next))} m`;
+				navigation.textContent = failed ? 'VID 0%' : `VID ${Math.round(100 - videoLoss * 62)}%\nH ${Math.round(distance(base))} m\n${arrow} ${next.label} ${Math.round(distance(next))} m`;
 				altitudeText.textContent = `${(airborne && height > .73 ? height : 0).toFixed(1)} m AGL`;
 				speedText.textContent = `${Math.round(Math.hypot(motion.vx, motion.vz) * 3.6)} km/h`;
 				batteryText.textContent = `${acro.voltage.toFixed(1)} V`;
 				usedText.textContent = `${Math.round(acro.used)} mAh`;
-				throttleText.textContent = manual() ? `THR ${Math.round((failed ? 0 : acro.throttle) * 100)}%` : '';
+				throttleText.textContent = manual() ? `THR ${Math.round((airborne && !failed ? acro.throttle : 0) * 100)}%` : '';
 				batteryText.dataset.low = battery <= 22;
-				stateText.textContent = failed ? copy.osdFail : !airborne ? copy.osdSafe : battery <= 22 ? copy.osdLow : manual() && !hasLifted ? copy.osdArmed : '';
+				stateText.textContent = failed ? copy.osdFail : landed ? copy.osdLanded : !airborne ? copy.osdSafe : battery <= 22 ? copy.osdLow : manual() && !hasLifted ? copy.osdArmed : '';
 			}
 			flash = Math.max(0, flash - delta);
 			frame.classList.toggle('photo-flash', flash > 0 && !reduceMotion.matches);

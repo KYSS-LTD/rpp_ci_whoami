@@ -7,8 +7,9 @@ export function start_Assembly({ mount, complete, signal }) {
 	const bench = create_Bench();
 	const copy = text.assembly;
 	const color = type => `#${componentColors[type].toString(16).padStart(6,'0')}`;
-	const scene = scene_Frame(`<canvas id="wires" aria-hidden="true"></canvas><span class="view-label">${copy.view}</span><button type="button" class="scene-button" id="rotate">${copy.rotate}</button>`);
-	const panel = `<div class="kit-profile"><h2>${fpvKit.name}</h2><p>${copy.profile}</p></div><button class="button button-primary" id="driver" type="button">${copy.tool}</button><div class="diagram"><p class="micro">${copy.diagram}</p><div class="diagram-grid">
+	const scene = scene_Frame('<canvas id="wires" aria-hidden="true"></canvas>');
+	const controls = `<div class="scene-actions"><button class="button button-primary" id="driver" type="button">${copy.tool}</button></div>`;
+	const panel = `<div class="kit-profile"><h2>${fpvKit.name}</h2><p>${copy.profile}</p></div><button type="button" class="button button-quiet" id="rotate">${copy.rotate}</button><div class="diagram"><p class="micro">${copy.diagram}</p><div class="diagram-grid">
 		${Object.entries(connections).map(([type, port]) => `<div><span class="part-dot" style="--part:${color(type)}"></span><b>${port}</b><span>${copy.labels[port]}</span></div>`).join('')}
 		</div></div>
 		<h2>${copy.parts}</h2><div class="part-grid">
@@ -17,10 +18,12 @@ export function start_Assembly({ mount, complete, signal }) {
 		<p class="detail" id="part-detail" aria-live="polite">${copy.select}</p>
 		<h2>${copy.ports}</h2><div class="port-grid">
 		${Object.entries(connections).map(([type, port]) => `<button class="port-button" id="port-${port}" type="button" disabled>${port}</button>`).join('')}
-		</div>
-		<button class="button button-primary wide" id="check" type="button" disabled>${copy.check}</button>`;
-	mount(stage_Shell(0, scene, panel));
+		</div>`;
+	mount(stage_Shell(0, scene, panel, controls));
 	let errors = 0;
+	let phase = 'opening';
+	const tool = query('#driver');
+	const detail = query('#part-detail');
 
 	function update_Controls() {
 		const active = bench.selected;
@@ -28,30 +31,50 @@ export function start_Assembly({ mount, complete, signal }) {
 			const part = query(`#part-${type}`);
 			const socket = query(`#port-${port}`);
 			const installed = bench.installed.has(type);
-			part.disabled = bench.turn < 1;
 			part.setAttribute('aria-pressed', type === active);
-			socket.disabled = installed || active === null;
+			socket.disabled = installed || active === null || phase !== 'wiring';
 			socket.dataset.installed = installed;
 			part.dataset.installed = installed;
 		}
-		query('#check').disabled = bench.installed.size !== partOrder.length;
-		query('#part-detail').textContent = active ? copy.items[active].detail : copy.select;
+		tool.hidden = phase === 'secured' || (phase === 'wiring' && bench.installed.size < partOrder.length);
+		tool.textContent = { opening: bench.tool ? copy.twist : copy.tool, wiring: copy.closeLid, closing: copy.tighten }[phase] ?? '';
 	}
 
 	const canvas = query('#canvas-slot canvas');
-	const tool = query('#driver');
 	let lastX = null;
 	function turn_Driver(amount) {
-		bench.tool = true;
-		bench.turn = Math.min(1, bench.turn + amount);
-		tool.textContent = bench.turn === 1 ? copy.open : copy.twist;
-		tool.disabled = bench.turn === 1;
-		set_Status(bench.turn === 1 ? copy.select : copy.turnHint);
+		if (phase === 'opening') {
+			bench.turn = Math.min(1, bench.turn + amount);
+			if (bench.turn === 1) {
+				phase = 'wiring';
+				bench.lidOpen = true;
+			}
+			set_Status(bench.lidOpen ? copy.open : copy.turnHint);
+		} else if (phase === 'closing') {
+			bench.turn = Math.max(0, bench.turn - amount);
+			if (bench.turn === 0) {
+				phase = 'secured';
+				bench.tool = false;
+				set_Status(copy.secured, 'success');
+			}
+		}
 		update_Controls();
 	}
-	tool.addEventListener('click', () => turn_Driver(bench.tool ? .25 : 0), { signal });
+	tool.addEventListener('click', () => {
+		if (phase === 'wiring' && bench.installed.size === partOrder.length) {
+			phase = 'closing';
+			bench.lidOpen = false;
+			set_Status(copy.tightenHint);
+			update_Controls();
+			return;
+		}
+		const amount = bench.tool ? .25 : 0;
+		if (phase === 'opening') bench.tool = true;
+		turn_Driver(amount);
+	}, { signal });
 	canvas.addEventListener('pointerdown', event => {
-		if (!bench.tool || bench.turn === 1) return;
+		if (event.button !== 0 || lastX !== null || !bench.tool || (phase !== 'opening' && phase !== 'closing')) return;
+		if (controlAt(point(event))?.startsWith('part-')) return;
 		canvas.setPointerCapture(event.pointerId);
 		lastX = event.clientX;
 	}, { signal });
@@ -64,18 +87,21 @@ export function start_Assembly({ mount, complete, signal }) {
 	update_Controls();
 	for (const [type, port] of Object.entries(connections)) {
 		bind_Click(`#part-${type}`, () => {
-			if (type !== 'battery' && bench.installed.has('battery')) {
-				set_Status(copy.disconnectPower, 'warn');
-				return;
+			const item = copy.items[type];
+			const info = `${item.title} · ${item.detail}`;
+			detail.textContent = info;
+			let notice = info;
+			let state = '';
+			if (phase === 'wiring') {
+				if (type !== 'battery' && bench.installed.has('battery')) {
+					notice = `${info} ${copy.disconnectPower}`;
+					state = 'warn';
+				} else if (bench.installed.delete(type)) {
+					bench.selected = null;
+					notice = `${info} ${copy.unplugged}`;
+				} else bench.selected = type;
 			}
-			if (bench.installed.delete(type)) {
-				bench.selected = null;
-				set_Status(copy.unplugged);
-				update_Controls();
-				return;
-			}
-			bench.selected = type;
-			set_Status('');
+			set_Status(notice, state, true);
 			update_Controls();
 		}, signal);
 		bind_Click(`#port-${port}`, () => {
@@ -92,8 +118,6 @@ export function start_Assembly({ mount, complete, signal }) {
 			bench.installed.add(type);
 			bench.selected = null;
 			update_Controls();
-			const nextPart = query('.part-button:not(:disabled)') || query('#check');
-			nextPart.focus({ preventScroll: true });
 			set_Status(bench.installed.size === partOrder.length ? copy.good : `${copy.installed} ${bench.installed.size} / ${partOrder.length}`, 'success');
 		}, signal);
 	}
@@ -108,12 +132,12 @@ export function start_Assembly({ mount, complete, signal }) {
 		return bench.pick(position.x * 2 - 1, 1 - position.y * 2);
 	}
 	canvas.addEventListener('pointerdown', event => {
-		if (bench.turn < 1 || event.button !== 0 || dragging) return;
+		if (event.button !== 0 || dragging || lastX !== null) return;
 		const position = point(event);
 		const control = controlAt(position);
 		if (!control) return;
 		query(`#${control}`).click();
-		if (control.startsWith('part-') && bench.selected) {
+		if (phase === 'wiring' && control === `part-${bench.selected}`) {
 			dragging = { id: event.pointerId, position };
 			canvas.setPointerCapture(event.pointerId);
 		}
@@ -139,6 +163,7 @@ export function start_Assembly({ mount, complete, signal }) {
 			wires.height = height;
 		}
 		ink.clearRect(0, 0, width, height);
+		if (!bench.lidOpen) return;
 		for (const type of partOrder) {
 			const moving = dragging && type === bench.selected;
 			if (!moving && !bench.installed.has(type)) continue;
@@ -159,6 +184,6 @@ export function start_Assembly({ mount, complete, signal }) {
 		}
 	};
 	bind_Click('#rotate', () => bench.rotate(), signal);
-	bind_Click('#check', () => complete(Math.max(55, 100 - errors * 6)), signal);
+	bench.score = () => Math.max(0, bench.installed.size * 12 + (phase === 'opening' ? 0 : 8) + (bench.lidOpen || phase === 'opening' ? 0 : 10) + (phase === 'secured' ? 10 : 0) - errors * 6);
 	return bench;
 }

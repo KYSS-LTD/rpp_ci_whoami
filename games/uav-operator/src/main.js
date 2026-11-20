@@ -9,7 +9,7 @@ import { debug_Message, publish_Result, read_Progress, save_Progress } from './p
 import { create_Home, create_Renderer, resize_Frame } from './scenes.js';
 import { start_Survey } from './survey.js';
 import { text } from './text.js';
-import { bind_Click, glyphs, query } from './ui.js';
+import { bind_Click, bind_Stage, glyphs, query } from './ui.js';
 
 const app = query('#app');
 const progress = read_Progress();
@@ -97,6 +97,7 @@ function mount(markup) {
 function open_Screen(nextPage) {
 	stop_Mode();
 	page = nextPage;
+	app.classList.toggle('playing', page.kind === 'stage');
 	controller = new AbortController();
 	back.hidden = page.kind === 'home';
 	best.hidden = !progress.best || page.kind !== 'home';
@@ -144,19 +145,22 @@ function show_Home(focus = true) {
 
 function show_Stage(index) {
 	const signal = open_Screen({ kind: 'stage', index });
-	mode = modes[index]({ mount, coast, renderer, signal, complete: score => {
-		progress.scores[index] = score;
-		if (progress.scores.length === 3) {
-			const total = progress.scores.reduce((sum, entry) => sum + entry, 0);
-			progress.best = Math.max(progress.best, total);
-			if (index === 2) publish_Result(progress.scores, total);
-		}
-		save_Progress(progress);
-		show_Debrief(index, score);
-	} });
-	bind_Click('#restart', () => show_Stage(index), signal);
-	focus_Heading();
+	mode = modes[index]({ mount, coast, renderer, signal });
+	bind_Stage({ signal, restart: () => show_Stage(index), exit: open_Home, focusScene: mode.focus,
+		submit: () => save_Stage(index, mode.score()),
+	});
 	schedule_Frame();
+}
+
+function save_Stage(index, score) {
+	progress.scores[index] = score;
+	if (progress.scores.length === 3) {
+		const total = progress.scores.reduce((sum, entry) => sum + entry, 0);
+		progress.best = Math.max(progress.best, total);
+		if (index === 2) publish_Result(progress.scores, total);
+	}
+	save_Progress(progress);
+	show_Debrief(index, score);
 }
 
 function show_Debrief(index, score) {
@@ -226,6 +230,7 @@ try {
 		event.preventDefault();
 		graphicsLost = true;
 		stop_Mode();
+		app.classList.remove('playing');
 		screen.innerHTML = `<section class="result-card"><p role="alert">${text.graphicsLost}</p><button class="button button-primary" id="restore">${text.restore}</button></section>`;
 		bind_Click('#restore', () => location.reload());
 	});

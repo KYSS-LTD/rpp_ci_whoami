@@ -96,19 +96,42 @@ h1, h2, p { margin: 0; }
 .card-summary { font-size: .89rem; color: var(--muted); line-height: 1.45; }
 .home-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .3rem .9rem; margin-block-start: 1.48rem; padding-block-start: .85rem; border-top: 1px solid var(--line); color: #9aa59a; font: 500 .72rem/1.55 var(--mono); }
 
-.mission-heading { display: flex; justify-content: space-between; align-items: end; gap: .5rem; margin-block-end: 1rem; }
-.mission-heading .micro { color: #bbda91; margin-block-end: .35rem; }
-.mission-heading h1 { font-size: clamp(1.6rem, 1rem + 2.7vw, 3.2rem); letter-spacing: -.06em; line-height: 1.12; }
-.mission-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(265px, 315px); align-items: start; gap: 1rem; }
-.scene-column { min-inline-size: 0; }
-.scene-frame { position: relative; isolation: isolate; aspect-ratio: 16 / 10; border-radius: 15px; background: #30473b; outline: 1px solid #435246; }
-.scene-frame .canvas-slot { border-radius: inherit; overflow: hidden; }
-.view-label, .scene-button { position: absolute; top: .8rem; left: .8rem; border-radius: 7px; padding: .49rem .65rem; background: #16241ff0; border: 1px solid #7c988984; color: #eef6e6; font: 500 clamp(.66rem, .62rem + .2vw, .78rem)/1.3 var(--mono); letter-spacing: .045em; pointer-events: none; }
-.scene-button { top: auto; bottom: .7rem; pointer-events: auto; font-family: inherit; letter-spacing: 0; font-size: .83rem; font-weight: 750; }
-.scene-button:hover { background: #2b4639; }
-.control-panel { display: grid; gap: .75rem; padding: 1rem; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
-.mission-guide { font-size: .96rem; line-height: 1.57; font-weight: 700; }
-.control-panel h2 { font-size: .91rem; line-height: 1.3; }
+.playing .site-header { display: none; }
+.playing #screen { max-inline-size: none; padding: 0; }
+.mission-view {
+	--edge-top: max(.7rem, env(safe-area-inset-top));
+	--edge-right: max(.7rem, env(safe-area-inset-right));
+	--edge-left: max(.7rem, env(safe-area-inset-left));
+	--edge-bottom: max(.75rem, env(safe-area-inset-bottom));
+	position: relative; block-size: 100dvh; isolation: isolate; overflow: clip;
+}
+.scene-frame { position: absolute; inset: 0; isolation: isolate; background: #202824; }
+.scene-frame:focus { outline: none; }
+.stage-menu-button { position: absolute; z-index: 5; inset: var(--edge-top) var(--edge-right) auto auto; inline-size: 46px; padding: 0; font-size: 1.25rem; }
+.stage-menu, .flight-map, .stage-dialog { color: var(--paper); border: 1px solid #536451; border-radius: 12px; background: #171f1bee; padding: 1rem; }
+.stage-menu { position: fixed; z-index: 8; inset: calc(var(--edge-top) + 3.2rem) var(--edge-right) auto auto; margin: 0; inline-size: min(24rem, calc(100% - var(--edge-left) - var(--edge-right))); max-block-size: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 3.2rem); overflow: auto; overscroll-behavior: contain; }
+.stage-menu:popover-open { display: grid; gap: .8rem; }
+.stage-menu:not([popover]):not([hidden]) { display: grid; gap: .8rem; }
+.overlay-heading { display: flex; align-items: center; justify-content: space-between; gap: .7rem; }
+.overlay-heading h2 { font-size: 1.05rem; }
+.close-overlay { padding: 0; font-size: 1.25rem; }
+.stage-dialog { inline-size: min(32rem, calc(100% - 2rem)); max-block-size: calc(100dvh - 2rem); overflow: auto; padding: clamp(1rem, 4vw, 1.6rem); }
+.stage-dialog[open] { display: grid; gap: .85rem; }
+.stage-dialog h2 { line-height: 1.22; }
+.stage-dialog p { color: #cbd7c9; line-height: 1.5; }
+.dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .5rem; }
+.mission-view dialog:modal { overscroll-behavior: contain; }
+.mission-view dialog::backdrop { background: #070c09b5; overflow: hidden; overscroll-behavior: contain; }
+.stage-status { position: absolute; z-index: 4; inset: calc(var(--edge-top) + 6.8rem) auto auto 50%; transform: translateX(-50%); inline-size: max-content; max-inline-size: min(88%, 42rem); padding: .55rem .85rem; background: #122019ed; border: 1px solid #506855; border-radius: 7px; color: #e4ece2; font: 500 clamp(.74rem, 1.5vw, .88rem)/1.4 var(--mono); text-align: center; opacity: 0; pointer-events: none; }
+.stage-status[data-visible="true"] { opacity: 1; }
+.scene-actions { position: absolute; inset: auto var(--edge-right) var(--edge-bottom) var(--edge-left); display: flex; justify-content: center; pointer-events: none; }
+.scene-actions button { pointer-events: auto; }
+.survey-view .scene-frame { background: #151d19; }
+.survey-view :is(.canvas-slot, #annotations) { inset: 50% auto auto 50%; inline-size: min(100%, 160dvh); aspect-ratio: 8 / 5; transform: translate(-50%, -50%); }
+.survey-view #annotations:focus-visible { outline-offset: -2px; }
+#classification-feedback:empty { display: none; }
+#classification-feedback { color: #ffc081; }
+
 .diagram { border: 1px solid #354239; border-radius: 9px; background: #131b16; padding: .68rem; }
 .diagram .micro { margin-block-end: .46rem; }
 .diagram-grid { display: grid; gap: .37rem; }
@@ -125,18 +148,15 @@ h1, h2, p { margin: 0; }
 .port-button:disabled:not([data-installed="true"]) { color: #929d90; background: #1d251e; }
 .port-grid { display: grid; grid-template-columns: repeat(3, minmax(44px, 1fr)); gap: .35rem; }
 .port-button { font: 500 .78rem var(--mono); }
-.detail, .lesson { color: #b9c4b8; font-size: .88rem; line-height: 1.5; }
+.detail { color: #b9c4b8; font-size: .88rem; line-height: 1.5; }
 .detail { min-block-size: 3em; }
-.stage-status { min-block-size: 2.6em; color: #c7d0c3; font-size: .85rem; line-height: 1.45; }
 .stage-status[data-state="success"] { color: #d8ff9f; }
 .stage-status[data-state="warn"] { color: #ffc081; }
-.scene-column > .stage-status { margin-block: .38rem .16rem; padding: .64rem .8rem; border: 1px solid var(--line); border-radius: 8px; background: #18211a; }
 .assembly-view canvas { cursor: crosshair; }
 .keyboard-note, .joystick-note { font-size: .81rem; color: #aab8ab; line-height: 1.45; }
-.scene-column > .keyboard-note { padding-block-start: .65rem; }
 
 .fpv-osd {
-	position: absolute; inset: 6% 6.5% 7%;
+	position: absolute; inset: max(4rem, calc(var(--edge-top) + 3rem)) max(3.5%, var(--edge-right)) calc(var(--edge-bottom) + 3.75rem) max(3.5%, var(--edge-left));
 	color: #f6f7ef; font: 500 clamp(.55rem, 1.55vw, 1rem)/1.24 var(--mono);
 	font-variant-numeric: tabular-nums; text-shadow: 1px 0 #131512, -1px 0 #131512, 0 -1px #131512, 0 1px #131512, 1px 2px 2px #131512;
 	pointer-events: none; z-index: 2;
@@ -152,11 +172,15 @@ h1, h2, p { margin: 0; }
 .fpv-reticle::before { left: 0; }
 .fpv-reticle::after { right: 0; }
 #battery[data-low="true"], #osd-state { color: #fff0b2; }
+.signal-lost .fpv-reticle, .signal-lost #waypoints { display: none; }
+.signal-lost #osd-state { inset: 50% auto auto 50%; transform: translate(-50%, -50%); background: #132019ed; border: 1px solid #9caa94; padding: .6rem .85rem; font-size: clamp(.9rem, 2.8vw, 1.6rem); white-space: nowrap; }
 .fpv-controls { display: grid; gap: .45rem; }
 .fpv-controls label { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.03fr); gap: .32rem; align-items: center; color: var(--muted); font: 500 .75rem var(--mono); }
 .fpv-controls select { font: inherit; min-inline-size: 0; min-block-size: 2.15rem; color: var(--paper); padding-inline: .35rem; background: #17231e; border: 1px solid #4d6356; border-radius: 4px; }
 .fpv-controls select:disabled { opacity: .63; }
-.flight-view #map { display: block; margin: .52rem auto 0; width: min(100%, 182px); height: auto; border: 1px solid #5f7065; border-radius: 2px; }
+.flight-map { position: absolute; z-index: 5; inset: calc(var(--edge-top) + 3.2rem) auto auto var(--edge-left); inline-size: min(15.5rem, calc(100% - var(--edge-left) - var(--edge-right))); max-block-size: calc(100dvh - var(--edge-top) - var(--edge-bottom) - 3.2rem); overflow: auto; }
+.flight-map .sector-list { margin-top: .55rem; }
+.flight-view #map { display: block; margin: .52rem auto 0; width: min(100%, 182px, 32dvh); height: auto; border: 1px solid #5f7065; border-radius: 2px; }
 .kit-profile p { margin-top: .23rem; color: var(--muted); font: 500 .74rem/1.55 var(--mono); }
 .world-marker { position: absolute; transform: translate(-50%, -50%); border: 1px solid #d3f087; border-radius: 7px; min-inline-size: 1.55rem; min-block-size: 1.55rem; display: grid; place-items: center; color: #e7ffa2; background: #172822e8; font: 500 .85rem var(--mono); pointer-events: none; }
 .world-marker#marker-H { color: #9ff5ce; border-color: #a7e5c0; }
@@ -166,16 +190,30 @@ h1, h2, p { margin: 0; }
 .sector-list .captured::after { content: ' ✓'; }
 .flight-photo { margin: 0; display: grid; gap: .35rem; font: 500 .72rem var(--mono); color: var(--muted); }
 .flight-photo canvas { inline-size: 100%; block-size: auto; border-radius: 7px; }
-.flight-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; justify-items: center; gap: .36rem; padding: .65rem .3rem .2rem; }
-.joystick-group { display: grid; justify-items: center; gap: .24rem; text-align: center; color: #b9c8ba; font-size: .72rem; }
+.flight-controls { position: absolute; z-index: 3; inset: auto var(--edge-right) var(--edge-bottom) var(--edge-left); display: none; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; justify-items: center; gap: .36rem; pointer-events: none; }
+#flight-action { grid-column: 2; grid-row: 1; pointer-events: auto; }
+.joystick-group { display: grid; grid-row: 1; justify-items: center; gap: .24rem; text-align: center; color: #f1f4eb; text-shadow: 1px 1px #121812; font-size: .72rem; }
+.joystick-group:first-child { grid-column: 1; justify-self: start; }
+.joystick-group:last-child { grid-column: 3; justify-self: end; }
 .joystick { display: grid; place-items: center; inline-size: clamp(66px, 14vw, 91px); aspect-ratio: 1; border: 1px solid #526952; border-radius: 50%; background: radial-gradient(circle, #334638 0 7%, #28392d 8% 36%, #354b3a 37% 38%, #233127 39% 68%, #344c37 69% 71%, #25352a 72%); touch-action: none; -webkit-user-select: none; user-select: none; cursor: grab; }
 .joystick:active { cursor: grabbing; }
 .joystick i { display: block; inline-size: 41%; aspect-ratio: 1; border-radius: 50%; background: #829f65; border: 1px solid #b5d592; box-shadow: 0 3px 8px #0b150f9c; pointer-events: none; }
 .photo-flash::after { position: absolute; content: ''; inset: 0; border-radius: inherit; background: #ffffff42; pointer-events: none; }
 
+@media (any-pointer: coarse) {
+	.flight-controls { display: grid; }
+	.joystick { pointer-events: auto; }
+	#flight-action { padding-inline: .68rem; font-size: clamp(.77rem, 2.7vw, .9rem); }
+	.fpv-osd { inset-block-end: calc(var(--edge-bottom) + clamp(5.4rem, 16vw, 7.25rem)); }
+}
+
+@media (any-pointer: coarse) and (max-height: 440px) {
+	.fpv-osd { inset-block-end: calc(var(--edge-bottom) + 5.5rem); }
+	.joystick { inline-size: 65px; }
+	.stage-status { inset-block-start: calc(var(--edge-top) + 5.7rem); }
+}
+
 #annotations { position: absolute; inset: 0; border-radius: inherit; cursor: crosshair; touch-action: none; -webkit-user-select: none; user-select: none; }
-.photo-count { inset-inline: auto .8rem; }
-.photo-count b { color: var(--accent); white-space: nowrap; }
 .photo-box { position: absolute; border: 2px solid #f3ffd6; background: #ecff911d; box-shadow: 0 0 0 1px #153026; pointer-events: none; }
 .photo-box.accepted { border-color: #146342; background: #82ff7935; }
 .photo-hint { position: absolute; border: 2px dashed #fff5be; border-radius: 50%; box-shadow: 0 0 0 1px #442c20; pointer-events: none; }
@@ -207,10 +245,6 @@ h1, h2, p { margin: 0; }
 .score-list strong { color: var(--accent); font: 500 .81rem var(--mono); white-space: nowrap; }
 .boot-status { padding: 1.5rem 0; }
 
-@media (max-width: 850px) {
-	.mission-layout { grid-template-columns: minmax(0, 1fr) minmax(240px, 285px); gap: .75rem; }
-	.control-panel { padding: .8rem; }
-}
 @media (max-width: 670px) {
 	.topbar { min-block-size: 60px; }
 	.hero { min-block-size: 31rem; align-items: end; }
@@ -220,19 +254,8 @@ h1, h2, p { margin: 0; }
 	.hero h1 { margin-block: .72rem .66rem; }
 	.hero-intro { max-inline-size: 33ch; }
 	.hero-action { margin-block-start: .95rem; }
-	.mission-cards, .mission-layout { grid-template-columns: minmax(0, 1fr); }
+	.mission-cards { grid-template-columns: minmax(0, 1fr); }
 	.mission-card { padding: .8rem .9rem .96rem; }
-	.mission-view:not(.survey-view) .scene-frame { aspect-ratio: 1.27; }
-	.view-label { top: .45rem; left: .45rem; }
-	.photo-count { left: auto; right: .45rem; }
-}
-@media (pointer: coarse) {
-	.flight-view .keyboard-note, .survey-view .keyboard-note { display: none; }
-}
-@media (orientation: landscape) and (max-height: 510px) and (pointer: coarse) {
-	.flight-view .scene-frame { aspect-ratio: auto; height: 66dvh; min-height: 170px; }
-	.flight-view .flight-controls { position: relative; z-index: 3; margin-block-start: -44px; padding-inline: .5rem; }
-	.flight-view .fpv-bottom { bottom: 37px; }
 }
 
 .assembly-view canvas { touch-action: none; }

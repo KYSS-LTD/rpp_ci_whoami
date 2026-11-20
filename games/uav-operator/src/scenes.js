@@ -118,7 +118,7 @@ export function create_Bench() {
 	let angle = .20;
 	let lastAngle;
 	return {
-		turn: 0, tool: false, scene, camera, installed: new Set(), selected: null,
+		turn: 0, tool: false, lidOpen: false, scene, camera, installed: new Set(), selected: null,
 		wireEnds(type) {
 			const part = parts[type];
 			const plug = part.model.position.clone();
@@ -141,11 +141,11 @@ export function create_Bench() {
 			camera.lookAt(0, 0, 0);
 		},
 		update(delta, time) {
-			driver.visible = this.tool && this.turn < 1;
+			driver.visible = this.tool && !this.lidOpen;
 			driver.rotation.y = screw.rotation.y = this.turn * Math.PI * 6;
 			driver.position.y = .75 + this.turn * .23;
 			screw.position.y = .11 + this.turn * .23;
-			lid.position.z = THREE.MathUtils.lerp(lid.position.z, this.turn >= 1 ? -3.25 : 0, 1 - Math.exp(-7 * delta));
+			lid.position.z = THREE.MathUtils.lerp(lid.position.z, this.lidOpen ? -3.25 : 0, 1 - Math.exp(-7 * delta));
 			for (const [type, part] of Object.entries(parts)) {
 				const installed = this.installed.has(type);
 				const selected = this.selected === type;

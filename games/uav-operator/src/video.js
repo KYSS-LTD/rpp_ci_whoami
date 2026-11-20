@@ -7,7 +7,7 @@ export function create_AnalogFeed(renderer) {
 	const size = new THREE.Vector2();
 	const uniforms = {
 		image: { value: target.texture }, pixels: { value: new THREE.Vector2() },
-		clock: { value: 0 }, signalLoss: { value: 0 }, noise: { value: 0 },
+		clock: { value: 0 }, signalLoss: { value: 0 }, noise: { value: 0 }, dropout: { value: 0 },
 	};
 	const material = new THREE.ShaderMaterial({
 		uniforms, depthWrite: false, depthTest: false,
@@ -16,7 +16,7 @@ export function create_AnalogFeed(renderer) {
 		fragmentShader: `
 			uniform sampler2D image;
 			uniform vec2 pixels;
-			uniform float clock, signalLoss, noise;
+			uniform float clock, signalLoss, noise, dropout;
 			varying vec2 coord;
 			float hash(vec2 point) {
 				return fract(sin(dot(point, vec2(127.1, 311.7))) * 43758.5453);
@@ -38,6 +38,15 @@ export function create_AnalogFeed(renderer) {
 				color *= 1.0 - .15 * smoothstep(.38, 1.9, radius) - stripe;
 				color += noise * (grain * (.029 + signalLoss * .15) + .011 * sin(field * 1.17));
 				color = mix(color, vec3(.42 + grain * .65), band * signalLoss * noise * .32);
+				if (dropout > .5) {
+					float burst = floor(clock * 22.0);
+					float raster = floor(coord.y * 360.0);
+					float snow = hash(vec2(floor(coord.x * 640.0), raster + burst * 111.0));
+					float tear = hash(vec2(floor(raster / 12.0), floor(burst / 3.0)));
+					float streak = hash(vec2(floor(coord.x * 36.0 + tear * 20.0), raster + burst));
+					color = vec3(.014 + .23 * snow * snow + .11 * step(.77, tear) * streak);
+					color *= .55 + .45 * mod(raster, 2.0);
+				}
 				gl_FragColor = vec4(max(color, vec3(0.0)), 1.0);
 				#include <tonemapping_fragment>
 				#include <colorspace_fragment>
@@ -45,7 +54,7 @@ export function create_AnalogFeed(renderer) {
 	});
 	const quad = new FullScreenQuad(material);
 	return {
-		render(scene, camera, time, signalLoss, noise) {
+		render(scene, camera, time, signalLoss, noise, dropout = false) {
 			renderer.getDrawingBufferSize(size);
 			const height = Math.max(1, Math.min(size.y, 480));
 			const width = Math.max(1, Math.min(size.x, Math.round(height * size.x / size.y)));
@@ -54,9 +63,12 @@ export function create_AnalogFeed(renderer) {
 			uniforms.clock.value = time;
 			uniforms.signalLoss.value = signalLoss;
 			uniforms.noise.value = noise;
-			renderer.setRenderTarget(target);
-			try { renderer.render(scene, camera); }
-			finally { renderer.setRenderTarget(null); }
+			uniforms.dropout.value = Number(dropout);
+			if (!dropout) {
+				renderer.setRenderTarget(target);
+				try { renderer.render(scene, camera); }
+				finally { renderer.setRenderTarget(null); }
+			}
 			quad.render(renderer);
 		},
 		dispose() {

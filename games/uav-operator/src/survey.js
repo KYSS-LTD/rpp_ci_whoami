@@ -1,5 +1,5 @@
 import { create_Photo } from './scenes.js';
-import { bind_Click, query, scene_Frame, set_Status, stage_Shell } from './ui.js';
+import { bind_Click, close_StageMenu, query, scene_Frame, set_Status, stage_Shell } from './ui.js';
 import { text } from './text.js';
 
 function rectangle(first, second) {
@@ -21,29 +21,32 @@ function match_Quality(box, target) {
 	return overlap / (targetArea + boxArea - overlap);
 }
 
-export function start_Survey({ mount, complete, signal }) {
+export function start_Survey({ mount, signal }) {
 	const photo = create_Photo();
 	const copy = text.survey;
 	const targetCount = photo.targets.length;
 	const scene = scene_Frame(`<div id="annotations" tabindex="0" role="region" aria-label="${copy.view}" aria-describedby="photo-keys">
 		<div class="photo-box" id="draft" hidden></div><div class="photo-hint" id="photo-hint" hidden></div>
 		<div class="photo-cursor" id="photo-cursor" hidden></div>
-		</div><span class="view-label">${copy.view}</span><span class="photo-count view-label">${copy.count} <b id="found-count">0 / ${targetCount}</b></span>`);
-	const panel = `<div class="diagram"><p class="micro">${copy.legend}</p><ul class="photo-legend">
+		</div>`);
+	const panel = `<div class="diagram"><p class="micro">${copy.count} <b id="found-count">0 / ${targetCount}</b></p><p class="micro">${copy.legend}</p><ul class="photo-legend">
 		${Object.entries(copy.kinds).map(([kind, entry]) => `<li><i aria-hidden="true" class="object-${kind}"></i><div><strong>${entry.title}</strong><span>${entry.detail}</span></div></li>`).join('')}
-		</ul></div><div class="photo-actions">
-		<label for="category">${copy.category}</label><select id="category" disabled><option value="">${copy.classify}</option>${Object.entries(copy.kinds).map(([kind, entry]) => `<option value="${kind}">${entry.title}</option>`).join('')}</select>
-		<button class="button button-primary wide" id="confirm" type="button" disabled>${copy.confirm}</button>
-		<div class="actions-row"><button class="button button-quiet" id="photo-help" type="button">${copy.hint}</button><button class="button button-quiet" id="photo-reset" type="button" disabled>${copy.cancel}</button></div>
-		</div>`;
-	mount(stage_Shell(2, scene, panel, `<p class="keyboard-note" id="photo-keys">${copy.keys}</p>`));
+		</ul></div><button class="button button-quiet" id="photo-help" type="button">${copy.hint}</button>`;
+	const controls = `<dialog class="stage-dialog" id="classify-photo" aria-labelledby="classify-title">
+		<h2 id="classify-title">${copy.classifyTitle}</h2><div class="photo-actions">
+		<label for="category">${copy.category}</label><select id="category" autofocus disabled><option value="">${copy.classify}</option>${Object.entries(copy.kinds).map(([kind, entry]) => `<option value="${kind}">${entry.title}</option>`).join('')}</select>
+		<p id="classification-feedback" role="status"></p></div><form method="dialog" class="dialog-actions">
+		<button class="button button-quiet" value="cancel">${copy.cancel}</button><button class="button button-primary" id="confirm" type="button" disabled>${copy.confirm}</button>
+		</form></dialog>`;
+	mount(stage_Shell(2, scene, panel, controls, `<p class="keyboard-note" id="photo-keys">${copy.keys}</p>`));
 	const overlay = query('#annotations');
 	const draft = query('#draft');
 	const hint = query('#photo-hint');
 	const cursor = query('#photo-cursor');
 	const category = query('#category');
 	const confirm = query('#confirm');
-	const reset = query('#photo-reset');
+	const classification = query('#classify-photo');
+	const feedback = query('#classification-feedback');
 	const found = new Set();
 	let errors = 0;
 	let hints = 0;
@@ -57,7 +60,6 @@ export function start_Survey({ mount, complete, signal }) {
 	function update_Controls() {
 		category.disabled = !selection;
 		confirm.disabled = !selection || !category.value;
-		reset.disabled = !selection && !anchor;
 	}
 
 	function show_Draft(box) {
@@ -82,7 +84,10 @@ export function start_Survey({ mount, complete, signal }) {
 			selection = box;
 			anchor = null;
 			show_Draft(box);
-			set_Status(copy.classify);
+			feedback.textContent = '';
+			update_Controls();
+			classification.showModal();
+			return;
 		}
 		update_Controls();
 	}
@@ -94,7 +99,7 @@ export function start_Survey({ mount, complete, signal }) {
 	}
 
 	overlay.addEventListener('pointerdown', event => {
-		if (event.button !== 0 || active) return;
+		if (event.button !== 0 || active || found.size === targetCount) return;
 		if (selection) clear_Draft();
 		cursor.hidden = true;
 		active = { id: event.pointerId, start: pointer_Point(event) };
@@ -114,6 +119,7 @@ export function start_Survey({ mount, complete, signal }) {
 		clear_Draft();
 	}, { signal });
 	overlay.addEventListener('keydown', event => {
+		if (found.size === targetCount) return;
 		const offset = event.shiftKey ? .042 : .012;
 		const shifts = { ArrowLeft: [-offset, 0], ArrowRight: [offset, 0], ArrowUp: [0, -offset], ArrowDown: [0, offset] };
 		if (event.key in shifts) {
@@ -134,13 +140,16 @@ export function start_Survey({ mount, complete, signal }) {
 		}
 	}, { signal });
 	category.addEventListener('change', update_Controls, { signal });
-	bind_Click('#photo-reset', () => {
-		clear_Draft();
-		overlay.focus({ preventScroll: true });
-		set_Status(copy.trace);
+	classification.addEventListener('close', () => {
+		if (classification.returnValue !== 'accepted') {
+			clear_Draft();
+			set_Status(copy.trace);
+		}
+		classification.returnValue = '';
 	}, signal);
 	bind_Click('#photo-help', () => {
-		if (!hint.hidden) return;
+		close_StageMenu();
+		if (!hint.hidden || found.size === targetCount) return;
 		const target = photo.targets.find(item => !found.has(item));
 		hints++;
 		hint.hidden = false;
@@ -151,7 +160,7 @@ export function start_Survey({ mount, complete, signal }) {
 		const [best] = photo.targets.map(target => ({ target, quality: match_Quality(selection, target) })).sort((first, second) => second.quality - first.quality);
 		if (best.quality < .20 || found.has(best.target) || best.target.kind !== category.value) {
 			errors++;
-			set_Status(best.quality < .20 ? copy.miss : found.has(best.target) ? copy.duplicate : copy.wrong, 'warn');
+			feedback.textContent = best.quality < .20 ? copy.miss : found.has(best.target) ? copy.duplicate : copy.wrong;
 			return;
 		}
 		found.add(best.target);
@@ -161,15 +170,15 @@ export function start_Survey({ mount, complete, signal }) {
 		label.setAttribute('aria-label', copy.kinds[category.value].title);
 		place_Box(label, best.target);
 		overlay.prepend(label);
-		if (found.size === targetCount) {
-			complete(Math.max(55, 88 + Math.round(12 * accuracy / targetCount) - errors * 5 - hints * 3));
-			return;
-		}
 		query('#found-count').textContent = `${found.size} / ${targetCount}`;
+		query('#photo-help').disabled = found.size === targetCount;
 		hint.hidden = true;
 		clear_Draft();
+		classification.close('accepted');
 		overlay.focus({ preventScroll: true });
-		set_Status(copy.found, 'success');
+		set_Status(found.size === targetCount ? copy.allFound : copy.found, 'success');
 	}, signal);
+	photo.score = () => Math.max(0, Math.round((88 * found.size + 12 * accuracy) / targetCount) - errors * 5 - hints * 3);
+	photo.focus = () => overlay.focus({ preventScroll: true });
 	return photo;
 }
