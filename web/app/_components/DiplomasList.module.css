@@ -1,0 +1,98 @@
+/* Дипломы: группа на игру, внутри карточки с медалью цвета рейтинга (бронза, серебро, золото). */
+
+.game {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+.list {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+	gap: 16px;
+}
+
+.diploma {
+	/* Цвет рейтинга по умолчанию: бронза. Ниже переопределяется по data-rating. */
+	--rating-color: var(--color-bronze);
+	--rating-soft: var(--color-bronze-soft);
+
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 20px;
+	overflow: hidden;
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-top: 4px solid var(--rating-color);
+	border-radius: var(--radius);
+	box-shadow: var(--shadow-card);
+}
+
+.diploma[data-rating="silver"] {
+	--rating-color: var(--color-silver);
+	--rating-soft: var(--color-silver-soft);
+}
+
+.diploma[data-rating="gold"] {
+	--rating-color: var(--color-gold);
+	--rating-soft: var(--color-gold-soft);
+}
+
+/* Мягкая подсветка цветом рейтинга в углу карточки */
+.diploma::before {
+	content: "";
+	position: absolute;
+	top: -90px;
+	right: -90px;
+	width: 220px;
+	height: 220px;
+	border-radius: 50%;
+	background: radial-gradient(circle, var(--rating-soft) 0 35%, transparent 70%);
+	pointer-events: none;
+}
+
+.diploma > * {
+	position: relative;
+}
+
+/* Медаль: круг с бликом цвета рейтинга */
+.medal {
+	align-self: flex-start;
+	position: relative;
+	width: 44px;
+	height: 44px;
+	margin-bottom: 6px;
+	border-radius: 50%;
+	background: radial-gradient(circle at 35% 30%, rgb(255 255 255 / 0.7) 0 14%, var(--rating-color) 55%);
+	box-shadow:
+		0 0 0 4px var(--rating-soft),
+		inset 0 -3px 0 rgb(0 0 0 / 0.12);
+}
+
+.level {
+	font-size: 1.1rem;
+	font-weight: 650;
+}
+
+.detail {
+	font-size: 0.92rem;
+	color: var(--color-text-muted);
+}
+
+.rating {
+	align-self: flex-start;
+	padding: 3px 10px;
+	font-size: 0.82rem;
+	font-weight: 650;
+	color: var(--color-text);
+	background: var(--rating-soft);
+	border: 1px solid color-mix(in srgb, var(--rating-color) 50%, transparent);
+	border-radius: 999px;
+}
+
+.certificate {
+	width: 100%;
+	margin-top: 8px;
+}

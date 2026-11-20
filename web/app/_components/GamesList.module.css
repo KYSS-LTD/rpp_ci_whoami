@@ -1,0 +1,221 @@
+/* Экран игр: карточка игры, плитки уровней со статусом и оценка 1-5. */
+
+.gameCard {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+	padding: 0 0 24px;
+	overflow: hidden;
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-large);
+	box-shadow: var(--shadow-card);
+}
+
+/* Цветная полоса сверху карточки, только для вида */
+.gameCard::before {
+	content: "";
+	height: 8px;
+	background: linear-gradient(90deg, var(--color-accent), #ec4899 60%, #f59e0b);
+}
+
+.gameCard > * {
+	margin-inline: 24px;
+}
+
+.gameHead {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.gameHead h2 {
+	font-size: 1.5rem;
+}
+
+.gameHead p {
+	color: var(--color-text-muted);
+}
+
+.levels {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	gap: 12px;
+	counter-reset: level;
+}
+
+.level {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	grid-template-areas:
+		"title bars"
+		"status status"
+		"play play";
+	align-items: center;
+	gap: 10px 8px;
+	padding: 16px;
+	background: var(--color-surface-muted);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius);
+	counter-increment: level;
+	transition: border-color 0.15s;
+}
+
+.level:hover {
+	border-color: var(--color-border-strong);
+}
+
+.levelTitle {
+	grid-area: title;
+	font-weight: 650;
+	font-size: 1.05rem;
+}
+
+/* Полоски сложности: 1, 2 или 3 закрашены по номеру уровня */
+.bars {
+	grid-area: bars;
+	display: inline-flex;
+	align-items: flex-end;
+	gap: 3px;
+	height: 16px;
+}
+
+.bars span {
+	width: 5px;
+	border-radius: 2px;
+	background: var(--color-border-strong);
+}
+
+.bars span:nth-child(1) {
+	height: 7px;
+}
+
+.bars span:nth-child(2) {
+	height: 11px;
+}
+
+.bars span:nth-child(3) {
+	height: 16px;
+}
+
+.bars[data-difficulty="1"] span:nth-child(-n + 1),
+.bars[data-difficulty="2"] span:nth-child(-n + 2),
+.bars[data-difficulty="3"] span:nth-child(-n + 3) {
+	background: var(--color-accent);
+}
+
+.status {
+	grid-area: status;
+	justify-self: start;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 10px;
+	font-size: 0.82rem;
+	font-weight: 600;
+	color: var(--color-text-muted);
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: 999px;
+}
+
+.status::before {
+	content: "";
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--color-border-strong);
+}
+
+.level[data-completed="true"] .status {
+	color: var(--color-success);
+	background: var(--color-success-soft);
+	border-color: transparent;
+}
+
+.level[data-completed="true"] .status::before {
+	background: var(--color-success);
+}
+
+.play {
+	grid-area: play;
+	width: 100%;
+}
+
+.rating {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 16px;
+	padding-top: 20px;
+	border-top: 1px solid var(--color-border);
+}
+
+.rating legend {
+	float: left;
+	margin-right: 8px;
+	font-weight: 600;
+	color: var(--color-text-muted);
+}
+
+.ratingButtons {
+	display: inline-flex;
+	gap: 6px;
+}
+
+.ratingButtons button {
+	min-width: 40px;
+	min-height: 40px;
+	padding: 0;
+	border-radius: 50%;
+	font-weight: 650;
+}
+
+.ratingButtons button[aria-pressed="true"] {
+	color: var(--color-accent-contrast);
+	background: var(--color-accent);
+	border-color: var(--color-accent);
+}
+
+.ratingMessage {
+	align-self: flex-start;
+	padding: 8px 14px;
+	font-size: 0.92rem;
+	font-weight: 500;
+	color: var(--color-accent-soft-text);
+	background: var(--color-accent-soft);
+	border-radius: var(--radius-small);
+}
+
+@media (max-width: 600px) {
+	.gameCard {
+		gap: 16px;
+		padding-bottom: 18px;
+	}
+
+	.gameCard > * {
+		margin-inline: 16px;
+	}
+
+	.levels {
+		grid-template-columns: 1fr;
+	}
+
+	/* На телефоне плитка уровня в одну строку: название, статус, кнопка */
+	.level {
+		grid-template-columns: 1fr auto;
+		grid-template-areas:
+			"title bars"
+			"status play";
+		padding: 12px 14px;
+	}
+
+	.play {
+		width: auto;
+	}
+
+	.rating legend {
+		float: none;
+		width: 100%;
+	}
+}

@@ -1,0 +1,164 @@
+/* Личная страница: карточка соответствия профессиям с полосками, пройденные уровни и ачивки. */
+
+.player {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	align-self: flex-start;
+	padding: 6px 14px 6px 6px;
+	font-weight: 600;
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: 999px;
+}
+
+/* Круглый значок игрока */
+.player::before {
+	content: "";
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	background:
+		radial-gradient(circle at 50% 38%, rgb(255 255 255 / 0.85) 0 5px, transparent 5.5px),
+		radial-gradient(circle at 50% 100%, rgb(255 255 255 / 0.85) 0 10px, transparent 10.5px),
+		linear-gradient(135deg, var(--color-accent), #ec4899);
+}
+
+.analysis h2 {
+	margin-bottom: 18px;
+}
+
+.professions {
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+	counter-reset: profession;
+}
+
+.profession {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	counter-increment: profession;
+}
+
+.professionHead {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 10px;
+}
+
+/* Место в рейтинге профессий */
+.professionHead::before {
+	content: counter(profession);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	font-size: 0.82rem;
+	font-weight: 700;
+	color: var(--color-text-muted);
+	background: var(--color-surface-muted);
+	border-radius: 50%;
+}
+
+.professionName {
+	font-weight: 600;
+}
+
+.professionScore {
+	order: 1;
+	margin-left: auto;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+}
+
+.best {
+	padding: 2px 10px;
+	font-size: 0.78rem;
+	font-weight: 650;
+	color: var(--color-accent-soft-text);
+	background: var(--color-accent-soft);
+	border-radius: 999px;
+}
+
+.bar {
+	height: 10px;
+	overflow: hidden;
+	background: var(--color-surface-muted);
+	border-radius: 999px;
+}
+
+.barFill {
+	height: 100%;
+	min-width: 4px;
+	background: var(--color-border-strong);
+	border-radius: inherit;
+	transition: width 0.4s ease-out;
+}
+
+/* Лучшая профессия выделена цветом и крупнее */
+.profession[data-top="true"] .professionHead::before {
+	color: var(--color-accent-contrast);
+	background: var(--color-accent);
+}
+
+.profession[data-top="true"] .professionName,
+.profession[data-top="true"] .professionScore {
+	font-size: 1.1rem;
+}
+
+.profession[data-top="true"] .barFill {
+	background: linear-gradient(90deg, var(--color-accent), #ec4899);
+}
+
+.columns {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+	gap: 16px;
+}
+
+.columns h2 {
+	margin-bottom: 12px;
+	font-size: 1.1rem;
+}
+
+.columns ul {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.columns li {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+/* Маркер-галочка у пройденного уровня */
+.doneList li::before {
+	content: "";
+	flex: none;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	background:
+		linear-gradient(45deg, transparent 0 44%, var(--color-success) 44% 56%, transparent 56%) 7px 6px / 5px 8px no-repeat,
+		var(--color-success-soft);
+}
+
+/* Маркер-медаль у ачивки */
+.achievementList li::before {
+	content: "";
+	flex: none;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	background: radial-gradient(circle at 35% 30%, #fff6c8 0 18%, var(--color-gold) 60%);
+}
+
+.muted {
+	color: var(--color-text-muted);
+}

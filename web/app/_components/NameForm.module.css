@@ -1,0 +1,47 @@
+/* Форма имени перед первым уровнем: карточка по центру. */
+
+.wrapper {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	width: 100%;
+	max-width: 480px;
+	margin: 24px auto 0;
+}
+
+.wrapper > p {
+	color: var(--color-text-muted);
+}
+
+.form {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	margin-top: 8px;
+}
+
+.label {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	font-size: 0.92rem;
+	font-weight: 600;
+}
+
+.error {
+	padding: 8px 12px;
+	font-size: 0.92rem;
+	color: var(--color-danger);
+	background: var(--color-danger-soft);
+	border-radius: var(--radius-small);
+}
+
+.submit {
+	min-height: 46px;
+}
+
+@media (max-width: 600px) {
+	.wrapper {
+		margin-top: 8px;
+	}
+}

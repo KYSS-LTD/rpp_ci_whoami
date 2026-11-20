@@ -1,0 +1,74 @@
+/* Ачивки: сетка карточек. Полученные с золотой медалью, закрытые приглушены и с замком. */
+
+.list {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+	gap: 16px;
+}
+
+.item {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	align-content: start;
+	gap: 4px 14px;
+	padding: 18px;
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius);
+	box-shadow: var(--shadow-card);
+}
+
+/* Значок слева: золотая медаль у полученной ачивки */
+.item::before {
+	content: "";
+	grid-row: 1 / span 3;
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	background: radial-gradient(circle at 35% 30%, #fff6c8 0 16%, var(--color-gold) 58%);
+	box-shadow: 0 0 0 4px var(--color-gold-soft);
+}
+
+.item h2 {
+	align-self: center;
+	font-size: 1.05rem;
+}
+
+.description {
+	color: var(--color-text-muted);
+	font-size: 0.92rem;
+}
+
+.date {
+	justify-self: start;
+	margin-top: 6px;
+	padding: 2px 10px;
+	font-size: 0.8rem;
+	font-weight: 600;
+	color: var(--color-success);
+	background: var(--color-success-soft);
+	border-radius: 999px;
+}
+
+.item[data-awarded="false"] {
+	align-items: center;
+	background: transparent;
+	border-style: dashed;
+	border-color: var(--color-border-strong);
+	box-shadow: none;
+}
+
+.item[data-awarded="false"] h2 {
+	color: var(--color-text-muted);
+}
+
+/* Замок у закрытой ачивки: дужка рисуется рамкой, корпус фоном */
+.item[data-awarded="false"]::before {
+	grid-row: auto;
+	background:
+		linear-gradient(var(--color-text-muted), var(--color-text-muted)) center 62% / 18px 13px no-repeat,
+		radial-gradient(circle at 50% 42%, transparent 0 5px, var(--color-text-muted) 5.5px 8px, transparent 8.5px) center 28% / 22px 22px no-repeat,
+		var(--color-surface-muted);
+	box-shadow: none;
+	opacity: 0.8;
+}

@@ -1,0 +1,141 @@
+/* Шапка сайта: название, навигация и кнопка сброса. На телефоне навигация переносится на вторую строку. */
+
+.header {
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+	border-bottom: 1px solid var(--color-border);
+	backdrop-filter: saturate(1.4) blur(10px);
+	-webkit-backdrop-filter: saturate(1.4) blur(10px);
+}
+
+.inner {
+	display: flex;
+	align-items: center;
+	gap: 8px 24px;
+	max-width: var(--content-width);
+	margin: 0 auto;
+	padding: 12px 20px;
+}
+
+.brand {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	flex: none;
+	font-weight: 700;
+	font-size: 1.05rem;
+	letter-spacing: -0.01em;
+}
+
+/* Значок-логотип из CSS, без картинки */
+.brand::before {
+	content: "";
+	width: 28px;
+	height: 28px;
+	border-radius: 9px;
+	background:
+		radial-gradient(circle at 30% 30%, rgb(255 255 255 / 0.55) 0 18%, transparent 19%),
+		linear-gradient(135deg, var(--color-accent), #ec4899);
+}
+
+.nav {
+	flex: 1;
+	min-width: 0;
+}
+
+.navList {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.navLink {
+	display: inline-flex;
+	align-items: center;
+	min-height: 36px;
+	padding: 6px 12px;
+	font-size: 0.95rem;
+	font-weight: 500;
+	color: var(--color-text-muted);
+	border-radius: 999px;
+	transition:
+		background-color 0.15s,
+		color 0.15s;
+}
+
+.navLink:hover {
+	color: var(--color-text);
+	background: var(--color-surface-muted);
+}
+
+.navLink[aria-current="page"] {
+	color: var(--color-accent-soft-text);
+	background: var(--color-accent-soft);
+}
+
+.resetButton {
+	flex: none;
+	min-height: 36px;
+	padding: 6px 14px;
+	font-size: 0.9rem;
+	color: var(--color-danger);
+	background: transparent;
+	border-color: var(--color-border-strong);
+}
+
+.resetButton:hover:not(:disabled) {
+	color: var(--color-danger);
+	background: var(--color-danger-soft);
+	border-color: var(--color-danger);
+}
+
+@media (max-width: 760px) {
+	.inner {
+		flex-wrap: wrap;
+		justify-content: space-between;
+		gap: 6px 8px;
+		padding: 10px 16px 6px;
+	}
+
+	/* Навигация уходит на отдельную строку под названием и кнопкой */
+	.nav {
+		order: 3;
+		flex-basis: 100%;
+	}
+
+	.navList {
+		gap: 0;
+		margin-inline: -6px;
+	}
+
+	.navLink {
+		min-height: 34px;
+		padding: 4px 6px;
+		font-size: 0.85rem;
+	}
+
+	.brand {
+		gap: 8px;
+		font-size: 0.9rem;
+	}
+
+	.brand::before {
+		width: 24px;
+		height: 24px;
+		border-radius: 8px;
+	}
+
+	.resetButton {
+		min-height: 32px;
+		padding: 4px 9px;
+		font-size: 0.8rem;
+	}
+}
+
+@media (max-width: 360px) {
+	.brand::before {
+		display: none;
+	}
+}
