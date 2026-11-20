@@ -1,6 +1,13 @@
 // Проверка манифеста игры по контракту game-module-contract.
 
-import { requiredLevelIds, supportedContractVersion, type GameManifest, type ManifestValidation } from "./types";
+import {
+	gameBuildsPath,
+	gameFormats,
+	requiredLevelIds,
+	supportedContractVersion,
+	type GameManifest,
+	type ManifestValidation,
+} from "./types";
 
 function isNonEmptyString(value: unknown): value is string {
 	return typeof value === "string" && value.trim().length > 0;
@@ -45,6 +52,70 @@ function collectProfessionReasons(professionTags: unknown): string[] {
 	return reasons;
 }
 
+// Проверяет необязательные поля витрины. Отсутствующее поле не ошибка, неверный тип - ошибка.
+function collectPresentationReasons(manifest: Partial<GameManifest>): string[] {
+	const reasons: string[] = [];
+	if (manifest.format !== undefined && !gameFormats.includes(manifest.format)) {
+		reasons.push(`неизвестный формат игры: ${String(manifest.format)}, допустимы: ${gameFormats.join(", ")}`);
+	}
+	if (manifest.summary !== undefined && typeof manifest.summary !== "string") {
+		reasons.push("поле summary должно быть строкой");
+	}
+	if (manifest.preview !== undefined) {
+		const frames = (manifest.preview as { frames?: unknown } | null)?.frames;
+		if (!Array.isArray(frames) || frames.length === 0 || !frames.every(isNonEmptyString)) {
+			reasons.push("поле preview.frames должно быть непустым списком путей к кадрам");
+		}
+	}
+	if (
+		manifest.estimatedMinutes !== undefined &&
+		(typeof manifest.estimatedMinutes !== "number" || !(manifest.estimatedMinutes > 0))
+	) {
+		reasons.push(`время уровня должно быть положительным числом: ${String(manifest.estimatedMinutes)}`);
+	}
+	if (manifest.inDevelopment !== undefined && typeof manifest.inDevelopment !== "boolean") {
+		reasons.push("поле inDevelopment должно быть true или false");
+	}
+	return reasons;
+}
+
+// Проверяет объявление сборки: вид запуска iframe, путь внутри /game-builds/<gameId>/, положительный таймаут.
+// Путь без "..", "//", "\\" и схемы, чтобы сборка не указывала на чужую папку или внешний адрес.
+function collectRuntimeReasons(manifest: Partial<GameManifest>): string[] {
+	if (manifest.runtime === undefined) {
+		return [];
+	}
+	const runtime = manifest.runtime as { kind?: unknown; entry?: unknown; readyTimeoutSec?: unknown } | null;
+	if (!runtime || typeof runtime !== "object") {
+		return ["поле runtime должно быть объектом"];
+	}
+	const reasons: string[] = [];
+	if (runtime.kind !== "iframe") {
+		reasons.push(`неизвестный вид запуска: ${String(runtime.kind)}, допустим iframe`);
+	}
+	const expectedPrefix = `${gameBuildsPath}/${String(manifest.gameId)}/`;
+	const entry = runtime.entry;
+	if (!isNonEmptyString(entry)) {
+		reasons.push("не указан путь к сборке runtime.entry");
+	} else if (
+		!entry.startsWith(expectedPrefix) ||
+		entry.length === expectedPrefix.length ||
+		entry.includes("..") ||
+		entry.slice(1).includes("//") ||
+		entry.includes("\\") ||
+		entry.includes(":")
+	) {
+		reasons.push(`путь к сборке должен вести внутрь ${expectedPrefix}: ${entry}`);
+	}
+	if (
+		runtime.readyTimeoutSec !== undefined &&
+		(typeof runtime.readyTimeoutSec !== "number" || !Number.isFinite(runtime.readyTimeoutSec) || runtime.readyTimeoutSec <= 0)
+	) {
+		reasons.push(`время ожидания сборки должно быть положительным числом: ${String(runtime.readyTimeoutSec)}`);
+	}
+	return reasons;
+}
+
 // Проверяет манифест целиком и возвращает либо манифест, либо причины отказа.
 export function validateManifest(input: unknown, supportedVersion: number = supportedContractVersion): ManifestValidation {
 	const manifest = input as Partial<GameManifest> | null;
@@ -64,6 +135,8 @@ export function validateManifest(input: unknown, supportedVersion: number = supp
 	}
 	reasons.push(...collectLevelReasons(manifest.levels));
 	reasons.push(...collectProfessionReasons(manifest.professionTags));
+	reasons.push(...collectPresentationReasons(manifest));
+	reasons.push(...collectRuntimeReasons(manifest));
 
 	if (reasons.length > 0) {
 		return { ok: false, reasons };

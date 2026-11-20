@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Сторонние библиотеки внутри сборок iframe-игр (например, three.js) не проверяются.
+    "public/game-builds/**/vendor/**",
   ]),
 ]);
 

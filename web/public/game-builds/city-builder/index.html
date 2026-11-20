@@ -1,0 +1,48 @@
+<!doctype html>
+<!--
+	Игра "Город будущего" на three.js: пример игры, которая подключается к порталу готовой веб-сборкой.
+	Портал открывает страницу в изолированном фрейме: /game-builds/city-builder/index.html?level=easy.
+	Мост с порталом: portal-bridge.js (копия sdk/web/portal-bridge.js). Тексты сцены: texts.js.
+-->
+<html lang="ru">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Город будущего</title>
+		<link rel="stylesheet" href="style.css" />
+	</head>
+	<body>
+		<div id="scene"></div>
+
+		<div id="loading" class="loading">
+			<span class="spinner"></span>
+			<span data-text="loading"></span>
+		</div>
+
+		<header class="hud" hidden>
+			<div class="goal">
+				<strong id="level-title"></strong>
+				<span id="goal"></span>
+			</div>
+			<dl class="stats">
+				<div><dt data-text="budget"></dt><dd id="budget"></dd></div>
+				<div><dt data-text="population"></dt><dd id="population"></dd></div>
+				<div><dt data-text="energy"></dt><dd id="energy"></dd></div>
+			</dl>
+		</header>
+
+		<p id="hint" class="hint" hidden></p>
+
+		<footer class="toolbar" hidden>
+			<div class="tools" id="tools"></div>
+			<div class="actions">
+				<button type="button" id="exit" class="secondary" data-text="exit"></button>
+				<button type="button" id="finish" class="primary" data-text="finish"></button>
+			</div>
+		</footer>
+
+		<script src="portal-bridge.js"></script>
+		<script src="texts.js"></script>
+		<script type="module" src="game.js"></script>
+	</body>
+</html>

@@ -4,4 +4,6 @@
 export const professionNames: Record<string, string> = {
 	analyst: "Аналитик",
 	designer: "Дизайнер",
+	engineer: "Инженер",
+	programmer: "Программист",
 };

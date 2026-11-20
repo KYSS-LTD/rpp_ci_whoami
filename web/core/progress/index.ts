@@ -2,7 +2,9 @@
 import { achievementDefinitions, evaluateAchievements, grantAchievements, type AwardedAchievement } from "../achievements";
 import { isValidRating } from "../analysis";
 import { issueDiploma, type Diploma } from "../diplomas";
+import { validateLevelResult } from "../contract/result";
 import type { LevelResult } from "../contract/types";
+import { debugLog } from "../debug";
 import { platformStorage, storageKeys, type PlatformStorage, type StorageWriteResult } from "../storage";
 
 // Подписчики, которым нужно перерисоваться при изменении прогресса.
@@ -73,23 +75,33 @@ export function readAwardedAchievements(storage: PlatformStorage = platformStora
 	return storage.read<AwardedAchievement[]>(storageKeys.achievements, []);
 }
 
-// Итог сохранения попытки: статус записи и ачивки, выданные именно за эту попытку.
+// Итог сохранения попытки: принят ли результат, статус записи и ачивки, выданные именно за эту попытку.
+// Если результат не прошёл проверку, accepted = false, в хранилище ничего не пишется, а writeResult остаётся { ok: true }.
 export interface RecordOutcome {
+	accepted: boolean;
+	invalidReasons: string[];
 	writeResult: StorageWriteResult;
 	newlyAwarded: AwardedAchievement[];
 	newDiploma: Diploma | null;
 }
 
 // Сохраняет попытку уровня и выдает ачивки. Попытки с completed=false хранятся, но не дают наград.
+// Результат сначала проверяется: неверный не сохраняется и не даёт наград.
 export function recordLevelResult(
 	result: LevelResult,
 	storage: PlatformStorage = platformStorage,
 	awardedAt: string = new Date().toISOString(),
 ): RecordOutcome {
+	const validation = validateLevelResult(result);
+	if (!validation.ok) {
+		debugLog("progress", "результат уровня отклонён", validation.reasons, result);
+		return { accepted: false, invalidReasons: validation.reasons, writeResult: { ok: true }, newlyAwarded: [], newDiploma: null };
+	}
+
 	const attempts = readLevelResults(storage);
 	const writeResult = storage.write(storageKeys.levelResults, [...attempts, result]);
 	if (!writeResult.ok) {
-		return { writeResult, newlyAwarded: [], newDiploma: null };
+		return { accepted: true, invalidReasons: [], writeResult, newlyAwarded: [], newDiploma: null };
 	}
 
 	const earnedIds = evaluateAchievements(result, achievementDefinitions);
@@ -102,7 +114,7 @@ export function recordLevelResult(
 		storage.write(storageKeys.diplomas, [...readDiplomas(storage), diploma]);
 	}
 	notifyProgressChanged();
-	return { writeResult, newlyAwarded, newDiploma: diploma };
+	return { accepted: true, invalidReasons: [], writeResult, newlyAwarded, newDiploma: diploma };
 }
 
 // Сбрасывает результаты всех игр и профессий, имя сохраняется.

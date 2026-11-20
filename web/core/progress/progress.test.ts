@@ -71,3 +71,25 @@ describe("дипломы и имя", () => {
 		expect(readDiplomas(createPlatformStorage(backend))[0].playerName).toBe("Анна");
 	});
 });
+
+describe("проверка результата перед сохранением", () => {
+	it("результат с очками больше максимума не сохраняется и не даёт наград", () => {
+		const storage = createPlatformStorage(createMemoryBackend());
+		storage.write(storageKeys.playerName, "Анна");
+		const outcome = recordLevelResult({ ...completedEasy, score: 15, maxScore: 3 }, storage);
+		expect(outcome.accepted).toBe(false);
+		expect(outcome.invalidReasons.join(" ")).toContain("score больше maxScore");
+		expect(outcome.newlyAwarded).toEqual([]);
+		expect(outcome.newDiploma).toBeNull();
+		expect(storage.read(storageKeys.levelResults, [])).toEqual([]);
+		expect(readAwardedAchievements(storage)).toEqual([]);
+		expect(readDiplomas(storage)).toEqual([]);
+	});
+
+	it("валидный результат принимается и учитывается", () => {
+		const storage = createPlatformStorage(createMemoryBackend());
+		const outcome = recordLevelResult({ ...completedEasy, score: 2, maxScore: 3 }, storage);
+		expect(outcome.accepted).toBe(true);
+		expect(storage.read(storageKeys.levelResults, [])).toHaveLength(1);
+	});
+});
