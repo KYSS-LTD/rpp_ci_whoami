@@ -6,6 +6,8 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			"@": fileURLToPath(new URL("./", import.meta.url)),
+			// Шрифты next/font работают только в сборке Next.js, в тестах их заменяет заглушка.
+			"next/font/google": fileURLToPath(new URL("./test-stubs/next-font-google.ts", import.meta.url)),
 		},
 	},
 	test: {

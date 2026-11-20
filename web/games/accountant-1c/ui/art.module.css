@@ -1,0 +1,348 @@
+/* Цвета иллюстраций. Фикус и кружка стоят на столе и берут переменные портала (следуют теме),
+   персонажи, купюры, весы и штамп живут внутри окна программы и берут его светлую палитру (--acc-*). */
+
+/* ---------- Фикус ---------- */
+
+.ficus {
+	display: block;
+	width: 72px;
+	height: 100px;
+	overflow: visible;
+}
+
+.ficusPlant {
+	transform-origin: 40px 82px;
+	transition:
+		transform 0.6s ease,
+		filter 0.6s ease;
+}
+
+.ficusStem {
+	fill: none;
+	stroke: var(--color-accent-deep);
+	stroke-width: 3;
+	stroke-linecap: round;
+}
+
+.ficusLeaf {
+	fill: var(--color-accent);
+	stroke: var(--color-accent-deep);
+	stroke-width: 1;
+	transition: fill 0.6s ease;
+}
+
+.ficusFlowers circle {
+	fill: var(--color-highlight);
+	stroke: var(--color-surface);
+	stroke-width: 1.5;
+	opacity: 0;
+	transition: opacity 0.6s ease;
+}
+
+.ficusPot {
+	fill: var(--color-bronze);
+}
+
+.ficusPotRim {
+	fill: var(--color-bronze);
+	filter: brightness(0.85);
+}
+
+.ficus[data-state="blooming"] .ficusFlowers circle {
+	opacity: 1;
+}
+
+.ficus[data-state="wilting"] .ficusPlant {
+	transform: rotate(-9deg) scaleY(0.94);
+}
+
+.ficus[data-state="wilting"] .ficusLeaf {
+	fill: var(--color-gold);
+}
+
+.ficus[data-state="dry"] .ficusPlant {
+	transform: rotate(-16deg) scaleY(0.86);
+}
+
+.ficus[data-state="dry"] .ficusLeaf {
+	fill: var(--color-bronze-soft);
+	stroke: var(--color-bronze);
+}
+
+/* ---------- Кружка ---------- */
+
+.mug {
+	display: block;
+	width: 48px;
+	height: 48px;
+}
+
+.mugBody {
+	fill: var(--color-surface);
+	stroke: var(--color-border-strong);
+	stroke-width: 2;
+}
+
+.mugHandle {
+	fill: none;
+	stroke: var(--color-border-strong);
+	stroke-width: 4;
+}
+
+.mugStripe {
+	fill: var(--color-danger);
+	opacity: 0.75;
+}
+
+.steam {
+	fill: none;
+	stroke: var(--color-text-muted);
+	stroke-width: 2;
+	stroke-linecap: round;
+	opacity: 0.6;
+}
+
+/* ---------- Персонажи ---------- */
+
+.avatar {
+	display: block;
+	flex: none;
+	width: 40px;
+	height: 40px;
+}
+
+.avatarBg {
+	fill: var(--acc-avatar-bg, #f1e3c8);
+}
+
+.avatarBgAlt {
+	fill: var(--acc-avatar-bg-alt, #d7e6ea);
+}
+
+.skin {
+	fill: #f2c9a5;
+}
+
+.hairDark {
+	fill: #6b4a3a;
+}
+
+.hairGrey {
+	fill: none;
+	stroke: #8b8b8b;
+	stroke-width: 3;
+	stroke-linecap: round;
+}
+
+.shirtChief {
+	fill: var(--acc-accent, #2f7d7a);
+}
+
+.suit {
+	fill: #3c4a5c;
+}
+
+.tie {
+	fill: #c0392b;
+}
+
+.glasses {
+	fill: none;
+	stroke: #2b2a26;
+	stroke-width: 1.3;
+}
+
+.pearls circle {
+	fill: #fffaf0;
+	stroke: #c9c3b0;
+	stroke-width: 0.5;
+}
+
+.eye {
+	fill: #2b2a26;
+}
+
+.mouth {
+	fill: none;
+	stroke: #8a4b3a;
+	stroke-width: 1.4;
+	stroke-linecap: round;
+}
+
+.visitor {
+	display: block;
+	width: 64px;
+	height: 72px;
+}
+
+.visitorBody {
+	fill: #5b7fa6;
+}
+
+.visitorHair {
+	fill: #3b2f2a;
+}
+
+.visitor[data-variant="1"] .visitorBody {
+	fill: #8c6bb1;
+}
+
+.visitor[data-variant="1"] .visitorHair {
+	fill: #b0703a;
+}
+
+.visitor[data-variant="2"] .visitorBody {
+	fill: #c97b2a;
+}
+
+.visitor[data-variant="3"] .visitorBody {
+	fill: #4f8a5b;
+}
+
+.visitor[data-variant="3"] .visitorHair {
+	fill: #d9b46a;
+}
+
+/* ---------- Купюры ---------- */
+
+.banknotes {
+	display: block;
+	width: 90px;
+	height: 50px;
+}
+
+.noteBack {
+	fill: #b8d8b0;
+	stroke: #6f9a66;
+}
+
+.noteFront {
+	fill: #d6ecd0;
+	stroke: #6f9a66;
+}
+
+.noteMark {
+	fill: none;
+	stroke: #6f9a66;
+	stroke-width: 1.5;
+}
+
+/* ---------- Весы ---------- */
+
+.scales {
+	display: block;
+	width: 120px;
+	height: 90px;
+	overflow: visible;
+}
+
+.scalesBase,
+.scalesPost,
+.scalesPivot {
+	fill: var(--acc-muted, #6d6a60);
+}
+
+.scalesBeam {
+	transform-box: view-box;
+	transform-origin: 60px 16px;
+	transition: transform 0.5s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+.scalesString {
+	fill: none;
+	stroke: var(--acc-muted, #6d6a60);
+	stroke-width: 1;
+}
+
+.scalesPan {
+	fill: var(--acc-highlight, #f3d77a);
+	stroke: var(--acc-muted, #6d6a60);
+}
+
+/* ---------- Штамп ---------- */
+
+.stamp {
+	--stamp-color: #2f7d7a;
+	position: relative;
+	display: grid;
+	place-items: center;
+	width: min(260px, 100%);
+	aspect-ratio: 200 / 120;
+	color: var(--stamp-color);
+	transform: rotate(-7deg);
+}
+
+.stamp svg {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+}
+
+.stamp[data-stamp="approved"] {
+	--stamp-color: #2e7d3c;
+}
+
+.stamp[data-stamp="remarks"] {
+	--stamp-color: #b7791f;
+}
+
+.stamp[data-stamp="taxDemand"] {
+	--stamp-color: #b42318;
+}
+
+.stampFrame,
+.stampFrameInner {
+	fill: none;
+	stroke: var(--stamp-color);
+}
+
+.stampFrame {
+	stroke-width: 6;
+}
+
+.stampFrameInner {
+	stroke-width: 2;
+	stroke-dasharray: 6 4;
+}
+
+.stampText {
+	position: relative;
+	max-width: 80%;
+	font-size: 1.05rem;
+	font-weight: 800;
+	line-height: 1.15;
+	text-align: center;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+/* ---------- Значок окна ---------- */
+
+.appIcon {
+	display: block;
+	width: 20px;
+	height: 20px;
+}
+
+.appIconBg {
+	fill: var(--acc-accent, #2f7d7a);
+}
+
+.appIconLeaf {
+	fill: #f3d77a;
+}
+
+.appIconVein {
+	stroke: var(--acc-accent, #2f7d7a);
+	stroke-width: 1.2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ficusPlant,
+	.ficusLeaf,
+	.ficusFlowers circle,
+	.scalesBeam {
+		transition: none;
+	}
+}

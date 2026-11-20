@@ -1,0 +1,802 @@
+/* Мини-игры на рабочем месте. Бумаги на столе берут цвета стола (--ink, --paper, desk.module.css),
+   формы в программе на мониторе берут жёлто-красную палитру окна (--acc-*, AppWindow.module.css). */
+
+/* ---------- Формы в программе ---------- */
+
+.monitorForm {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+/* Кнопки формы всегда видны внизу экрана программы, даже когда журнал длинный. */
+.monitorForm > [role="toolbar"],
+.programForm > [role="toolbar"] {
+	position: sticky;
+	bottom: -8px;
+	z-index: 2;
+	padding: 6px 0;
+	background: linear-gradient(transparent, var(--acc-bg) 30%);
+}
+
+.formTitle {
+	font-size: 1rem;
+	font-weight: 700;
+	color: var(--acc-accent);
+}
+
+.instruction {
+	font-size: 0.78rem;
+	color: var(--acc-muted);
+}
+
+.counterLine {
+	font-weight: 700;
+}
+
+.areaTitle {
+	font-size: 0.74rem;
+	font-weight: 700;
+	color: var(--acc-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.tableScroll {
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+.table {
+	width: 100%;
+	font-size: 0.8rem;
+	border-collapse: collapse;
+	background: #ffffff;
+	border: 1px solid var(--acc-border);
+}
+
+.table th,
+.table td {
+	padding: 4px 6px;
+	text-align: left;
+	vertical-align: middle;
+	border-bottom: 1px solid #f0e6c4;
+}
+
+.table thead th {
+	font-weight: 700;
+	white-space: nowrap;
+	background: var(--acc-panel);
+}
+
+.table tbody th {
+	font-weight: 500;
+	white-space: nowrap;
+}
+
+.table tr[data-current="true"] {
+	background: var(--acc-highlight-soft);
+}
+
+.emptyCell {
+	color: var(--acc-muted);
+}
+
+.amountCell,
+.mono {
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.amountCell {
+	text-align: right;
+}
+
+.stampCell {
+	text-align: right;
+}
+
+.hint {
+	padding: 4px 8px;
+	font-size: 0.8rem;
+	background: var(--acc-highlight-soft);
+	border: 1px dashed var(--acc-yellow-strong);
+}
+
+.postingsLayout {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	gap: 10px;
+	align-items: start;
+}
+
+.postedCell {
+	width: 24px;
+}
+
+.postedMark {
+	display: inline-block;
+	width: 14px;
+	height: 14px;
+	border: 1.5px solid var(--acc-border);
+}
+
+.postedMark[data-posted="true"] {
+	background: var(--acc-success);
+	border-color: var(--acc-success);
+	clip-path: polygon(14% 52%, 0 66%, 38% 100%, 100% 22%, 86% 8%, 38% 72%);
+}
+
+.monitorForm .linkButton {
+	min-height: 0;
+	padding: 1px 0;
+	text-align: left;
+	color: var(--acc-text);
+	background: none;
+	border: none;
+}
+
+.monitorForm .linkButton:hover:not(:disabled) {
+	color: var(--acc-accent);
+	text-decoration: underline;
+	background: none;
+}
+
+.programForm {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px;
+	background: #ffffff;
+	border: 1px solid var(--acc-border);
+	border-top: 3px solid var(--acc-yellow);
+}
+
+.operationText {
+	font-weight: 700;
+}
+
+.postingFields {
+	display: grid;
+	gap: 6px;
+}
+
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	font-size: 0.78rem;
+	color: var(--acc-muted);
+}
+
+.movements {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 6px;
+	background: var(--acc-panel);
+	border: 1px solid var(--acc-border);
+}
+
+.cellInput {
+	width: 100%;
+	min-width: 72px;
+	max-width: 110px;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Бумаги на столе ---------- */
+
+.paperBody {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 6px;
+	padding: 8px 10px 10px;
+}
+
+.paperLines li {
+	padding: 1px 0;
+	border-bottom: 1px dotted var(--paper-line);
+}
+
+.childrenList {
+	padding-left: 18px;
+	list-style: decimal;
+}
+
+.currentPaper {
+	outline: 3px solid var(--yellow);
+	outline-offset: 2px;
+}
+
+.paperHeading {
+	font-family: var(--pixel);
+	font-size: 1rem;
+	font-weight: 400;
+	color: var(--ink);
+}
+
+/* Кнопка на бумаге: крупная, плоская, с тенью-ступенькой. */
+.paperButton {
+	min-height: 32px;
+	padding: 4px 12px;
+	font-family: var(--pixel);
+	font-size: 0.92rem;
+	font-weight: 400;
+	color: #1b1512;
+	background: var(--yellow);
+	border: 2px solid #1b1512;
+	border-radius: 0;
+	box-shadow: 0 3px 0 #1b1512;
+}
+
+.paperButton:hover:not(:disabled) {
+	background: #ffe066;
+}
+
+.paperButton:active:not(:disabled) {
+	box-shadow: 0 1px 0 #1b1512;
+	transform: translateY(2px);
+}
+
+.paperForm {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+	padding: 8px 10px 12px;
+}
+
+.paperField {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	width: 100%;
+	font-size: 0.76rem;
+	color: var(--ink-muted);
+}
+
+.paperField input,
+.computedLabel input,
+.balanceLine input {
+	min-height: 30px;
+	padding: 2px 6px;
+	font-family: var(--mono);
+	font-size: 1rem;
+	color: var(--ink-blue);
+	background: transparent;
+	border: none;
+	border-bottom: 2px solid var(--ink);
+	border-radius: 0;
+}
+
+.paperField input:focus,
+.computedLabel input:focus {
+	background: rgb(247 210 62 / 0.25);
+	outline: none;
+	box-shadow: none;
+}
+
+.fieldError {
+	font-size: 0.76rem;
+	color: var(--ink-red);
+}
+
+.tornForm {
+	animation: tearOff 0.35s steps(4) both;
+}
+
+@keyframes tearOff {
+	from {
+		clip-path: inset(0 0 100% 0);
+	}
+}
+
+/* ---------- Документы-кнопки и штампы (первичка) ---------- */
+
+.documentCard,
+.amountCard {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 3px;
+	width: 100%;
+	min-height: 70px;
+	padding: 8px 10px;
+	font-family: var(--mono);
+	font-size: 0.78rem;
+	font-weight: 400;
+	text-align: left;
+	color: var(--ink);
+	cursor: grab;
+	background: transparent;
+	border: none;
+	border-radius: 0;
+	user-select: none;
+}
+
+.documentCard:hover:not(:disabled),
+.amountCard:hover:not(:disabled) {
+	background: rgb(255 255 255 / 0.25);
+}
+
+.documentCard[aria-pressed="true"],
+.amountCard[aria-pressed="true"],
+.rowDraggable[aria-pressed="true"] {
+	background: rgb(247 210 62 / 0.4);
+	box-shadow: inset 0 0 0 3px var(--yellow);
+}
+
+.documentCard[data-dragging="true"],
+.amountCard[data-dragging="true"],
+.rowDraggable[data-dragging="true"] {
+	cursor: grabbing;
+}
+
+.documentTitle {
+	font-weight: 700;
+}
+
+.documentDetails {
+	font-size: 0.74rem;
+	color: var(--ink-muted);
+}
+
+.stampTray {
+	position: absolute;
+	bottom: 0;
+	left: 12px;
+	z-index: 800;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	width: min(800px, calc(100% - 260px));
+	padding: 6px 10px 10px;
+	background: linear-gradient(#3a2d25, #2a201b);
+	border: 3px solid #15100c;
+	border-bottom: none;
+	box-shadow: 0 -6px 0 rgb(0 0 0 / 0.25);
+	animation: traySlide 0.4s steps(4) both;
+}
+
+@keyframes traySlide {
+	from {
+		transform: translateY(100%);
+	}
+}
+
+.trayHint {
+	font-family: var(--mono);
+	font-size: 0.72rem;
+	color: #d9cbb0;
+}
+
+.stampRow {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
+	gap: 8px;
+}
+
+/* Резиновый штамп: ручка сверху, подушка с надписью снизу. Это цель для документа. */
+.rubberStamp {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	cursor: pointer;
+	outline: none;
+	transition: transform 0.1s;
+}
+
+.stampHandle {
+	width: 22px;
+	height: 22px;
+	background: #7a1f1f;
+	border: 2px solid #15100c;
+	border-radius: 50% 50% 4px 4px;
+}
+
+.stampFace {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	min-height: 40px;
+	padding: 2px 4px;
+	font-family: var(--pixel);
+	font-size: 0.78rem;
+	line-height: 1.05;
+	text-align: center;
+	color: #1b1512;
+	background: var(--yellow);
+	border: 2px solid #15100c;
+	box-shadow: 0 4px 0 #15100c;
+}
+
+.rubberStamp[data-zone="trash"] .stampFace {
+	color: #fff4e8;
+	background: var(--red);
+}
+
+.rubberStamp[aria-disabled="false"]:hover {
+	transform: translateY(-3px);
+}
+
+.rubberStamp[data-active="true"] {
+	transform: translateY(-6px);
+}
+
+.rubberStamp[data-active="true"] .stampFace,
+.rubberStamp:focus-visible .stampFace {
+	outline: 3px solid #ffffff;
+	outline-offset: 2px;
+}
+
+.stampTray .trayCancel {
+	align-self: flex-start;
+	min-height: 24px;
+	padding: 1px 8px;
+	font-family: var(--pixel);
+	font-size: 0.8rem;
+	color: #fff4e8;
+	background: transparent;
+	border: 2px solid #d9cbb0;
+	border-radius: 0;
+}
+
+/* ---------- Касса ---------- */
+
+/* Ордер на подоконнике: узкая полоска со штампом, не закрывает посетителя. */
+.handedOrder {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+	padding: 2px 6px;
+	overflow: hidden;
+	font-family: var(--mono);
+	font-size: 0.66rem;
+	white-space: nowrap;
+	color: var(--ink);
+	background: var(--paper);
+	border: 1px solid var(--paper-line);
+	transform: rotate(-1.5deg);
+	animation: handOver 0.45s steps(5) both;
+}
+
+.handedOrder > span:first-child {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.handedOrder [role="img"] {
+	flex: none;
+	padding: 0 4px;
+	font-size: 0.66rem;
+	border-width: 2px;
+}
+
+@keyframes handOver {
+	from {
+		opacity: 0;
+		transform: translateY(40px) rotate(-1.5deg);
+	}
+}
+
+.cashBox {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 8px 10px 10px;
+}
+
+.cashCounter {
+	font-family: var(--pixel);
+	font-size: 1.35rem;
+	color: var(--ink-green);
+	font-variant-numeric: tabular-nums;
+}
+
+.pads {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 10px;
+	padding: 10px;
+	background: #f3ead4;
+}
+
+.pad {
+	position: relative;
+	min-height: 70px;
+	padding: 6px;
+	font-family: var(--pixel);
+	font-size: 0.95rem;
+	font-weight: 400;
+	color: var(--ink);
+	background: var(--paper);
+	border: 2px solid #1b1512;
+	border-radius: 0;
+	box-shadow:
+		3px 3px 0 #d9cbb0,
+		6px 6px 0 #1b1512;
+}
+
+.pad[data-type="outcomeOrder"] {
+	background: #f6dcd6;
+}
+
+.pad[aria-checked="true"] {
+	background: var(--yellow);
+	transform: translate(3px, 3px);
+	box-shadow:
+		1px 1px 0 #d9cbb0,
+		3px 3px 0 #1b1512;
+}
+
+.padSheets {
+	position: absolute;
+	right: 4px;
+	bottom: 4px;
+	left: 4px;
+	height: 4px;
+	border-top: 1px dashed var(--ink-muted);
+}
+
+/* ---------- Сверка ---------- */
+
+.statementList {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 6px;
+}
+
+.statementRow {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 6px;
+	padding: 2px;
+	border-bottom: 1px dotted var(--paper-line);
+}
+
+.statementRow[data-state="matched"] {
+	background: rgb(46 125 60 / 0.12);
+}
+
+.statementRow[data-state="marked"] {
+	background: rgb(179 38 30 / 0.12);
+}
+
+.rowBody {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+	width: 100%;
+	min-height: 30px;
+	padding: 2px 6px;
+	font-family: var(--mono);
+	font-size: 0.76rem;
+	font-weight: 400;
+	text-align: left;
+	color: var(--ink);
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 0;
+}
+
+.rowDraggable {
+	cursor: grab;
+}
+
+.rowDraggable:hover:not(:disabled) {
+	background: rgb(247 210 62 / 0.25);
+}
+
+.rowTarget[aria-disabled="false"] {
+	cursor: pointer;
+	border: 2px dashed var(--ink-blue);
+}
+
+.rowTarget[data-active="true"] {
+	background: rgb(247 210 62 / 0.45);
+	border-style: solid;
+}
+
+.rowText {
+	min-width: 0;
+}
+
+.rowAmount {
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.rowAmount[data-direction="in"] {
+	color: var(--ink-green);
+}
+
+.flagButton {
+	min-height: 24px;
+	padding: 1px 6px;
+	font-family: var(--pixel);
+	font-size: 0.74rem;
+	font-weight: 400;
+	color: var(--ink-red);
+	background: transparent;
+	border: 2px solid var(--ink-red);
+	border-radius: 0;
+}
+
+.flagButton[aria-pressed="true"] {
+	color: #fff4e8;
+	background: var(--ink-red);
+}
+
+.matchedBadge {
+	padding: 0 6px;
+	font-family: var(--pixel);
+	font-size: 0.74rem;
+	color: var(--ink-green);
+	border: 2px solid var(--ink-green);
+	transform: rotate(-4deg);
+}
+
+/* ---------- Баланс ---------- */
+
+.cardTag {
+	font-family: var(--pixel);
+	font-size: 0.7rem;
+	color: var(--ink-red);
+}
+
+.amountValue {
+	font-family: var(--pixel);
+	font-size: 1.1rem;
+	font-variant-numeric: tabular-nums;
+}
+
+.balanceForm {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 10px;
+	padding: 8px;
+}
+
+.balanceForm .areaTitle {
+	font-family: var(--pixel);
+	font-size: 0.9rem;
+	font-weight: 400;
+	color: var(--ink);
+}
+
+.balanceLines {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.lineTarget {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-height: 36px;
+	padding: 3px 4px;
+	border: 1px dashed var(--paper-line);
+}
+
+.lineTarget[aria-disabled="false"] {
+	cursor: pointer;
+	border: 2px dashed var(--ink-blue);
+}
+
+.lineTarget[data-active="true"] {
+	background: rgb(247 210 62 / 0.45);
+}
+
+.lineTitle {
+	font-size: 0.74rem;
+	font-weight: 700;
+}
+
+.placedItem {
+	display: flex;
+	justify-content: space-between;
+	gap: 6px;
+	font-size: 0.72rem;
+	color: var(--ink-blue);
+}
+
+.balanceLine[data-computed="true"] {
+	padding: 3px 4px;
+	background: rgb(247 210 62 / 0.3);
+	border: 2px solid var(--yellow-dark);
+}
+
+.computedLabel {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.balanceTotal {
+	margin-top: 4px;
+	font-weight: 700;
+	text-align: right;
+	border-top: 2px solid var(--ink);
+}
+
+.scalesFigure {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	padding: 6px;
+	font-size: 0.74rem;
+	text-align: center;
+}
+
+/* ---------- Узкие экраны ---------- */
+
+@container (max-width: 760px) {
+	.stampTray {
+		position: relative;
+		left: auto;
+		width: 100%;
+		order: 10;
+	}
+
+	.stampRow {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+
+	.balanceForm {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 860px) {
+	.postingsLayout {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.stampTray,
+	.tornForm,
+	.handedOrder {
+		animation: none;
+	}
+
+	.rubberStamp {
+		transition: none;
+	}
+}
+
+/* Наведение: свои цвета, иначе общий стиль кнопок портала затемняет бумагу. */
+.pad:hover:not(:disabled) {
+	background: #fff8dd;
+}
+
+.pad[data-type="outcomeOrder"]:hover:not(:disabled) {
+	background: #fbe7e2;
+}
+
+.pad[aria-checked="true"]:hover:not(:disabled) {
+	background: #ffe066;
+}
+
+.flagButton:hover:not(:disabled) {
+	background: rgb(179 38 30 / 0.12);
+}
+
+.flagButton[aria-pressed="true"]:hover:not(:disabled) {
+	background: #9e1f18;
+}
+
+.stampTray .trayCancel:hover:not(:disabled) {
+	background: rgb(255 255 255 / 0.1);
+}

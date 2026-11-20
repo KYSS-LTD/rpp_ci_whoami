@@ -1,0 +1,120 @@
+/* Панель кнопок формы (в программе на мониторе) и лист «Итоги дня» (на столе). */
+
+.toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 5px;
+	padding: 6px 0;
+}
+
+/* Основная кнопка программы: жёлтая с жирной подписью. Внутри окна программы перекрывает обычную кнопку. */
+.toolbar .primaryButton {
+	font-weight: 700;
+	color: #2b1f00;
+	background: linear-gradient(#ffe57a, #f2c418);
+	border: 1px solid #b38a00;
+}
+
+.toolbar .primaryButton:hover:not(:disabled) {
+	background: linear-gradient(#fff0a0, #f7d23e);
+}
+
+.movementsButton[aria-pressed="true"] {
+	background: #fff1b8;
+	border-color: #e9b80c;
+}
+
+.formTitle {
+	margin-bottom: 4px;
+	font-size: 1.05rem;
+	font-weight: 700;
+}
+
+/* ---------- Итоги дня ---------- */
+
+.monthClose {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 10px 12px 14px;
+}
+
+.monthClose .formTitle {
+	font-family: var(--acc-font-pixel), "Courier New", monospace;
+	font-size: 1.25rem;
+	font-weight: 400;
+	color: #3b2f27;
+}
+
+.ledger {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.ledger th,
+.ledger td {
+	padding: 4px 2px;
+	font-weight: 400;
+	text-align: left;
+	border-bottom: 1px dotted #b8ae96;
+}
+
+.ledger td {
+	text-align: right;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
+
+.totalRow th,
+.totalRow td {
+	font-size: 1.05rem;
+	border-top: 2px solid #3b2f27;
+	border-bottom: 3px double #3b2f27;
+}
+
+.stampPress {
+	margin: 2px 0 2px 20px;
+	animation: stampPress 0.45s steps(5) both;
+}
+
+@keyframes stampPress {
+	from {
+		opacity: 0;
+		transform: rotate(-7deg) scale(2);
+	}
+	to {
+		opacity: 1;
+		transform: rotate(-7deg) scale(1);
+	}
+}
+
+.monthClose .submitButton {
+	min-height: 40px;
+	padding: 6px 18px;
+	font-family: var(--acc-font-pixel), "Courier New", monospace;
+	font-size: 1.1rem;
+	font-weight: 400;
+	color: #fff4e8;
+	background: #c8102e;
+	border: 3px solid #1b1512;
+	border-radius: 0;
+	box-shadow: 0 4px 0 #1b1512;
+}
+
+.monthClose .submitButton:active:not(:disabled) {
+	box-shadow: 0 1px 0 #1b1512;
+	transform: translateY(3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.stampPress {
+		animation: stampAppear 0.3s ease both;
+	}
+}
+
+@keyframes stampAppear {
+	from {
+		opacity: 0;
+	}
+}
