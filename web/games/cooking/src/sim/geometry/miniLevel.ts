@@ -13,7 +13,7 @@
 //   #.....####.#
 //   #..........#
 //   #..........#
-//   ####...#####   южная стена с проёмом двери (x 2..3.5)
+//   #####..#####   южная стена: кусок проёма wall_doorway (x 2..4) со стойками по бокам и проёмом 1 по центру (x 2.5..3.5)
 //
 // createBlankLevel: пустой уровень с заданными препятствиями (colliders) и станциями: для тестов, где нужна своя топология.
 import type { LevelConfig, LevelParams, Rect, StationConfig, Vec2 } from "../../contracts";
@@ -36,8 +36,8 @@ export function createMiniLevel(paramsOverrides: DeepPartial<LevelParams> = {}):
 			{ id: "wall-west", model: "wall", rect: rect(0, 0.5, 0.5, 4), rotationDeg: 90, blocking: true },
 			{ id: "wall-east", model: "wall", rect: rect(5.5, 0.5, 0.5, 4), rotationDeg: 90, blocking: true },
 			{ id: "wall-south-left", model: "wall", rect: rect(0, 4.5, 2, 0.5), rotationDeg: 0, blocking: true },
-			{ id: "wall-south-right", model: "wall", rect: rect(3.5, 4.5, 2.5, 0.5), rotationDeg: 0, blocking: true },
-			{ id: "wall-south-door", model: "wall_doorway", rect: rect(2, 4.5, 1.5, 0.5), rotationDeg: 0, blocking: false },
+			{ id: "wall-south-right", model: "wall", rect: rect(4, 4.5, 2, 0.5), rotationDeg: 0, blocking: true },
+			{ id: "wall-south-door", model: "wall_doorway", rect: rect(2, 4.5, 2, 0.5), rotationDeg: 0, blocking: false },
 		],
 		colliders: [],
 		stations: [
@@ -74,12 +74,13 @@ export function createMiniLevel(paramsOverrides: DeepPartial<LevelParams> = {}):
 			},
 		],
 		door: {
-			rect: rect(2, 4.5, 1.5, 0.5),
+			// Проём: середина куска wall_doorway (стойки по бокам, их даёт геометрия).
+			rect: rect(2.5, 4.5, 1, 0.5),
 			rotationDeg: 0,
-			insidePoint: { x: 2.75, z: 4 },
-			outsidePoint: { x: 2.75, z: 4.75 },
-			spawnPoint: { x: 2.75, z: 4.75 },
-			exitPoint: { x: 2.75, z: 4.75 },
+			insidePoint: { x: 3, z: 4 },
+			outsidePoint: { x: 3, z: 4.75 },
+			spawnPoint: { x: 3, z: 4.75 },
+			exitPoint: { x: 3, z: 4.75 },
 		},
 		// Очереди нет (улицы в мини-уровне нет), смещения оставлены для полноты данных.
 		queue: {

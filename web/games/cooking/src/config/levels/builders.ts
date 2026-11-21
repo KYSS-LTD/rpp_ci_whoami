@@ -149,8 +149,23 @@ function createSeat(chairRect: Rect, chairModel: string, rotationDeg: Rotation, 
 	};
 }
 
+// Уплотнённый ряд столов: все места подаются с одного свободного бокового прохода.
+function useSharedApproach(seats: SeatConfig[], approachX: number | undefined): SeatConfig[] {
+	if (approachX === undefined) {
+		return seats;
+	}
+	return seats.map((seat, index) => {
+		// Двухместный стол обслуживается с двух сторон, а у четырёхместного западное место остаётся у левого прохода.
+		if (seats.length === 2 || index === 3) {
+			return seat;
+		}
+		const approachPoint = point(approachX, seat.sitPoint.z);
+		return { ...seat, approachPoint, servePoint: approachPoint };
+	});
+}
+
 // Стол на 2 места: столешница 1 x 1 с углом (x, z), стулья слева и справа (0.5 x 1). Места: 0 слева, 1 справа.
-export function createTwoTop(id: string, number: number, x: number, z: number): TableConfig {
+export function createTwoTop(id: string, number: number, x: number, z: number, sharedApproachX?: number): TableConfig {
 	const centerZ = z + 0.5;
 	return {
 		id,
@@ -158,15 +173,15 @@ export function createTwoTop(id: string, number: number, x: number, z: number): 
 		rect: rect(x, z, 1, 1),
 		model: "table_round_A_small",
 		rotationDeg: 0,
-		seats: [
+		seats: useSharedApproach([
 			createSeat(rect(x - 0.5, z, 0.5, 1), "chair_stool", 90, point(x - 1, centerZ), point(x + 0.3, centerZ)),
 			createSeat(rect(x + 1, z, 0.5, 1), "chair_stool", 270, point(x + 2, centerZ), point(x + 0.7, centerZ)),
-		],
+		], sharedApproachX),
 	};
 }
 
 // Стол на 4 места: столешница 1.5 x 1.5 с углом (x, z), стулья 0.5 x 0.5 с четырёх сторон. Места: 0 север, 1 восток, 2 юг, 3 запад.
-export function createFourTop(id: string, number: number, x: number, z: number): TableConfig {
+export function createFourTop(id: string, number: number, x: number, z: number, sharedApproachX?: number): TableConfig {
 	const centerX = x + 0.75;
 	const centerZ = z + 0.75;
 	return {
@@ -175,12 +190,12 @@ export function createFourTop(id: string, number: number, x: number, z: number):
 		rect: rect(x, z, 1.5, 1.5),
 		model: "table_round_A",
 		rotationDeg: 0,
-		seats: [
+		seats: useSharedApproach([
 			createSeat(rect(x + 0.5, z - 0.5, 0.5, 0.5), "chair_A", 0, point(centerX, z - 1), point(centerX, z + 0.35)),
 			createSeat(rect(x + 1.5, z + 0.5, 0.5, 0.5), "chair_A", 270, point(x + 2.5, centerZ), point(x + 1.15, centerZ)),
 			createSeat(rect(x + 0.5, z + 1.5, 0.5, 0.5), "chair_A", 180, point(centerX, z + 2.5), point(centerX, z + 1.15)),
 			createSeat(rect(x - 0.5, z + 0.5, 0.5, 0.5), "chair_A", 90, point(x - 1, centerZ), point(x + 0.35, centerZ)),
-		],
+		], sharedApproachX),
 	};
 }
 

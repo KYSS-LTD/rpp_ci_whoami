@@ -2,12 +2,13 @@
 // и HUD по уровню из сообщения старта, цикл кадров, пауза (в том числе при скрытой вкладке), один итог порталу.
 // Порядок и вызовы по interfaces.md (раздел 9) и записи SONNET-3 в inbox-opus.md. Все зависимости подменяются в тестах
 // (GameModules). Точка входа страницы: main.ts. Владелец: Opus-агент.
-import type { GameSnapshot, Hud, InputSource, LevelConfig, PortalBridgeApi, ResultReporter, SceneRenderer, ShiftPhase, Simulation } from "./contracts";
+import type { GameProgress, GameSnapshot, Hud, InputSource, LevelConfig, PortalBridgeApi, ResultReporter, SceneRenderer, ShiftPhase, Simulation } from "./contracts";
 import { debugLog, isDebugEnabled } from "./config/debug";
 import { getLevelConfig, isLevelId, pickVerifiedSeed } from "./config/levels";
 import { createHud } from "./hud";
 import { createResultReporter } from "./hud/reporter";
 import { createInputSystem } from "./input";
+import { getCampaignDay, getCampaignMenu, listDishesNeedingTutorial, markCampaignDayCompleted, markDishCooked, parseGameProgress } from "./progress";
 import { createDishIcons, createFrameLoop, createSceneRenderer, prepareAssets } from "./render";
 import { createSimulation } from "./sim/simulation";
 import { systemTexts } from "./texts";
@@ -98,7 +99,7 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 			return;
 		}
 		try {
-			runLevel(getLevelConfig(start.levelId));
+			runLevel(getLevelConfig(start.levelId), parseGameProgress(start.progress));
 		} catch (error) {
 			debugLog("game", "ошибка запуска уровня", error);
 			handle.cleanup();
@@ -107,10 +108,26 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 	});
 
 	// Запуск уровня: симуляция, ввод, сцена, HUD, цикл кадров.
-	function runLevel(level: LevelConfig): void {
+	function runLevel(level: LevelConfig, initialProgress: GameProgress): void {
+		const campaignDay = getCampaignDay(initialProgress, level.id);
+		level = { ...level, params: { ...level.params, menu: getCampaignMenu(campaignDay) } };
 		documentRef.title = systemTexts.documentTitle;
 		const simulation = modules.createSimulation({ level, seed: pickVerifiedSeed(level, random) });
 		handle.simulation = simulation;
+		// Прогресс блюд: блюдо, принятое окном выдачи при игре с вводом, запоминается и уходит порталу один раз на блюдо.
+		let progress = initialProgress;
+		let campaignDaySaved = false;
+		simulation.subscribe((event) => {
+			if (event.type === "dishAccepted") {
+				const updated = markDishCooked(progress, event.dish);
+				if (updated) {
+					progress = updated;
+					bridge.saveProgress(updated);
+				}
+			}
+		});
+		// Блюда меню, которых игрок ещё не готовил: перед стартовым экраном по ним показываются подсказки (список считается один раз).
+		const tutorialDishes = listDishesNeedingTutorial(level.params.menu, initialProgress);
 		const input: InputSource = modules.createInputSystem({ root });
 		let scene: SceneRenderer | null = null;
 		let hud: Hud | null = null;
@@ -186,6 +203,8 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 			reporter,
 			dishIcons: icons,
 			inputMode: input.getMode(),
+			tutorialDishes,
+			campaignDay,
 		});
 		input.onModeChange((mode) => hud?.setInputMode(mode));
 		// До нажатия "Начать" ввод выключен.
@@ -224,6 +243,14 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 				syncInput();
 				// Смена завершена успешно или по времени: результат уходит порталу один раз, дальше игра закрывается.
 				if (snapshot.phase === "finished" && snapshot.result) {
+					if (snapshot.result.completed && !campaignDaySaved) {
+						campaignDaySaved = true;
+						const updated = markCampaignDayCompleted(progress, level.id);
+						if (updated) {
+							progress = updated;
+							bridge.saveProgress(updated);
+						}
+					}
 					const isSent = reporter.reportResult(snapshot.result);
 					if (!isSent && !handle.closed) {
 						// Мост отклонил результат (неверные числа): повторять каждый кадр бессмысленно, сообщаем об ошибке один раз.

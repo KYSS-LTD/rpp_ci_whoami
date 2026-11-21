@@ -6,6 +6,7 @@ import type { ActionRejectReason, DishId, PatiencePlace } from "../contracts";
 const dishNames: Record<DishId, string> = {
 	burger: "Бургер",
 	ham: "Окорок",
+	steak: "Стейк",
 	veggieBurger: "Овощной бургер",
 	stew: "Рагу",
 };
@@ -23,6 +24,8 @@ const rejectReasons: Record<ActionRejectReason, string> = {
 	dishNotReady: "Блюдо ещё не готово",
 	noOpenOrder: "Такое блюдо сейчас никто не ждёт",
 	windowFull: "В окне выдачи нет места",
+	dishNotPlated: "Сначала положите блюдо на тарелку",
+	needsWater: "Сначала налейте воду в кастрюлю",
 };
 
 export const hudTexts = {
@@ -32,7 +35,8 @@ export const hudTexts = {
 	// Заказы по столам.
 	orders: {
 		panelLabel: "Заказы по столам",
-		tableTitle: (tableNumber: number): string => `Стол ${tableNumber}`,
+		// Слово "Стол" отдельно: компактная карточка показывает только номер, слово читают вспомогательные технологии.
+		tableWord: "Стол",
 		tableServed: "Стол обслужен",
 		status: {
 			waiting: "Ждёт",
@@ -66,16 +70,44 @@ export const hudTexts = {
 	// Стартовый экран.
 	start: {
 		title: "Повар",
+		prologue: "Вы нашли работу поваром в небольшом ресторане. Начальник будет знакомить вас с новым рецептом каждый рабочий день.",
+		dayLabel: (day: number): string => `Рабочий день ${day} из 5`,
+		dayGoal: "Ваша задача на неделю: обслужить всех гостей ресторана.",
 		goal: "Накормите всех гостей смены, пока они не потеряли терпение.",
 		rules: [
-			"Заказы по столам видны сверху слева, самые срочные идут первыми.",
+			"Заказы по столам видны сверху справа, самые срочные идут первыми.",
 			"Готовьте блюда на кухне и сдавайте тарелку в окно выдачи.",
 			"Официант сам отнесёт блюдо к нужному столу.",
 			"Если гость уйдёт, не дождавшись, смена закончится.",
 		],
 		pauseHintKeyboard: "Клавиша P ставит игру на паузу.",
-		pauseHintTouch: "Кнопка паузы находится вверху справа.",
+		pauseHintTouch: "Кнопка паузы находится вверху слева.",
 		startButton: "Начать",
+		tutorialButton: "Посмотреть рецепт",
+	},
+
+	tutorial: {
+		title: (dishName: string): string => `Рецепт: ${dishName}`,
+		next: "Дальше",
+		done: "К смене",
+		skip: "Пропустить подсказки",
+		stepLabel: (step: number, count: number): string => `Шаг ${step} из ${count}`,
+		steps: {
+			hamTake: "Возьмите окорок из ящика.", hamCook: "Положите окорок в духовку и дождитесь готовности.",
+			hamPlate: "Возьмите тарелку и переложите на неё готовый окорок.", hamServe: "Отнесите тарелку к окну выдачи.",
+			steakTake: "Возьмите стейк из ящика. Резать его не нужно.",
+			steakCook: "Положите целый стейк на сковороду и дождитесь готовности.", steakPlate: "Возьмите тарелку и переложите на неё готовый стейк.",
+			steakServe: "Передайте заказ через окно выдачи.",
+			burgerPrepare: "Возьмите стейк и нарежьте его на столе.", burgerCook: "Пожарьте нарезанный стейк на сковороде.",
+			burgerAssemble: "Держите котлету в руке, возьмите булочку из ящика и соедините их.",
+			burgerServe: "Возьмите тарелку и сдайте бургер в окно выдачи.",
+			veggiePrepare: "Нарежьте картофель и морковь на любой поверхности.", veggieCook: "Пожарьте овощи на сковороде.",
+			veggieAssemble: "Соедините овощную котлету с булочкой в руках.", veggieServe: "Положите бургер на тарелку и сдайте заказ.",
+			stewPot: "Возьмите пустую кастрюлю со стола.", stewWater: "Наполните кастрюлю водой у крана.",
+			stewChop: "Нарежьте картофель, морковь и лук.", stewFill: "Добавьте все овощи в кастрюлю на столе или на плите.",
+			stewCook: "Поставьте полную кастрюлю на конфорку. Она выключится сама после варки.",
+			stewServe: "Возьмите тарелку, наберите порцию и сдайте рагу.",
+		},
 	},
 
 	// Пауза.
@@ -92,16 +124,13 @@ export const hudTexts = {
 		title: "Гость ушёл",
 		continueButton: "Продолжить",
 		scoreSummary: (score: number, maxScore: number): string => `Набрано очков: ${score} из ${maxScore}`,
-		// Причина по месту: очередь на улице или стол в зале (с номером стола и блюдом).
-		reason: (place: PatiencePlace, tableNumber: number | null, dishName: string | null): string => {
+		// Причина по месту: очередь на улице или стол в зале. Номер стола игроку не показывается: только блюдо, которого гость не дождался.
+		reason: (place: PatiencePlace, dishName: string | null): string => {
 			if (place === "queue") {
 				return "Группа гостей не дождалась свободного стола и ушла с улицы.";
 			}
-			if (tableNumber !== null && dishName !== null) {
-				return `Гость за столом ${tableNumber} не дождался блюда «${dishName}» и ушёл.`;
-			}
-			if (tableNumber !== null) {
-				return `Гость за столом ${tableNumber} не дождался заказа и ушёл.`;
+			if (dishName !== null) {
+				return `Гость не дождался блюда «${dishName}» и ушёл.`;
 			}
 			return "Гость не дождался заказа и ушёл.";
 		},

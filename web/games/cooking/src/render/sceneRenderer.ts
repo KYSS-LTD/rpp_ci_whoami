@@ -59,12 +59,13 @@ export interface SceneRendererInternals extends SceneRenderer {
 }
 
 // Освещение: мягкий общий свет и одно направленное солнце без теней (без тяжёлых теней ради слабых телефонов).
-function addLights(scene: Scene): void {
+function addLights(scene: Scene): DirectionalLight {
 	scene.add(new AmbientLight(0xffffff, 0.9));
 	scene.add(new HemisphereLight(0xdfeaff, 0x8c7a66, 1.1));
 	const sun = new DirectionalLight(0xfff3df, 1.9);
 	sun.position.set(-6, 14, 9);
 	scene.add(sun);
+	return sun;
 }
 
 // Размер контейнера с запасным значением, если вёрстка ещё не посчитана.
@@ -84,8 +85,13 @@ export function createSceneRendererCore(
 ): SceneRendererInternals {
 	const { level, container, debug } = options;
 	const scene = new Scene();
-	scene.background = new Color(backgroundColor);
-	addLights(scene);
+	const skyColor = new Color(backgroundColor);
+	scene.background = skyColor;
+	const sunLight = addLights(scene);
+	const morningSky = new Color(0x89b8d0);
+	const eveningSky = new Color(0xef9a6e);
+	const morningSun = new Color(0xfff3df);
+	const eveningSun = new Color(0xffbf74);
 
 	const initialSize = measureContainer(container);
 	const camera = createSceneCamera(level.view, initialSize.width / initialSize.height);
@@ -144,6 +150,10 @@ export function createSceneRendererCore(
 				return;
 			}
 			timeSec += frameDtSec;
+			const dayProgress = Math.min(1, Math.max(0, snapshot.elapsedSec / Math.max(1, snapshot.durationSec)));
+			skyColor.lerpColors(morningSky, eveningSky, dayProgress);
+			sunLight.color.lerpColors(morningSun, eveningSun, dayProgress);
+			sunLight.intensity = 1.9 - 0.55 * dayProgress;
 			stations.update(snapshot.stations, timeSec);
 			tableware.update(snapshot);
 			actors.update(snapshot, frameDtSec);

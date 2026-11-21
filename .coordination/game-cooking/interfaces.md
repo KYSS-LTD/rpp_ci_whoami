@@ -1,8 +1,37 @@
 # Интерфейсы игры cooking простым языком
 
-Источник истины: `web/games/cooking/src/contracts.ts` (версия контрактов `CONTRACTS_VERSION`, сейчас 1). Этот документ коротко объясняет его, но при расхождении верен `contracts.ts`. Все числа баланса лежат в `LevelParams` (`config/levels/defaults.ts`), в код их не пишем.
+Источник истины: `web/games/cooking/src/contracts.ts` (версия контрактов `CONTRACTS_VERSION`, сейчас 2; изменения второго этапа в разделе 0). Этот документ коротко объясняет его, но при расхождении верен `contracts.ts`. Все числа баланса лежат в `LevelParams` (`config/levels/defaults.ts`), в код их не пишем.
 
 Пути ниже относительны `web/games/cooking/src/`. Команды запускаются из папки `web`.
+
+## 0. Версия 2 (второй этап): что изменилось
+
+Подробные решения: `openspec/changes/game-cooking/design.md` D17-D25, задачи 10-16 в `tasks.md`. Разделы 5 и 6 ниже описывают версию 1 и в частях про тарелку, кастрюлю и `pot` устарели: читайте этот раздел и `contracts.ts`.
+
+**Предметы.** `Item = IngredientItem | AssemblyItem | PotItem`. `PlateItem` удалён.
+- `AssemblyItem { type: "assembly", contents: IngredientItem[], dish: DishId | null, plated: boolean }`: сборка из нескольких ингредиентов в руке или на поверхности. `plated = true` значит на тарелке; пустая тарелка это `contents = []`, `plated = true`, `dish = null`. Блюдо без тарелки это `dish` задан, `plated = false`. Одиночный ингредиент остаётся `IngredientItem`.
+- `PotItem { type: "pot", hasWater, contents (нарезанные овощи), cookProgressSec, portions }`: переносимая кастрюля.
+- `ITEM_CATALOG` без `stew/burnt`: рагу не пригорает.
+
+**Станции.** `StationKind`: `pot` удалён, добавлены `stove` (конфорка для кастрюли) и `tap` (кран, только hard). `StationConfig.startItem?: "pot"` (counter с кастрюлей в начале смены). Раковины нет.
+
+**Правила взаимодействия** (E) собраны одним комментарием перед `Kitchen` в `contracts.ts` (соединение в руках, на прилавке, на плите, тарелка как последний этап, кастрюля, кран, окно принимает только блюдо на тарелке).
+
+**Параметры.** `KitchenParams`: `boardCutDurationFactor` (0.8), `cookDurationFactor` (0.8), `cooking: Record<CookRecipeId, CookTiming>` где `CookTiming { cookSec, burnSec: number | null }` (null у рагу), `potCapacity`, `stewPortionsPerBatch`. Новые значения по умолчанию уже в `config/levels/defaults.ts`.
+
+**Отказы и события.** `ActionRejectReason`: добавлены `dishNotPlated`, `needsWater`. События: `itemCombined { stationId, item }`, `potWaterFilled { stationId }`, `dishAssembled { dish, plated }`. Рагу стартует и заканчивается теми же `cookingStarted` и `cookingDone` (recipe `stew`), `itemBurnt` для кастрюли не бывает.
+
+**Рецепты.** `CookTransition.stationKind`: `"pan" | "oven"`; рагу описывает новый `PotRecipe { id: "stew", inputs, portion }` (таблицы `sim/kitchen/recipes.ts`, SONNET-1).
+
+**Снимок.** `StationSnapshot.isHeating` (плита или конфорка включена), `items` может содержать `AssemblyItem` и `PotItem`, `burnProgress` растёт после готовности и равен 1 у сгоревшего (красная полоса), для кастрюли всегда 0; `progress` это зелёная полоса. `ServingWindow.tryAccept(dish: AssemblyItem)`.
+
+**Мост и прогресс.** `PortalBridgeApi.onStart` получает `start.progress` (объект или null), `saveProgress(data): boolean`. `GameProgress { version: 1, cookedDishes }`, константы `GAME_PROGRESS_VERSION`, `MAX_GAME_PROGRESS_BYTES` (4096). Разбор и обновление: `src/progress.ts` (`parseGameProgress`, `markDishCooked`, `listDishesNeedingTutorial`). `game.ts` сам вызывает `saveProgress` по событию `dishAccepted`.
+
+**Подсказки.** `HudOptions.tutorialDishes: readonly DishId[]` (блюда без прогресса, по которым HUD показывает окна перед стартовым экраном). Типы `TutorialStepConfig`, `DishTutorialConfig`; файл `config/tutorial.ts` и анимации `public/tutorial/` делает SONNET-3 (задачи 14.4, 14.5).
+
+**Владение в расширении (исключение из правила "общие файлы правит Opus-агент").** SONNET-2: `web/core/bridge/`, `web/core/storage/`, `web/app/_components/IframeLevel.tsx`, `web/sdk/` (веб-SDK, копии моста, Unity SDK, README, тесты согласованности), `web/docs/game-bridge-protocol.md`, `web/docs/adding-game.md`. SONNET-3: `web/scripts/capture-tutorial.mjs`, `web/games/cooking/public/tutorial/`, `web/games/cooking/src/config/tutorial.ts`, `web/games/cooking/src/texts/hud.ts`; devDependency `gifenc` и скрипт `npm run capture:tutorial` в `package.json` уже добавлены.
+
+**Что ломается в коде версии 1 (компилятор подскажет):** любые `type: "plate"`, `PlateItem`, вид станции `"pot"`, `cooking.stew.burnSec` как число, `StationSnapshot` без `isHeating`, мок `PortalBridgeApi` без `saveProgress`, `HudOptions` без `tutorialDishes`, `onStart` без `progress`.
 
 ## 1. Общие договорённости
 
@@ -156,3 +185,4 @@
 |---|---|---|---|
 | 1 | фаза 0 | Первая версия: типы данных уровня, предметы, ввод, события, снимок, интерфейсы областей (геометрия, навигация, игрок, кухня, окно и заказы, клиенты, официанты, смена, ввод, рендер, HUD, отправка итога, цикл кадров, симуляция) | все |
 | 1 (правка комментария) | фаза 1 | Комментарий `PropConfig.heightScale`: низкие стены 0.35 вместо 0.25. Версия не повышалась, типы не менялись | SONNET-3 |
+| 2 | второй этап | Сборка без тарелки (`AssemblyItem`, `PotItem`, `PlateItem` удалён), станции `stove` и `tap` вместо `pot`, `startItem`, параметры `boardCutDurationFactor`, `cookDurationFactor`, `CookTiming` (рагу без подгорания), `PotRecipe`, `StationSnapshot.isHeating`, `burnProgress` растёт (красная полоса), события `itemCombined`, `potWaterFilled`, `dishAssembled.plated`, отказы `dishNotPlated`, `needsWater`, `ServingWindow.tryAccept(AssemblyItem)`, мост: `start.progress`, `saveProgress`, `GameProgress`, подсказки: `HudOptions.tutorialDishes`, `TutorialStepConfig`, `DishTutorialConfig` | все (S1 кухня и клиенты, S2 мост и портал, S3 рендер и HUD) |

@@ -1,7 +1,7 @@
 // Окно выдачи (задача 2.9): принимает только готовое блюдо с открытым заказом, привязывает его к самому раннему
 // заказу того же блюда (статус "в доставке") и хранит до забора официантом. Реализует ServingWindow из contracts.ts.
 // Резервирование блюд за официантами ведёт система официантов, окно о нём не знает. Владелец: SONNET-1.
-import type { EventSink, LevelConfig, OrderBoard, PlateItem, ServingWindow, SimClock, WindowAcceptResult, WindowDish, WindowDishId } from "../../contracts";
+import type { AssemblyItem, EventSink, LevelConfig, OrderBoard, ServingWindow, SimClock, WindowAcceptResult, WindowDish, WindowDishId } from "../../contracts";
 
 // Зависимости окна.
 export interface ServingWindowDeps {
@@ -30,7 +30,7 @@ export function createServingWindow(deps: ServingWindowDeps): ServingWindow {
 	}
 
 	return {
-		tryAccept(plate: PlateItem): WindowAcceptResult {
+		tryAccept(plate: AssemblyItem): WindowAcceptResult {
 			// Принимается только готовое блюдо: тарелка, содержимое которой совпало с рецептом.
 			if (plate.dish === null) {
 				return { ok: false, reason: "dishNotReady" };

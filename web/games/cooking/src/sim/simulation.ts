@@ -30,7 +30,10 @@ import { createWaiterSystem } from "./waiter";
 
 // Глубокая копия предмета для снимка: потребитель снимка не должен делить объекты с кухней.
 function copyItem(item: Item): Item {
-	return item.type === "plate" ? { type: "plate", contents: item.contents.map((ingredient) => ({ ...ingredient })), dish: item.dish } : { ...item };
+	if (item.type === "ingredient") {
+		return { ...item };
+	}
+	return { ...item, contents: item.contents.map((ingredient) => ({ ...ingredient })) };
 }
 
 // Создаёт симуляцию уровня по seed расписания. Расписание, геометрия и все модули строятся сразу; смена стоит в фазе ready,

@@ -20,13 +20,15 @@ interface IframeLevelProps {
 	onPracticeFinish?: (result: PracticeResult) => void;
 	// Игра сообщила о выходе без результата: показать экран незавершённого уровня, ничего не сохранять.
 	onExitWithoutResult: () => void;
+	progress?: unknown;
+	onSaveProgress?: (data: Record<string, unknown>) => void;
 }
 
 // Этапы уровня на стороне портала (docs/game-bridge-protocol.md). finished и abandoned рисует LevelRunner.
 type LevelPhase = "loading" | "running" | "failed";
 
 // Уровень iframe-игры (capability game-iframe-bridge): сборка в изолированном фрейме и обмен сообщениями по протоколу.
-export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPracticeFinish, onExitWithoutResult }: IframeLevelProps) {
+export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPracticeFinish, onExitWithoutResult, progress = null, onSaveProgress }: IframeLevelProps) {
 	const frameRef = useRef<HTMLIFrameElement>(null);
 	const levelRef = useRef<HTMLElement>(null);
 	const [nativeFullscreen, setNativeFullscreen] = useState(false);
@@ -83,10 +85,10 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 	const startedAtRef = useRef(0);
 	const hasResultRef = useRef(false);
 	const freeMode = Boolean(onPracticeFinish);
-	const callbacksRef = useRef({ onFinish, onPracticeFinish, onExitWithoutResult });
+	const callbacksRef = useRef({ onFinish, onPracticeFinish, onExitWithoutResult, onSaveProgress });
 	useEffect(() => {
-		callbacksRef.current = { onFinish, onPracticeFinish, onExitWithoutResult };
-	}, [onFinish, onPracticeFinish, onExitWithoutResult]);
+		callbacksRef.current = { onFinish, onPracticeFinish, onExitWithoutResult, onSaveProgress };
+	}, [onFinish, onPracticeFinish, onExitWithoutResult, onSaveProgress]);
 
 	function changePhase(nextPhase: LevelPhase) {
 		phaseRef.current = nextPhase;
@@ -114,11 +116,15 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 
 			if (message.type === "ready" && currentPhase === "loading") {
 				// targetOrigin "*": у изолированного фрейма нет адресуемого источника, а в сообщении нет секретов.
-				frameWindow.postMessage(buildStartMessage(gameId, level.id), "*");
+				frameWindow.postMessage(buildStartMessage(gameId, level.id, progress), "*");
 				startedAtRef.current = Date.now();
 				phaseRef.current = "running";
 				setPhase("running");
 				frameRef.current?.focus();
+				return;
+			}
+			if (message.type === "progress" && currentPhase === "running" && !hasResultRef.current) {
+				callbacksRef.current.onSaveProgress?.(message.data);
 				return;
 			}
 			if (message.type === "practice-result" && freeMode && currentPhase === "running" && !hasResultRef.current) {
@@ -154,7 +160,7 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 
 		window.addEventListener("message", handleMessage);
 		return () => window.removeEventListener("message", handleMessage);
-	}, [gameId, level.id, attempt, freeMode]);
+	}, [gameId, level.id, attempt, freeMode, progress, onSaveProgress]);
 
 	// Разрешение Gamepad для изолированного iframe различается между браузерами.
 	// В таком случае портал передаёт игре только значения органов управления, без данных об устройстве.

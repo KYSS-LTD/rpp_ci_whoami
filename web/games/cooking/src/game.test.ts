@@ -8,21 +8,22 @@ import { startGame, type GameModules } from "./game";
 
 // Мост с шпионами: onStart запоминает обработчик, тест сам присылает старт.
 function createFakeBridge() {
-	let startHandler: ((start: { gameId: string; levelId: string }) => void) | null = null;
+	let startHandler: ((start: { gameId: string; levelId: string; progress: unknown }) => void) | null = null;
 	const bridge = {
 		protocolVersion: 1,
 		isEmbedded: true,
 		getLevelId: (): LevelId => "easy",
-		onStart: vi.fn((callback: (start: { gameId: string; levelId: string }) => void) => {
+		onStart: vi.fn((callback: (start: { gameId: string; levelId: string; progress: unknown }) => void) => {
 			startHandler = callback;
 		}),
+		saveProgress: vi.fn(() => true),
 		finish: vi.fn(() => true),
 		exit: vi.fn(),
 		reportError: vi.fn(),
 	};
 	return {
 		bridge: bridge as unknown as PortalBridgeApi & typeof bridge,
-		sendStart: (levelId: string) => startHandler?.({ gameId: "cooking", levelId }),
+		sendStart: (levelId: string, progress: unknown = null) => startHandler?.({ gameId: "cooking", levelId, progress }),
 	};
 }
 
@@ -89,7 +90,12 @@ function createScriptedSimulation(initialPhase: ShiftPhase = "ready") {
 	let advanceCalls = 0;
 	const makeSnapshot = (): GameSnapshot =>
 		({ phase, result, failure: null, tick: advanceCalls, elapsedSec: advanceCalls, timeLeftSec: 100 - advanceCalls }) as unknown as GameSnapshot;
+	const listeners: Array<(event: unknown) => void> = [];
 	const simulation = {
+		subscribe: vi.fn((listener: (event: unknown) => void) => {
+			listeners.push(listener);
+			return () => undefined;
+		}),
 		start: vi.fn(() => {
 			phase = "running";
 		}),
@@ -108,17 +114,18 @@ function createScriptedSimulation(initialPhase: ShiftPhase = "ready") {
 			result = nextResult;
 		},
 		getAdvanceCalls: () => advanceCalls,
+		emit: (event: unknown) => listeners.forEach((listener) => listener(event)),
 	};
 }
 
 // Запускает игру до подписки на старт и присылает старт уровня.
-async function launch(levelId: string, overrides: Partial<GameModules> = {}) {
+async function launch(levelId: string, overrides: Partial<GameModules> = {}, progress: unknown = null) {
 	const fakeBridge = createFakeBridge();
 	const fakes = createFakeModules(overrides);
 	const root = document.createElement("div");
 	document.body.append(root);
 	const handle = await startGame({ bridge: fakeBridge.bridge, root, modules: fakes.modules, random: () => 0 });
-	fakeBridge.sendStart(levelId);
+	fakeBridge.sendStart(levelId, progress);
 	return { ...fakeBridge, ...fakes, handle, root };
 }
 
@@ -270,6 +277,60 @@ describe("результат и выход", () => {
 		expect(game.bridge.finish).not.toHaveBeenCalled();
 		expect(game.loop.stop).toHaveBeenCalledTimes(1);
 		expect(game.handle?.isClosed()).toBe(true);
+	});
+});
+
+describe("прогресс блюд и подсказки", () => {
+	const dishAccepted = (dish: string) => ({ type: "dishAccepted", windowDishId: "wd-1", orderId: "o-1", dish, t: 1 });
+
+	it("сценарий 'Первое приготовление': первое принятое окном блюдо отправляется порталу один раз, повтор не отправляется", async () => {
+		const scripted = createScriptedSimulation();
+		const game = await launch("easy", { createSimulation: vi.fn(() => scripted.simulation) as unknown as GameModules["createSimulation"] });
+		scripted.emit(dishAccepted("burger"));
+		expect(game.bridge.saveProgress).toHaveBeenCalledTimes(1);
+		expect(game.bridge.saveProgress).toHaveBeenLastCalledWith({ version: 1, cookedDishes: ["burger"] });
+		scripted.emit(dishAccepted("burger"));
+		expect(game.bridge.saveProgress).toHaveBeenCalledTimes(1);
+		scripted.emit(dishAccepted("ham"));
+		expect(game.bridge.saveProgress).toHaveBeenCalledTimes(2);
+		expect(game.bridge.saveProgress).toHaveBeenLastCalledWith({ version: 1, cookedDishes: ["burger", "ham"] });
+	});
+
+	it("сценарий 'Прогресс из старта': знакомые блюда не попадают в список подсказок и не отправляются повторно", async () => {
+		const scripted = createScriptedSimulation();
+		const game = await launch(
+			"medium",
+			{ createSimulation: vi.fn(() => scripted.simulation) as unknown as GameModules["createSimulation"] },
+			{ version: 1, cookedDishes: ["burger", "ham"] },
+		);
+		// Сценарий 'Список блюд для подсказок': в меню medium остаётся только овощной бургер.
+		expect(game.state.hudOptions?.tutorialDishes).toEqual(["veggieBurger"]);
+		scripted.emit(dishAccepted("burger"));
+		expect(game.bridge.saveProgress).not.toHaveBeenCalled();
+		scripted.emit(dishAccepted("veggieBurger"));
+		expect(game.bridge.saveProgress).toHaveBeenLastCalledWith({ version: 1, cookedDishes: ["burger", "ham", "veggieBurger"] });
+	});
+
+	it("сценарий 'Битый блок' и старт без блока: подсказки по всем блюдам меню", async () => {
+		const withoutBlock = await launch("hard");
+		expect(withoutBlock.state.hudOptions?.tutorialDishes).toEqual(["burger", "ham", "veggieBurger", "stew"]);
+		const broken = await launch("easy", {}, { version: 99, cookedDishes: "бургер" });
+		expect(broken.state.hudOptions?.tutorialDishes).toEqual(["burger", "ham"]);
+	});
+
+	it("все блюда меню знакомы: список подсказок пуст", async () => {
+		const game = await launch("easy", {}, { version: 1, cookedDishes: ["burger", "ham"] });
+		expect(game.state.hudOptions?.tutorialDishes).toEqual([]);
+	});
+
+	it("сценарий 'Автоматическое прохождение прогресс не меняет': без ввода игрока блюда не принимаются и блок не отправляется", async () => {
+		const game = await launch("easy");
+		game.state.hudOptions?.callbacks.onStartPressed();
+		for (let frame = 0; frame < 600; frame += 1) {
+			game.state.onFrame?.(1 / 60, frame * 16);
+		}
+		expect(game.handle?.getSimulation()?.getSnapshot().tick).toBeGreaterThan(500);
+		expect(game.bridge.saveProgress).not.toHaveBeenCalled();
 	});
 });
 

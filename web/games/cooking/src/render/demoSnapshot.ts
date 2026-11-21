@@ -29,6 +29,8 @@ export interface DemoOptions {
 	failure?: FailureInfo | null;
 	score?: number;
 	servedCustomers?: number;
+	// Занять все места за всеми столами заказами (проверка раскладки карточек при полной загрузке зала).
+	fillAllTables?: boolean;
 }
 
 // Предметы для демонстрации в руке повара: от пустой руки до готового блюда.
@@ -36,15 +38,15 @@ const demoHandItems: Array<Item | null> = [
 	null,
 	{ type: "ingredient", kind: "steak", state: "raw" },
 	{ type: "ingredient", kind: "steak", state: "chopped" },
-	{ type: "plate", contents: [], dish: null },
-	{ type: "plate", contents: [{ type: "ingredient", kind: "bun", state: "raw" }], dish: null },
-	{ type: "plate", contents: [], dish: "burger" },
+	{ type: "assembly", contents: [], dish: null, plated: true },
+	{ type: "assembly", contents: [{ type: "ingredient", kind: "bun", state: "raw" }], dish: null, plated: true },
+	{ type: "assembly", contents: [{ type: "ingredient", kind: "patty", state: "cooked" }, { type: "ingredient", kind: "bun", state: "raw" }], dish: "burger", plated: true },
 	{ type: "ingredient", kind: "patty", state: "burnt" },
-	{ type: "plate", contents: [], dish: "veggieBurger" },
+	{ type: "assembly", contents: [{ type: "ingredient", kind: "veggiePatty", state: "cooked" }, { type: "ingredient", kind: "bun", state: "raw" }], dish: "veggieBurger", plated: true },
 ];
 
 // Блюда клиентов по кругу.
-const demoDishes: DishId[] = ["burger", "ham", "veggieBurger", "stew"];
+const demoDishes: DishId[] = ["burger", "ham", "steak", "veggieBurger", "stew"];
 
 // Позиция на замкнутом маршруте по точкам со скоростью speed (единиц/сек). Возвращает точку и направление.
 function walkRoute(points: readonly Vec2[], speed: number, timeSec: number): { position: Vec2; direction: Vec2 } {
@@ -71,12 +73,12 @@ function walkRoute(points: readonly Vec2[], speed: number, timeSec: number): { p
 
 // Состояние станции по виду и времени: цикл "сырое, готовится, готово, подгорает, сгорело".
 function createStationSnapshot(station: StationConfig, indexOfKind: number, timeSec: number): StationSnapshot {
-	const base: StationSnapshot = { id: station.id, kind: station.kind, items: [], phase: "idle", progress: 0, burnProgress: 0, portions: 0 };
+	const base: StationSnapshot = { id: station.id, kind: station.kind, items: [], phase: "idle", progress: 0, burnProgress: 0, portions: 0, isHeating: false };
 	const shifted = timeSec + indexOfKind * 5;
 	switch (station.kind) {
 		case "counter":
 			if (indexOfKind === 0) {
-				return { ...base, items: [{ type: "plate", contents: [], dish: "burger" }], phase: "holding" };
+				return { ...base, items: [{ type: "assembly", contents: [{ type: "ingredient", kind: "bun", state: "raw" }], dish: null, plated: true }], phase: "holding" };
 			}
 			return { ...base, items: [{ type: "ingredient", kind: "bun", state: "raw" }], phase: "holding" };
 		case "cuttingBoard": {
@@ -99,18 +101,18 @@ function createStationSnapshot(station: StationConfig, indexOfKind: number, time
 			}
 			return base;
 		}
-		case "pot": {
+		case "stove": {
 			const cycle = shifted % 24;
 			if (cycle < 4) {
-				return { ...base, items: [{ type: "ingredient", kind: "carrot", state: "chopped" }, { type: "ingredient", kind: "potato", state: "chopped" }], phase: "holding" };
+				return { ...base, items: [{ type: "pot", hasWater: true, contents: [{ type: "ingredient", kind: "carrot", state: "chopped" }, { type: "ingredient", kind: "potato", state: "chopped" }], cookProgressSec: 0, portions: 0 }], phase: "holding" };
 			}
 			if (cycle < 12) {
-				return { ...base, items: [{ type: "ingredient", kind: "carrot", state: "chopped" }, { type: "ingredient", kind: "potato", state: "chopped" }, { type: "ingredient", kind: "onion", state: "chopped" }], phase: "processing", progress: (cycle - 4) / 8 };
+				return { ...base, items: [{ type: "pot", hasWater: true, contents: [{ type: "ingredient", kind: "carrot", state: "chopped" }, { type: "ingredient", kind: "potato", state: "chopped" }, { type: "ingredient", kind: "onion", state: "chopped" }], cookProgressSec: (cycle - 4) / 8 * 8, portions: 0 }], phase: "processing", progress: (cycle - 4) / 8, isHeating: true };
 			}
 			if (cycle < 18) {
-				return { ...base, items: [{ type: "ingredient", kind: "stew", state: "cooked" }], phase: "ready", burnProgress: (cycle - 12) / 6, portions: 2 };
+				return { ...base, items: [{ type: "pot", hasWater: true, contents: [], cookProgressSec: 0, portions: 2 }], phase: "ready", progress: 1, portions: 2 };
 			}
-			return { ...base, items: [{ type: "ingredient", kind: "stew", state: "burnt" }], phase: "burnt" };
+			return { ...base, items: [{ type: "pot", hasWater: true, contents: [], cookProgressSec: 0, portions: 2 }], phase: "ready", progress: 1, portions: 2 };
 		}
 		case "oven": {
 			const cycle = shifted % 20;
@@ -182,12 +184,12 @@ export function createDemoSnapshot(level: LevelConfig, timeSec: number, options:
 	level.tables.forEach((table, tableIndex) => {
 		const orders: OrderSnapshot[] = [];
 		table.seats.forEach((seat, seatIndex) => {
-			if (tableIndex > 0 && (seatIndex + tableIndex) % 2 === 1) {
+			if (!options.fillAllTables && tableIndex > 0 && (seatIndex + tableIndex) % 2 === 1) {
 				return;
 			}
 			customerNumber += 1;
 			const dish = demoDishes[customerNumber % demoDishes.length];
-			const isServed = tableIndex === level.tables.length - 1;
+			const isServed = !options.fillAllTables && tableIndex === level.tables.length - 1;
 			const id = `c-${tableIndex + 1}-${seatIndex + 1}`;
 			customers.push({
 				id,
@@ -220,7 +222,7 @@ export function createDemoSnapshot(level: LevelConfig, timeSec: number, options:
 			tableId: table.id,
 			number: table.number,
 			capacity: table.seats.length,
-			state: orders.length === 0 ? "free" : tableIndex === level.tables.length - 1 ? "served" : "waiting",
+			state: orders.length === 0 ? "free" : !options.fillAllTables && tableIndex === level.tables.length - 1 ? "served" : "waiting",
 			groupId: orders.length === 0 ? null : `g-${tableIndex + 1}`,
 			orders,
 		});

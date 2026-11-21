@@ -4,8 +4,9 @@ import "./base.css";
 import { debugLog } from "./config/debug";
 import { startGame } from "./game";
 import { systemTexts } from "./texts";
+import type { PortalBridgeApi } from "./contracts";
 
-const bridge = window.PortalBridge;
+const bridge = (window as unknown as { PortalBridge: PortalBridgeApi }).PortalBridge;
 const root = document.getElementById("game-root");
 document.title = systemTexts.documentTitle;
 

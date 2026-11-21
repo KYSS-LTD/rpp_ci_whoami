@@ -15,6 +15,17 @@ export const portalMessageSource = "portal";
 
 // Параметр адреса сборки, в котором портал передаёт уровень (entry?level=easy).
 export const levelQueryParameter = "level";
+export const maxGameProgressBytes = 4096;
+
+export function isValidGameProgress(data: unknown): boolean {
+	if (data === null || typeof data !== "object" || Array.isArray(data)) return false;
+	try {
+		const serialized = JSON.stringify(data);
+		return typeof serialized === "string" && new TextEncoder().encode(serialized).length <= maxGameProgressBytes;
+	} catch {
+		return false;
+	}
+}
 
 export type PracticeResult = {
 	type: "practice-result";
@@ -28,6 +39,7 @@ export type PracticeResult = {
 // Сообщения игры, которые портал понимает.
 export type GameMessage =
 	| { type: "ready" }
+	| { type: "progress"; data: Record<string, unknown> }
 	| { type: "level-result"; score: number; maxScore: number; completed: boolean }
 	| PracticeResult
 	| { type: "exit" }
@@ -40,6 +52,7 @@ export interface StartMessage {
 	type: "start";
 	gameId: string;
 	levelId: LevelId;
+	progress: Record<string, unknown> | null;
 }
 
 // Итог разбора: сообщение или причина, по которой оно проигнорировано (для журнала отладки).
@@ -62,6 +75,9 @@ export function parseGameMessage(data: unknown): ParsedGameMessage {
 	switch (raw.type) {
 		case "ready":
 			return { ok: true, message: { type: "ready" } };
+		case "progress":
+			if (!isValidGameProgress(raw.data)) return { ok: false, reason: "неверный или слишком большой блок прогресса игры" };
+			return { ok: true, message: { type: "progress", data: raw.data as Record<string, unknown> } };
 		case "exit":
 			return { ok: true, message: { type: "exit" } };
 		case "error":
@@ -92,8 +108,9 @@ export function parseGameMessage(data: unknown): ParsedGameMessage {
 }
 
 // Собирает сообщение о старте уровня для игры.
-export function buildStartMessage(gameId: string, levelId: LevelId): StartMessage {
-	return { source: portalMessageSource, version: bridgeProtocolVersion, type: "start", gameId, levelId };
+export function buildStartMessage(gameId: string, levelId: LevelId, progress: unknown = null): StartMessage {
+	return { source: portalMessageSource, version: bridgeProtocolVersion, type: "start", gameId, levelId,
+		progress: isValidGameProgress(progress) ? progress as Record<string, unknown> : null };
 }
 
 // Адрес сборки с уровнем в параметре: "/game-builds/x/index.html" -> "/game-builds/x/index.html?level=easy".

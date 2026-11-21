@@ -109,11 +109,10 @@ describe("уровень easy (задача 8.1)", () => {
 		expect(level.tables).toHaveLength(3);
 	});
 
-	it("сценарий 'Блюда easy': меню из бургера и окорока, один официант с одной тарелкой, кастрюли нет", () => {
+	it("сценарий 'Блюда easy': меню из бургера и окорока, один официант с одной тарелкой", () => {
 		expect(level.params.menu).toEqual(["burger", "ham"]);
 		expect(level.waiters.waitPoints).toHaveLength(1);
 		expect(level.params.waiter.capacity).toBe(1);
-		expect(countStations(level, "pot")).toBe(0);
 	});
 });
 
@@ -124,11 +123,10 @@ describe("уровень medium (задача 8.2)", () => {
 		expect(level.params.durationSec).toBe(240);
 	});
 
-	it("в зале четыре стола, один официант с одной тарелкой, кастрюли нет", () => {
+	it("в зале четыре стола и один официант с одной тарелкой", () => {
 		expect(level.tables).toHaveLength(4);
 		expect(level.waiters.waitPoints).toHaveLength(1);
 		expect(level.params.waiter.capacity).toBe(1);
-		expect(countStations(level, "pot")).toBe(0);
 	});
 
 	it("сценарий 'Ящики для меню': есть ящики стейка, булочек, ветчины, картофеля и моркови; в меню добавлен овощной бургер", () => {
@@ -146,10 +144,11 @@ describe("уровень hard (задача 8.3)", () => {
 		expect(level.tables).toHaveLength(6);
 	});
 
-	it("сценарий 'Кастрюля на hard': на плите стоит кастрюля, а на easy и medium кастрюли нет", () => {
-		expect(countStations(level, "pot")).toBeGreaterThanOrEqual(1);
-		expect(countStations(getLevelConfig("easy"), "pot")).toBe(0);
-		expect(countStations(getLevelConfig("medium"), "pot")).toBe(0);
+	it("сценарий 'Кастрюля для рагу': стол с кастрюлей и конфорка есть на каждом уровне кампании", () => {
+		for (const candidate of LEVEL_IDS.map((id) => getLevelConfig(id))) {
+			expect(candidate.stations.some((station) => station.id === "pot-table" && station.startItem === "pot")).toBe(true);
+			expect(countStations(candidate, "stove")).toBeGreaterThanOrEqual(1);
+		}
 	});
 
 	it("сценарий 'Два официанта': в зале работают два официанта по две тарелки", () => {

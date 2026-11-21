@@ -1,25 +1,15 @@
-// Кухня (задачи 2.4-2.9): рука повара, ящики, прилавки, разделочная доска, плиты со сковородой и кастрюлей, духовка,
-// стопка тарелок, урна и окно выдачи. Реализует Kitchen из contracts.ts. Рецепты и переходы лежат в recipes.ts, числа
-// (время резки, готовки, подгорания) в LevelParams. Модуль не знает о DOM и three. Владелец: SONNET-1.
-//
-// Правила взаимодействия "взять/положить" (interact) зависят от руки и станции:
-// - рука пуста: берём предмет со станции (ящик и стопка выдают новый, плита отдаёт готовое, сгоревшее или последний
-//   положенный вход неполного набора);
-// - в руке ингредиент: кладём на станцию, если она его принимает;
-// - в руке тарелка: тарелка забирает готовый ингредиент со станции (прилавок, плита, кастрюля, духовка); положить тарелку
-//   можно на пустой прилавок, в стопку (пустую), в урну и в окно (готовое блюдо);
-// - ингредиент в руке и тарелка на прилавке: ингредиент ложится на тарелку.
-// Тарелка принимает ингредиент, только если он подходит хотя бы к одному рецепту меню уровня (recipes.checkPlateAccepts).
+// Кухня версии 2: предметы, сборки, переносимая кастрюля, нарезка, готовка и окно выдачи.
+// Модуль чистый: он не импортирует DOM или three.js. Баланс читается только из LevelParams.
 import {
 	type ActionRejectReason,
+	type AssemblyItem,
 	type CookTransition,
 	type IngredientItem,
 	type InteractResult,
 	type Item,
 	type Kitchen,
 	type KitchenDeps,
-	type PlateItem,
-	type ServingWindow,
+	type PotItem,
 	type StationConfig,
 	type StationId,
 	type StationPhase,
@@ -28,104 +18,77 @@ import {
 } from "../../contracts";
 import { debugLog } from "../../config/debug";
 import {
-	addIngredientToPlate,
-	checkPlateAccepts,
 	cloneItem,
+	combineWithIngredient,
 	createEmptyPlate,
+	createEmptyPot,
 	createIngredientFromSpec,
 	createIngredientItem,
 	findCookTransitions,
 	findCutTransition,
+	ingredientsFitMenu,
 	isBurntIngredient,
 	isSameMultiset,
 	isSubMultiset,
+	makeAssembly,
+	plateItem,
 	specOf,
+	potRecipe,
 } from "./recipes";
 import { createServingWindow } from "./servingWindow";
 
-// Допуск на накопленную погрешность вещественных чисел при сравнении времени.
 const TIME_EPSILON_SEC = 1e-9;
-
-// Состояние плиты или духовки: empty - пусто; loading - положена часть набора, готовка не началась; cooking - идёт готовка;
-// ready - готово, идёт отсчёт до подгорания; burnt - сгорело.
 type CookStatus = "empty" | "loading" | "cooking" | "ready" | "burnt";
 
-// Изменяемое состояние одной станции. Поля нужных видов станций используются, остальные остаются пустыми.
 interface StationRuntime {
 	config: StationConfig;
-	// Прилавок: любой предмет или тарелка. Доска: ингредиент.
 	item: Item | null;
-	// Доска: сколько секунд резки накоплено у текущего предмета.
 	cutProgressSec: number;
-	// Сковорода, кастрюля, духовка.
 	cookStatus: CookStatus;
-	// Что лежит на плите: набор входов, затем один предмет (котлета, ветчина) или овощи кастрюли, затем готовое или сгоревшее.
 	cookItems: IngredientItem[];
 	cookRecipe: CookTransition | null;
-	// Секунды в текущей стадии: до готовности при cooking, до подгорания при ready.
 	cookElapsedSec: number;
-	// Кастрюля: сколько порций рагу осталось.
-	portions: number;
+	potHeating: boolean;
 }
 
-// Результат попытки положить ингредиент на тарелку: новая тарелка или причина отказа.
-type PlateAddResult = { ok: true; plate: PlateItem } | { ok: false; reason: ActionRejectReason };
+type PotUpdate = { ok: true; pot: PotItem } | { ok: false; reason: ActionRejectReason };
+type InteractSuccess = { ok: true };
+const ACTION_OK: InteractSuccess = { ok: true };
 
-// Успешное действие.
-const ACTION_OK: InteractResult = { ok: true };
-
-// Отказ действия с причиной.
 function rejected(reason: ActionRejectReason): InteractResult {
 	return { ok: false, reason };
 }
 
-// Вид станции, готовящей еду сама.
-function isCookerKind(kind: StationConfig["kind"]): boolean {
-	return kind === "pan" || kind === "pot" || kind === "oven";
+function isIngredient(item: Item): item is IngredientItem {
+	return item.type === "ingredient";
 }
 
-// Создаёт кухню: рука пуста, все станции пусты, окно выдачи пусто.
-export function createKitchen(deps: KitchenDeps): Kitchen {
-	const params = deps.level.params.kitchen;
-	const menu = deps.level.params.menu;
-	const bus = deps.bus;
-	const servingWindow: ServingWindow = createServingWindow({ level: deps.level, orders: deps.orders, clock: deps.clock, bus });
+function isAssembly(item: Item): item is AssemblyItem {
+	return item.type === "assembly";
+}
 
-	const stationList: StationRuntime[] = deps.level.stations.map((config) => ({
+function ratioOf(elapsedSec: number, totalSec: number): number {
+	return totalSec <= 0 ? 1 : Math.min(1, Math.max(0, elapsedSec / totalSec));
+}
+
+export function createKitchen(deps: KitchenDeps): Kitchen {
+	const { level, orders, clock, bus } = deps;
+	const { kitchen: params, menu } = level.params;
+	const servingWindow = createServingWindow({ level, orders, clock, bus });
+	const stationList: StationRuntime[] = level.stations.map((config) => ({
 		config,
-		item: null,
+		item: config.startItem === "pot" ? createEmptyPot() : null,
 		cutProgressSec: 0,
 		cookStatus: "empty",
 		cookItems: [],
 		cookRecipe: null,
 		cookElapsedSec: 0,
-		portions: 0,
+		potHeating: false,
 	}));
 	const stationsById = new Map<StationId, StationRuntime>(stationList.map((runtime) => [runtime.config.id, runtime]));
-
-	// Предмет в руке повара.
 	let hand: Item | null = null;
-	// Станция, над которой удерживается рабочее действие.
 	let workStationId: StationId | null = null;
-	// Доска, на которой резка шла на последнем шаге (для phase processing и isWorking).
 	let cuttingStationId: StationId | null = null;
-
-	// ------------------------------------------------------------------------
-	// Общие помощники
-	// ------------------------------------------------------------------------
-
-	// Кладёт ингредиент на тарелку, если рецепты меню это позволяют. Шлёт dishAssembled, когда тарелка стала блюдом.
-	function addToPlate(plate: PlateItem, ingredient: IngredientItem): PlateAddResult {
-		const reason = checkPlateAccepts(menu, plate, ingredient);
-		if (reason !== null) {
-			return { ok: false, reason };
-		}
-		const updated = addIngredientToPlate(menu, plate, ingredient);
-		if (updated.dish !== null) {
-			bus.emit({ type: "dishAssembled", dish: updated.dish });
-		}
-		return { ok: true, plate: updated };
-	}
 
 	function emitTaken(stationId: StationId, item: Item): void {
 		bus.emit({ type: "itemTaken", stationId, item: cloneItem(item) });
@@ -135,273 +98,368 @@ export function createKitchen(deps: KitchenDeps): Kitchen {
 		bus.emit({ type: "itemPlaced", stationId, item: cloneItem(item) });
 	}
 
-	// Сбрасывает плиту в пустое состояние.
-	function resetCooker(runtime: StationRuntime): void {
-		runtime.cookStatus = "empty";
-		runtime.cookItems = [];
-		runtime.cookRecipe = null;
-		runtime.cookElapsedSec = 0;
-		runtime.portions = 0;
+	function emitCombined(stationId: StationId, item: Item, previousDish: string | null): void {
+		bus.emit({ type: "itemCombined", stationId, item: cloneItem(item) });
+		if (item.type === "assembly" && item.dish !== null && item.dish !== previousDish) {
+			bus.emit({ type: "dishAssembled", dish: item.dish, plated: item.plated });
+		}
 	}
 
-	// ------------------------------------------------------------------------
-	// Взаимодействие по видам станций
-	// ------------------------------------------------------------------------
-
-	// Ящик: выдаёт один сырой ингредиент в пустую руку.
-	function interactCrate(runtime: StationRuntime): InteractResult {
-		if (hand !== null) {
-			return rejected("handBusy");
+	function dishOf(item: Item): string | null {
+		if (item.type === "assembly") {
+			return item.dish;
 		}
+		if (item.type !== "ingredient" || item.state === "burnt") {
+			return null;
+		}
+		return makeAssembly(menu, [item], false).dish;
+	}
+
+	function combineItems(first: Item, second: Item): Item | null {
+		if (first.type === "pot" || second.type === "pot" || isBurntIngredient(first) || isBurntIngredient(second)) {
+			return null;
+		}
+		if (isAssembly(first) && first.plated && isAssembly(second) && second.plated) {
+			return null;
+		}
+		const firstItems = isAssembly(first) ? first.contents : [first];
+		const secondItems = isAssembly(second) ? second.contents : [second];
+		const contents = [...firstItems, ...secondItems];
+		if (!ingredientsFitMenu(menu, contents)) {
+			return null;
+		}
+		const plated = isAssembly(first) && first.plated || isAssembly(second) && second.plated;
+		return makeAssembly(menu, contents, plated);
+	}
+
+	function addVegetable(pot: PotItem, ingredient: IngredientItem): PotUpdate {
+		if (!pot.hasWater) {
+			return { ok: false, reason: "needsWater" };
+		}
+		if (pot.portions > 0 || ingredient.state !== "chopped" || !["carrot", "potato", "onion"].includes(ingredient.kind)) {
+			return { ok: false, reason: "itemNotAccepted" };
+		}
+		if (pot.contents.length >= params.potCapacity) {
+			return { ok: false, reason: "stationOccupied" };
+		}
+		const contents = [...pot.contents, { ...ingredient }];
+		if (!isSubMultiset(contents.map(specOf), potRecipe.inputs)) {
+			return { ok: false, reason: "itemNotAccepted" };
+		}
+		return { ok: true, pot: { ...pot, contents } };
+	}
+
+	function scoopStew(pot: PotItem, stationId: StationId): InteractResult {
+		if (hand === null || !isAssembly(hand) || !hand.plated) {
+			return rejected(hand === null ? "plateRequired" : "plateRequired");
+		}
+		if (pot.portions <= 0) {
+			return rejected("nothingToTake");
+		}
+		const previousDish = hand.dish;
+		const portion = createIngredientFromSpec(potRecipe.portion);
+		const combined = combineWithIngredient(menu, hand, portion);
+		if (!combined || !isAssembly(combined)) {
+			return rejected("plateNotAccepted");
+		}
+		hand = combined;
+		const remaining = pot.portions - 1;
+		const nextPot: PotItem = remaining === 0
+			? { ...pot, hasWater: false, contents: [], cookProgressSec: 0, portions: 0 }
+			: { ...pot, portions: remaining };
+		const runtime = stationsById.get(stationId);
+		if (runtime && runtime.item?.type === "pot") {
+			runtime.item = nextPot;
+		}
+		emitCombined(stationId, hand, previousDish);
+		return ACTION_OK;
+	}
+
+	function interactCrate(runtime: StationRuntime): InteractResult {
 		const kind = runtime.config.ingredient;
 		if (!kind) {
 			debugLog("kitchen", `у ящика ${runtime.config.id} не задан ингредиент`);
 			return rejected("nothingToTake");
 		}
-		hand = createIngredientItem(kind, "raw");
-		emitTaken(runtime.config.id, hand);
+		if (hand === null) {
+			hand = createIngredientItem(kind, "raw");
+			emitTaken(runtime.config.id, hand);
+			return ACTION_OK;
+		}
+		const ingredient = createIngredientItem(kind, "raw");
+		const combined = combineWithIngredient(menu, hand, ingredient);
+		if (!combined) {
+			return rejected("handBusy");
+		}
+		const previousDish = dishOf(hand);
+		hand = combined;
+		emitCombined(runtime.config.id, hand, previousDish);
 		return ACTION_OK;
 	}
 
-	// Прилавок: хранит один предмет; ингредиент и тарелка соединяются в одну тарелку.
-	function interactCounter(runtime: StationRuntime): InteractResult {
+	function interactSurface(runtime: StationRuntime): InteractResult {
 		const stationId = runtime.config.id;
-		const onCounter = runtime.item;
+		const onSurface = runtime.item;
 		if (hand === null) {
-			if (onCounter === null) {
+			if (onSurface === null) {
 				return rejected("nothingToTake");
 			}
-			hand = onCounter;
+			hand = onSurface;
 			runtime.item = null;
-			emitTaken(stationId, hand);
-			return ACTION_OK;
-		}
-		if (onCounter === null) {
-			const placed = hand;
-			runtime.item = placed;
-			hand = null;
-			emitPlaced(stationId, placed);
-			return ACTION_OK;
-		}
-		// Занято и в руке, и на прилавке: возможно соединение тарелки с ингредиентом.
-		if (hand.type === "plate" && onCounter.type === "ingredient") {
-			const result = addToPlate(hand, onCounter);
-			if (!result.ok) {
-				return rejected(result.reason);
-			}
-			hand = result.plate;
-			runtime.item = null;
-			emitTaken(stationId, onCounter);
-			return ACTION_OK;
-		}
-		if (hand.type === "ingredient" && onCounter.type === "plate") {
-			const result = addToPlate(onCounter, hand);
-			if (!result.ok) {
-				return rejected(result.reason);
-			}
-			const placed = hand;
-			runtime.item = result.plate;
-			hand = null;
-			emitPlaced(stationId, placed);
-			return ACTION_OK;
-		}
-		return rejected("stationOccupied");
-	}
-
-	// Разделочная доска: принимает сырой нарезаемый предмет, режет по удержанию (см. step), отдаёт предмет обратно.
-	function interactBoard(runtime: StationRuntime): InteractResult {
-		const stationId = runtime.config.id;
-		const onBoard = runtime.item;
-		if (hand === null) {
-			if (onBoard === null) {
-				return rejected("nothingToTake");
-			}
-			hand = onBoard;
-			runtime.item = null;
-			// Прогресс резки привязан к предмету на доске: забрали предмет, прогресс потерян.
 			runtime.cutProgressSec = 0;
+			runtime.potHeating = false;
 			emitTaken(stationId, hand);
 			return ACTION_OK;
 		}
-		if (onBoard !== null) {
-			if (hand.type === "plate" && onBoard.type === "ingredient") {
-				const result = addToPlate(hand, onBoard);
-				if (!result.ok) {
-					return rejected(result.reason);
-				}
-				hand = result.plate;
-				runtime.item = null;
-				runtime.cutProgressSec = 0;
-				emitTaken(stationId, onBoard);
-				return ACTION_OK;
+		if (onSurface === null) {
+			runtime.item = hand;
+			hand = null;
+			runtime.cutProgressSec = 0;
+			emitPlaced(stationId, runtime.item);
+			return ACTION_OK;
+		}
+		if (onSurface.type === "pot" && isIngredient(hand)) {
+			const update = addVegetable(onSurface, hand);
+			if (!update.ok) {
+				return rejected(update.reason);
 			}
+			runtime.item = update.pot;
+			const placed = hand;
+			hand = null;
+			bus.emit({ type: "itemCombined", stationId, item: cloneItem(runtime.item) });
+			emitPlaced(stationId, placed);
+			return ACTION_OK;
+		}
+		if (hand.type === "pot" && isIngredient(onSurface)) {
+			const update = addVegetable(hand, onSurface);
+			if (!update.ok) {
+				return rejected(update.reason);
+			}
+			const previousDish = dishOf(onSurface);
+			hand = update.pot;
+			runtime.item = null;
+			emitCombined(stationId, hand, previousDish);
+			return ACTION_OK;
+		}
+		if (onSurface.type === "pot" && isAssembly(hand) && hand.plated) {
+			return scoopStew(onSurface, stationId);
+		}
+		if (hand.type === "pot" && isAssembly(onSurface) && onSurface.plated) {
+			return scoopStew(hand, stationId);
+		}
+		const combined = combineItems(hand, onSurface);
+		if (!combined) {
 			return rejected("stationOccupied");
 		}
-		if (hand.type !== "ingredient") {
-			return rejected("itemNotAccepted");
+		const previousDish = dishOf(hand) ?? dishOf(onSurface);
+		const handCarriesPlate = isAssembly(hand) && hand.plated;
+		const surfaceCarriesPlate = isAssembly(onSurface) && onSurface.plated;
+		if (handCarriesPlate) {
+			hand = combined;
+			runtime.item = null;
+			emitTaken(stationId, onSurface);
+		} else {
+			runtime.item = combined;
+			hand = null;
+			emitPlaced(stationId, onSurface);
 		}
-		if (isBurntIngredient(hand)) {
-			return rejected("burntItem");
+		if (surfaceCarriesPlate && !handCarriesPlate) {
+			runtime.item = combined;
 		}
-		if (!findCutTransition(hand)) {
-			return rejected("itemNotAccepted");
-		}
-		const placed = hand;
-		runtime.item = placed;
-		runtime.cutProgressSec = 0;
-		hand = null;
-		emitPlaced(stationId, placed);
+		emitCombined(stationId, combined, previousDish);
 		return ACTION_OK;
 	}
 
-	// Начинает готовку по полному набору входов.
+	function resetCooker(runtime: StationRuntime): void {
+		runtime.cookStatus = "empty";
+		runtime.cookItems = [];
+		runtime.cookRecipe = null;
+		runtime.cookElapsedSec = 0;
+	}
+
 	function startCooking(runtime: StationRuntime, transition: CookTransition): void {
 		runtime.cookStatus = "cooking";
 		runtime.cookRecipe = transition;
 		runtime.cookElapsedSec = 0;
-		// Сковорода и духовка заменяют набор одним предметом в процессе (котлета, ветчина), кастрюля оставляет овощи.
-		if (transition.cooking) {
-			runtime.cookItems = [createIngredientFromSpec(transition.cooking)];
-		}
+		runtime.cookItems = transition.cooking ? [createIngredientFromSpec(transition.cooking)] : runtime.cookItems;
 		bus.emit({ type: "cookingStarted", stationId: runtime.config.id, recipe: transition.id });
 	}
 
-	// Плита: кладём ингредиент (часть набора или весь), в пустой руке берём готовое или сгоревшее, тарелка забирает готовое.
-	function interactCooker(runtime: StationRuntime): InteractResult {
-		if (hand === null) {
-			return takeFromCooker(runtime);
-		}
-		if (hand.type === "plate") {
-			return takeFromCookerOntoPlate(runtime, hand);
-		}
-		return placeIntoCooker(runtime, hand);
-	}
-
-	// Пустая рука берёт со станции то, что она может отдать без тарелки.
-	function takeFromCooker(runtime: StationRuntime): InteractResult {
-		const stationId = runtime.config.id;
-		switch (runtime.cookStatus) {
-			case "loading": {
-				// Положенное, но ещё не запущенное в готовку, можно забрать обратно (последним положенным).
-				const returned = runtime.cookItems.pop();
-				if (!returned) {
-					return rejected("nothingToTake");
-				}
-				if (runtime.cookItems.length === 0) {
-					resetCooker(runtime);
-				}
-				hand = returned;
-				emitTaken(stationId, returned);
-				return ACTION_OK;
-			}
-			case "ready": {
-				// Порция рагу берётся только на тарелку.
-				if (runtime.config.kind === "pot") {
-					return rejected("plateRequired");
-				}
-				hand = runtime.cookItems[0];
-				resetCooker(runtime);
-				emitTaken(stationId, hand);
-				return ACTION_OK;
-			}
-			case "burnt": {
-				// Сгоревшее можно только вынести в урну: берём в руку целиком.
-				hand = runtime.cookItems[0];
-				resetCooker(runtime);
-				emitTaken(stationId, hand);
-				return ACTION_OK;
-			}
-			default:
-				return rejected("nothingToTake");
-		}
-	}
-
-	// Тарелка в руке забирает готовое: котлету, ветчину, порцию рагу.
-	function takeFromCookerOntoPlate(runtime: StationRuntime, plate: PlateItem): InteractResult {
-		const stationId = runtime.config.id;
-		if (runtime.cookStatus === "burnt") {
-			return rejected("burntItem");
-		}
-		if (runtime.cookStatus !== "ready") {
-			return rejected("nothingToTake");
-		}
-		const taken: IngredientItem = runtime.cookItems[0];
-		const result = addToPlate(plate, taken);
-		if (!result.ok) {
-			return rejected(result.reason);
-		}
-		hand = result.plate;
-		if (runtime.config.kind === "pot" && runtime.portions > 1) {
-			// В кастрюле остались порции: готовое рагу и отсчёт до подгорания продолжаются.
-			runtime.portions -= 1;
-		} else {
-			resetCooker(runtime);
-		}
-		emitTaken(stationId, taken);
-		return ACTION_OK;
-	}
-
-	// Ингредиент в руке кладётся в плиту, если вместе с лежащим он входит в набор одного из переходов этой плиты.
-	function placeIntoCooker(runtime: StationRuntime, ingredient: IngredientItem): InteractResult {
+	function loadCooker(runtime: StationRuntime, ingredient: IngredientItem): InteractResult {
 		if (runtime.cookStatus !== "empty" && runtime.cookStatus !== "loading") {
 			return rejected("stationOccupied");
 		}
 		if (isBurntIngredient(ingredient)) {
 			return rejected("burntItem");
 		}
-		if (runtime.config.kind === "pot" && runtime.cookItems.length >= params.potCapacity) {
-			return rejected("stationOccupied");
-		}
-		const loadedSpecs = [...runtime.cookItems.map(specOf), specOf(ingredient)];
-		const transition = findCookTransitions(runtime.config.kind).find((candidate) => isSubMultiset(loadedSpecs, candidate.inputs));
+		const nextItems = [...runtime.cookItems, ingredient];
+		const specs = nextItems.map(specOf);
+		const transition = findCookTransitions(runtime.config.kind).find((candidate) => isSubMultiset(specs, candidate.inputs));
 		if (!transition) {
 			return rejected("itemNotAccepted");
 		}
-		runtime.cookItems = [...runtime.cookItems, ingredient];
+		runtime.cookItems = nextItems.map((item) => ({ ...item }));
 		runtime.cookRecipe = transition;
 		runtime.cookStatus = "loading";
 		hand = null;
 		emitPlaced(runtime.config.id, ingredient);
-		if (isSameMultiset(loadedSpecs, transition.inputs)) {
+		if (isSameMultiset(specs, transition.inputs)) {
 			startCooking(runtime, transition);
 		}
 		return ACTION_OK;
 	}
 
-	// Стопка тарелок: бесконечно выдаёт чистые тарелки, принимает назад только пустую.
-	function interactPlateStack(runtime: StationRuntime): InteractResult {
-		const stationId = runtime.config.id;
-		if (hand === null) {
-			hand = createEmptyPlate();
-			emitTaken(stationId, hand);
+	function takeCooker(runtime: StationRuntime): InteractResult {
+		if (runtime.cookStatus === "loading") {
+			const returned = runtime.cookItems.pop();
+			if (!returned) {
+				return rejected("nothingToTake");
+			}
+			if (runtime.cookItems.length === 0) {
+				resetCooker(runtime);
+			} else {
+				const specs = runtime.cookItems.map(specOf);
+				runtime.cookRecipe = findCookTransitions(runtime.config.kind).find((entry) => isSubMultiset(specs, entry.inputs)) ?? null;
+			}
+			hand = returned;
+			emitTaken(runtime.config.id, returned);
 			return ACTION_OK;
 		}
-		if (hand.type === "plate" && hand.contents.length === 0) {
-			const returned = hand;
+		if (runtime.cookStatus !== "ready" && runtime.cookStatus !== "burnt") {
+			return rejected("nothingToTake");
+		}
+		const item = runtime.cookItems[0];
+		if (!item) {
+			return rejected("nothingToTake");
+		}
+		if (runtime.cookStatus === "ready" && hand !== null) {
+			const previousDish = dishOf(hand);
+			const combined = combineWithIngredient(menu, hand, item);
+			if (!combined) {
+				return rejected("itemNotAccepted");
+			}
+			hand = combined;
+			emitCombined(runtime.config.id, combined, previousDish);
+		} else if (runtime.cookStatus === "burnt" && hand !== null) {
+			return rejected("burntItem");
+		} else {
+			hand = item;
+			emitTaken(runtime.config.id, item);
+		}
+		resetCooker(runtime);
+		return ACTION_OK;
+	}
+
+	function interactCooker(runtime: StationRuntime): InteractResult {
+		if (hand === null) {
+			return takeCooker(runtime);
+		}
+		if (isIngredient(hand)) {
+			return loadCooker(runtime, hand);
+		}
+		return takeCooker(runtime);
+	}
+
+	function interactStove(runtime: StationRuntime): InteractResult {
+		const onStove = runtime.item;
+		if (onStove === null) {
+			if (hand?.type !== "pot") {
+				return rejected(hand === null ? "nothingToTake" : "itemNotAccepted");
+			}
+			runtime.item = hand;
 			hand = null;
-			emitPlaced(stationId, returned);
+			runtime.potHeating = false;
+			emitPlaced(runtime.config.id, runtime.item);
 			return ACTION_OK;
+		}
+		if (onStove.type !== "pot") {
+			return rejected("stationOccupied");
+		}
+		if (hand === null) {
+			hand = onStove;
+			runtime.item = null;
+			runtime.potHeating = false;
+			emitTaken(runtime.config.id, hand);
+			return ACTION_OK;
+		}
+		if (isIngredient(hand)) {
+			const update = addVegetable(onStove, hand);
+			if (!update.ok) {
+				return rejected(update.reason);
+			}
+			runtime.item = update.pot;
+			const added = hand;
+			hand = null;
+			bus.emit({ type: "itemCombined", stationId: runtime.config.id, item: cloneItem(update.pot) });
+			emitPlaced(runtime.config.id, added);
+			return ACTION_OK;
+		}
+		if (isAssembly(hand) && hand.plated) {
+			return scoopStew(onStove, runtime.config.id);
 		}
 		return rejected("itemNotAccepted");
 	}
 
-	// Урна: уничтожает любой предмет в руке, в том числе тарелку с содержимым.
+	function interactTap(runtime: StationRuntime): InteractResult {
+		if (hand?.type !== "pot") {
+			return rejected(hand === null ? "handEmpty" : "itemNotAccepted");
+		}
+		if (!hand.hasWater) {
+			hand = { ...hand, hasWater: true };
+			bus.emit({ type: "potWaterFilled", stationId: runtime.config.id });
+		}
+		return ACTION_OK;
+	}
+
+	function interactPlateStack(runtime: StationRuntime): InteractResult {
+		if (hand === null) {
+			hand = createEmptyPlate();
+			emitTaken(runtime.config.id, hand);
+			return ACTION_OK;
+		}
+		if (isAssembly(hand) && hand.plated && hand.contents.length === 0) {
+			const returned = hand;
+			hand = null;
+			emitPlaced(runtime.config.id, returned);
+			return ACTION_OK;
+		}
+		const plated = plateItem(menu, hand);
+		if (!plated) {
+			return rejected(isBurntIngredient(hand) ? "burntItem" : "plateNotAccepted");
+		}
+		const previousDish = dishOf(hand);
+		hand = plated;
+		if (plated.dish !== null && plated.dish !== previousDish) {
+			bus.emit({ type: "dishAssembled", dish: plated.dish, plated: true });
+		}
+		bus.emit({ type: "itemCombined", stationId: runtime.config.id, item: cloneItem(hand) });
+		return ACTION_OK;
+	}
+
 	function interactTrash(): InteractResult {
 		if (hand === null) {
 			return rejected("handEmpty");
 		}
-		const thrown = hand;
+		if (hand.type === "pot") {
+			return rejected("itemNotAccepted");
+		}
+		const trashed = hand;
 		hand = null;
-		bus.emit({ type: "itemTrashed", item: cloneItem(thrown) });
+		bus.emit({ type: "itemTrashed", item: cloneItem(trashed) });
 		return ACTION_OK;
 	}
 
-	// Окно выдачи: принимает тарелку с готовым блюдом, для которого есть открытый заказ.
 	function interactServingWindow(): InteractResult {
 		if (hand === null) {
 			return rejected("handEmpty");
 		}
-		if (hand.type !== "plate") {
+		if (!isAssembly(hand)) {
+			return rejected(dishOf(hand) !== null ? "dishNotPlated" : "dishNotReady");
+		}
+		if (!hand.plated) {
+			return rejected("dishNotPlated");
+		}
+		if (hand.dish === null) {
 			return rejected("dishNotReady");
 		}
 		const result = servingWindow.tryAccept(hand);
@@ -412,18 +470,13 @@ export function createKitchen(deps: KitchenDeps): Kitchen {
 		return ACTION_OK;
 	}
 
-	// ------------------------------------------------------------------------
-	// Шаг: резка, готовка, подгорание
-	// ------------------------------------------------------------------------
-
-	// Резка на доске под рабочим действием.
 	function stepCutting(dtSec: number): void {
 		cuttingStationId = null;
 		if (workStationId === null) {
 			return;
 		}
 		const runtime = stationsById.get(workStationId);
-		if (!runtime || runtime.config.kind !== "cuttingBoard" || runtime.item === null || runtime.item.type !== "ingredient") {
+		if (!runtime || runtime.config.kind !== "counter" && runtime.config.kind !== "cuttingBoard" || runtime.item === null || !isIngredient(runtime.item)) {
 			return;
 		}
 		const transition = findCutTransition(runtime.item);
@@ -431,15 +484,16 @@ export function createKitchen(deps: KitchenDeps): Kitchen {
 			return;
 		}
 		cuttingStationId = runtime.config.id;
+		const factor = runtime.config.kind === "cuttingBoard" ? params.boardCutDurationFactor : 1;
+		const durationSec = params.cutSec * factor;
 		runtime.cutProgressSec += dtSec;
-		if (runtime.cutProgressSec + TIME_EPSILON_SEC >= params.cutSec) {
+		if (runtime.cutProgressSec + TIME_EPSILON_SEC >= durationSec) {
 			runtime.item = createIngredientFromSpec(transition.output);
-			runtime.cutProgressSec = params.cutSec;
+			runtime.cutProgressSec = durationSec;
 			bus.emit({ type: "cuttingDone", stationId: runtime.config.id });
 		}
 	}
 
-	// Готовка и подгорание на одной плите.
 	function stepCooker(runtime: StationRuntime, dtSec: number): void {
 		const transition = runtime.cookRecipe;
 		if (!transition) {
@@ -448,91 +502,130 @@ export function createKitchen(deps: KitchenDeps): Kitchen {
 		const timing = params.cooking[transition.id];
 		if (runtime.cookStatus === "cooking") {
 			runtime.cookElapsedSec += dtSec;
-			if (runtime.cookElapsedSec + TIME_EPSILON_SEC >= timing.cookSec) {
-				// Излишек времени уходит в отсчёт до подгорания.
-				runtime.cookElapsedSec = Math.max(0, runtime.cookElapsedSec - timing.cookSec);
+			const cookDurationSec = timing.cookSec * params.cookDurationFactor;
+			if (runtime.cookElapsedSec + TIME_EPSILON_SEC >= cookDurationSec) {
+				const excess = Math.max(0, runtime.cookElapsedSec - cookDurationSec);
 				runtime.cookStatus = "ready";
 				runtime.cookItems = [createIngredientFromSpec(transition.cooked)];
-				runtime.portions = transition.id === "stew" ? params.stewPortionsPerBatch : 0;
+				runtime.cookElapsedSec = timing.burnSec === null ? 0 : excess;
 				bus.emit({ type: "cookingDone", stationId: runtime.config.id, recipe: transition.id });
+				if (timing.burnSec !== null && excess + TIME_EPSILON_SEC >= timing.burnSec) {
+					runtime.cookStatus = "burnt";
+					runtime.cookItems = [createIngredientFromSpec(transition.burnt)];
+					runtime.cookElapsedSec = 0;
+					bus.emit({ type: "itemBurnt", stationId: runtime.config.id });
+				}
 			}
-		} else if (runtime.cookStatus === "ready") {
+		} else if (runtime.cookStatus === "ready" && timing.burnSec !== null) {
 			runtime.cookElapsedSec += dtSec;
 			if (runtime.cookElapsedSec + TIME_EPSILON_SEC >= timing.burnSec) {
 				runtime.cookStatus = "burnt";
 				runtime.cookItems = [createIngredientFromSpec(transition.burnt)];
 				runtime.cookElapsedSec = 0;
-				runtime.portions = 0;
 				bus.emit({ type: "itemBurnt", stationId: runtime.config.id });
 			}
 		}
 	}
 
-	// ------------------------------------------------------------------------
-	// Снимки
-	// ------------------------------------------------------------------------
-
-	// Доля пройденного пути с защитой от деления на ноль, в пределах 0..1.
-	function ratioOf(elapsedSec: number, totalSec: number): number {
-		if (totalSec <= 0) {
-			return 1;
+	function stepPot(runtime: StationRuntime, dtSec: number): void {
+		const pot = runtime.item;
+		if (runtime.config.kind !== "stove" || pot?.type !== "pot") {
+			runtime.potHeating = false;
+			return;
 		}
-		return Math.min(1, Math.max(0, elapsedSec / totalSec));
+		const fullSet = pot.hasWater && pot.portions === 0 && isSameMultiset(pot.contents.map(specOf), potRecipe.inputs);
+		if (!fullSet) {
+			runtime.potHeating = false;
+			return;
+		}
+		if (!runtime.potHeating) {
+			runtime.potHeating = true;
+			bus.emit({ type: "cookingStarted", stationId: runtime.config.id, recipe: "stew" });
+		}
+		const cookDurationSec = params.cooking.stew.cookSec * params.cookDurationFactor;
+		const cookProgressSec = pot.cookProgressSec + dtSec;
+		if (cookProgressSec + TIME_EPSILON_SEC >= cookDurationSec) {
+			runtime.item = { ...pot, contents: [], cookProgressSec: 0, portions: params.stewPortionsPerBatch };
+			runtime.potHeating = false;
+			bus.emit({ type: "cookingDone", stationId: runtime.config.id, recipe: "stew" });
+		} else {
+			runtime.item = { ...pot, cookProgressSec };
+		}
 	}
 
 	function snapshotOf(runtime: StationRuntime): StationSnapshot {
 		const { id, kind } = runtime.config;
-		const base: StationSnapshot = { id, kind, items: [], phase: "idle", progress: 0, burnProgress: 0, portions: 0 };
-		if (kind === "counter") {
-			return runtime.item === null ? base : { ...base, items: [cloneItem(runtime.item)], phase: "holding" };
-		}
-		if (kind === "cuttingBoard") {
-			const onBoard = runtime.item;
-			if (onBoard === null || onBoard.type !== "ingredient") {
+		const base: StationSnapshot = { id, kind, items: [], phase: "idle", progress: 0, burnProgress: 0, portions: 0, isHeating: false };
+		if (kind === "counter" || kind === "cuttingBoard") {
+			const item = runtime.item;
+			if (item === null) {
 				return base;
 			}
-			const items = [cloneItem(onBoard)];
-			if (!findCutTransition(onBoard)) {
-				// Нарезано: можно забирать.
-				return { ...base, items, phase: "ready", progress: 1 };
+			const items = [cloneItem(item)];
+			if (!isIngredient(item) || !findCutTransition(item)) {
+				const ready: StationPhase = isAssembly(item) && item.dish !== null ? "ready" : "holding";
+				return { ...base, items, phase: ready, progress: isIngredient(item) && item.state === "chopped" ? 1 : 0 };
 			}
-			const phase: StationPhase = cuttingStationId === id ? "processing" : "holding";
-			return { ...base, items, phase, progress: ratioOf(runtime.cutProgressSec, params.cutSec) };
+			const factor = kind === "cuttingBoard" ? params.boardCutDurationFactor : 1;
+			const duration = params.cutSec * factor;
+			return {
+				...base,
+				items,
+				phase: cuttingStationId === id ? "processing" : "holding",
+				progress: ratioOf(runtime.cutProgressSec, duration),
+			};
 		}
-		if (isCookerKind(kind)) {
-			const items = runtime.cookItems.map((ingredient) => cloneItem(ingredient));
-			const timing = runtime.cookRecipe ? params.cooking[runtime.cookRecipe.id] : null;
+		if (kind === "pan" || kind === "oven") {
+			const items = runtime.cookItems.map((item) => cloneItem(item));
+			const transition = runtime.cookRecipe;
+			const timing = transition ? params.cooking[transition.id] : null;
 			switch (runtime.cookStatus) {
 				case "loading":
 					return { ...base, items, phase: "holding" };
 				case "cooking":
-					return { ...base, items, phase: "processing", progress: ratioOf(runtime.cookElapsedSec, timing ? timing.cookSec : 0) };
+					return {
+						...base,
+						items,
+						phase: "processing",
+						progress: ratioOf(runtime.cookElapsedSec, timing ? timing.cookSec * params.cookDurationFactor : 0),
+						isHeating: true,
+					};
 				case "ready":
 					return {
 						...base,
 						items,
 						phase: "ready",
 						progress: 1,
-						burnProgress: ratioOf(runtime.cookElapsedSec, timing ? timing.burnSec : 0),
-						portions: kind === "pot" ? runtime.portions : 0,
+						burnProgress: timing?.burnSec === null || !timing ? 0 : ratioOf(runtime.cookElapsedSec, timing.burnSec),
 					};
 				case "burnt":
-					return { ...base, items, phase: "burnt" };
+					return { ...base, items, phase: "burnt", progress: 1, burnProgress: 1 };
 				default:
 					return base;
 			}
 		}
-		// Ящик, стопка тарелок, урна и окно своих предметов не хранят.
+		if (kind === "stove" && runtime.item?.type === "pot") {
+			const pot = runtime.item;
+			const ready = pot.portions > 0;
+			const processing = runtime.potHeating;
+			return {
+				...base,
+				items: [cloneItem(pot)],
+				phase: ready ? "ready" : processing ? "processing" : "holding",
+				progress: ready ? 1 : ratioOf(pot.cookProgressSec, params.cooking.stew.cookSec * params.cookDurationFactor),
+				portions: pot.portions,
+				isHeating: processing,
+			};
+		}
+		if (runtime.item !== null) {
+			const ready = isAssembly(runtime.item) && runtime.item.dish !== null;
+			return { ...base, items: [cloneItem(runtime.item)], phase: ready ? "ready" : "holding" };
+		}
 		return base;
 	}
 
-	// ------------------------------------------------------------------------
-	// Интерфейс Kitchen
-	// ------------------------------------------------------------------------
-
 	return {
 		window: servingWindow,
-
 		interact(stationId: StationId): InteractResult {
 			const runtime = stationsById.get(stationId);
 			if (!runtime) {
@@ -545,15 +638,18 @@ export function createKitchen(deps: KitchenDeps): Kitchen {
 					result = interactCrate(runtime);
 					break;
 				case "counter":
-					result = interactCounter(runtime);
-					break;
 				case "cuttingBoard":
-					result = interactBoard(runtime);
+					result = interactSurface(runtime);
 					break;
 				case "pan":
-				case "pot":
 				case "oven":
 					result = interactCooker(runtime);
+					break;
+				case "stove":
+					result = interactStove(runtime);
+					break;
+				case "tap":
+					result = interactTap(runtime);
 					break;
 				case "plateStack":
 					result = interactPlateStack(runtime);
@@ -570,32 +666,28 @@ export function createKitchen(deps: KitchenDeps): Kitchen {
 			}
 			return result;
 		},
-
 		setWork(stationId: StationId | null): void {
 			workStationId = stationId;
 		},
-
 		step(dtSec: number): void {
 			stepCutting(dtSec);
 			stationList.forEach((runtime) => {
-				if (isCookerKind(runtime.config.kind)) {
+				if (runtime.config.kind === "pan" || runtime.config.kind === "oven") {
 					stepCooker(runtime, dtSec);
+				} else if (runtime.config.kind === "stove") {
+					stepPot(runtime, dtSec);
 				}
 			});
 		},
-
 		getHand(): Item | null {
 			return hand === null ? null : cloneItem(hand);
 		},
-
 		isWorking(): boolean {
 			return cuttingStationId !== null;
 		},
-
 		getStationSnapshots(): StationSnapshot[] {
 			return stationList.map(snapshotOf);
 		},
-
 		getWindowDishSnapshots(): WindowDishSnapshot[] {
 			return servingWindow.getDishes().map((dish) => ({ id: dish.id, dish: dish.dish, orderId: dish.orderId, slotIndex: dish.slotIndex }));
 		},

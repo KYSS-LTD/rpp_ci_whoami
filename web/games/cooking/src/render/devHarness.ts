@@ -23,12 +23,13 @@ function createLoggingBridge(): PortalBridgeApi {
 		protocolVersion: 1,
 		isEmbedded: false,
 		getLevelId: () => "easy",
-		onStart: (callback) => callback({ gameId: "harness", levelId: "easy" }),
+		onStart: (callback) => callback({ gameId: "harness", levelId: "easy", progress: null }),
 		finish: (result) => {
 			log("finish", result);
 			return true;
 		},
 		exit: () => log("exit"),
+		saveProgress: () => true,
 		reportError: (message) => {
 			log("reportError", message);
 			document.body.insertAdjacentText("afterbegin", `Ошибка: ${message}`);
@@ -50,6 +51,8 @@ function readParams() {
 		elapsedSec: elapsedParam === null ? undefined : Number(elapsedParam),
 		failKind: params.get("fail") === "queue" ? "queue" : "table",
 		freeze: params.has("freeze"),
+		// ?full: все места за всеми столами заняты заказами (демо-снимок).
+		full: params.has("full"),
 		// ?sim: вместо демо-снимка работает настоящая симуляция с вводом (клавиатура, мышь, касания).
 		sim: params.has("sim") || params.has("bot"),
 		// ?bot: вместо игрока играет эталонный бот (чтобы увидеть полный цикл готовки и подачи на живых данных); ?speed=N ускоряет.
@@ -97,7 +100,8 @@ async function bootHarness(): Promise<void> {
 	});
 	// Настоящая симуляция: те же вызовы, что у main (шаг по вводу, события, снимок), для проверки рендера и HUD на живых данных.
 	const simulation = params.sim ? createSimulation({ level, seed: level.verifiedSeeds[0] }) : null;
-	const input = params.sim ? createInputSystem({ root }) : null;
+	// В демо-режиме со сценарием касаний слой ввода создаётся ради вида стика и кнопок (проверка перекрытия HUD).
+	const input = params.sim || params.mode === "touch" ? createInputSystem({ root }) : null;
 	simulationRef.current = simulation;
 	inputRef.current = input;
 
@@ -122,6 +126,8 @@ async function bootHarness(): Promise<void> {
 		reporter,
 		dishIcons: icons,
 		inputMode: input ? input.getMode() : params.mode,
+		tutorialDishes: [],
+		campaignDay: 1,
 	});
 	hudRef.current = hud;
 	input?.onModeChange((mode) => hud.setInputMode(mode));
@@ -161,7 +167,7 @@ async function bootHarness(): Promise<void> {
 				timeSec += frameDtSec;
 			}
 			const elapsedSec = harnessPhase === "ready" ? 0 : (params.elapsedSec ?? timeSec);
-			const demoOptions: DemoOptions = { phase: harnessPhase, elapsedSec, failure: harnessPhase === "failed" ? failure : null };
+			const demoOptions: DemoOptions = { phase: harnessPhase, elapsedSec, failure: harnessPhase === "failed" ? failure : null, fillAllTables: params.full };
 			const snapshot = createDemoSnapshot(level, timeSec, demoOptions);
 			scene.render(snapshot, frameDtSec);
 			hud.update(snapshot, nowMs);

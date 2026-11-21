@@ -49,7 +49,6 @@ export const coreModelNames = [
 	"crate_onions",
 	// Станции кухни.
 	"kitchencounter_straight_A",
-	"kitchencounter_sink",
 	"cuttingboard",
 	"stove_single",
 	"pan_A",
@@ -155,12 +154,19 @@ const itemModelByKey: Readonly<Record<string, AssetModelName>> = {
 	"veggiePatty:raw": "food_ingredient_vegetableburger_uncooked",
 	"veggiePatty:cooked": "food_ingredient_vegetableburger_cooked",
 	"veggiePatty:burnt": "food_ingredient_burger_trash",
+	// Жареный стейк: своей модели в паке нет, берётся сырой стейк и красится в коричневый (см. itemTints).
+	"friedSteak:raw": "food_ingredient_steak",
+	"friedSteak:cooked": "food_ingredient_steak",
+	"friedSteak:burnt": "food_ingredient_steak",
 	"stew:cooked": "stew_pot",
 	"stew:burnt": "stew_pot",
 };
 
 // Пары, у которых в паке нет своей модели "сгоревшее": рендер красит их в тёмный цвет.
-export const burntTintItems: ReadonlySet<string> = new Set(["veggiePatty:burnt", "stew:burnt"]);
+export const burntTintItems: ReadonlySet<string> = new Set(["veggiePatty:burnt", "stew:burnt", "friedSteak:burnt"]);
+
+// Цвет, которым красится копия модели: розовое сырое мясо жареного стейка становится коричневым.
+export const itemTints: Readonly<Record<string, number>> = { "friedSteak:cooked": 0xa5693a };
 
 // Ключ пары "вид + состояние" для таблиц.
 export function getItemKey(spec: ItemSpec): string {
@@ -176,6 +182,7 @@ export function getItemModelName(spec: ItemSpec): AssetModelName | null {
 export const dishModelNames: Readonly<Record<DishId, AssetModelName>> = {
 	burger: "food_burger",
 	ham: "food_dinner",
+	steak: "food_dinner",
 	veggieBurger: "food_vegetableburger",
 	stew: "food_stew",
 };
@@ -190,6 +197,7 @@ export const crateModelNames: Readonly<Record<IngredientKind, AssetModelName>> =
 	onion: "crate_onions",
 	patty: "crate",
 	veggiePatty: "crate",
+	friedSteak: "crate",
 	stew: "crate",
 };
 
@@ -200,11 +208,12 @@ export const stationBaseModelNames: Readonly<Record<StationKind, AssetModelName 
 	counter: "kitchencounter_straight_A",
 	cuttingBoard: "kitchencounter_straight_A",
 	pan: "stove_single",
-	pot: "stove_single",
+	stove: "stove_single",
 	oven: "oven",
 	plateStack: "kitchencounter_straight_A",
 	trash: null,
 	servingWindow: "wall_orderwindow",
+	tap: null,
 };
 
 // Модели-надстройки на станциях.

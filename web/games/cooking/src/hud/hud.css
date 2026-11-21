@@ -1,8 +1,8 @@
 /*
  * Стили HUD игры cooking (задачи 7.1-7.7). Слои экрана снизу вверх: canvas, слой касаний (z-index 1, input/touch.ts),
  * HUD (z-index 10, pointer-events: none везде, кроме кнопок и диалогов), модальные диалоги (top layer браузера).
- * HUD занимает только верхние зоны: слева сверху карточки заказов, по центру сверху таймер, справа сверху очередь и пауза.
- * Нижняя часть и правый край свободны для стика и кнопок на сенсорных устройствах.
+ * HUD занимает только верхние зоны: слева сверху пауза и очередь, по центру сверху таймер, справа сверху карточки заказов.
+ * Нижняя часть свободна для стика (слева) и кнопок "Взять" и "Резать" (справа) на сенсорных устройствах.
  * Только дефис, длинное и среднее тире запрещены.
  */
 
@@ -13,14 +13,15 @@
 	--hud-muted: #b7c3cc;
 	--hud-accent: #ffd23f;
 	--hud-danger: #ff5a4d;
-	--hud-gap: 0.5rem;
-	--hud-orders-max-height: 78dvh;
+	/* Зазор и ширину центрального блока задаёт код (hud/index.ts) по размеру окна: те же числа использует расчёт раскладки карточек. */
+	--hud-gap: 8px;
+	--hud-center-width: auto;
 
 	position: absolute;
 	inset: 0;
 	z-index: 10;
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+	grid-template-columns: minmax(0, 1fr) var(--hud-center-width) minmax(0, 1fr);
 	align-items: start;
 	gap: var(--hud-gap);
 	padding-block: max(0.5rem, env(safe-area-inset-top, 0px)) 0.5rem;
@@ -39,27 +40,26 @@
 	display: none !important;
 }
 
-/* --- Карточки заказов (слева сверху) --- */
+/* --- Карточки заказов (справа сверху) --- */
 
+/*
+ * Блок карточек: сетка, заполняемая по колонкам сверху вниз (самый срочный стол первым). Число строк и вид карточек
+ * (data-density: full или compact) выбирает код по размеру зоны (hud/ordersLayout.ts), так что блок целиком помещается в зону
+ * между краем экрана, таймером и запасом под стик. Содержимое не обрезается: overflow не скрывается.
+ */
 .hud-orders {
-	grid-column: 1;
-	justify-self: start;
-	display: flex;
-	flex-flow: column wrap;
-	align-content: flex-start;
-	gap: var(--hud-gap);
-	/* Не шире двух колонок карточек и не шире своей зоны: третья колонка не должна торчать обрезанной. */
-	inline-size: min(100%, 27rem);
-	container-type: inline-size;
-	/* Колонка не опускается ниже заданной доли высоты: на сенсорном устройстве ниже стик, лишние карточки уходят во вторую колонку. */
-	max-block-size: var(--hud-orders-max-height);
-	overflow: hidden;
+	grid-column: 3;
+	justify-self: end;
+	display: grid;
+	grid-auto-flow: column;
+	grid-template-rows: repeat(var(--hud-orders-rows, 1), auto);
+	grid-auto-columns: var(--hud-full-card-width, 13rem);
+	align-content: start;
+	align-items: start;
+	gap: var(--hud-orders-gap, 8px);
 }
 
 .hud-card {
-	/* Две карточки в ряд умещаются в зоне колонки: ширина считается от контейнера, а не от экрана. */
-	inline-size: min(13rem, calc((100cqw - var(--hud-gap)) / 2));
-	min-inline-size: 8.5rem;
 	box-sizing: border-box;
 	padding: 0.35rem 0.5rem 0.45rem;
 	border-radius: 0.6rem;
@@ -218,7 +218,7 @@
 
 .hud-stats {
 	grid-column: 2;
-	justify-self: center;
+	min-inline-size: 0;
 	display: grid;
 	justify-items: center;
 	gap: 0.25rem;
@@ -272,7 +272,9 @@
 	margin: 0;
 	padding: 0.3rem 0.8rem;
 	border-radius: 0.5rem;
-	max-inline-size: min(90vw, 26rem);
+	box-sizing: border-box;
+	max-inline-size: 100%;
+	text-wrap: balance;
 }
 
 .hud-banner {
@@ -290,11 +292,11 @@
 	display: none;
 }
 
-/* --- Очередь и пауза (справа сверху) --- */
+/* --- Пауза и очередь (слева сверху) --- */
 
-.hud-right {
-	grid-column: 3;
-	justify-self: end;
+.hud-left {
+	grid-column: 1;
+	justify-self: start;
 	display: flex;
 	align-items: flex-start;
 	gap: var(--hud-gap);
@@ -400,6 +402,39 @@
 	margin: 0 0 0.5rem;
 	font-size: 1.5em;
 	text-wrap: balance;
+}
+
+.hud-day-label {
+	margin: 0 0 0.35rem;
+	color: var(--hud-accent);
+	font-size: 0.82em;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.hud-tutorial__picture {
+	display: block;
+	inline-size: min(100%, 30rem);
+	margin-inline: auto;
+	border-radius: 0.75rem;
+	background: #f3eadb;
+	overflow: hidden;
+}
+
+.hud-tutorial__image {
+	display: block;
+	inline-size: 100%;
+	 aspect-ratio: 8 / 5;
+	object-fit: contain;
+}
+
+.hud-dialog--tutorial {
+	inline-size: min(34rem, calc(100vw - 1.5rem));
+}
+
+.hud-dialog--tutorial .hud-dialog__actions {
+	justify-content: space-between;
 }
 
 .hud-dialog__lead {
@@ -529,72 +564,204 @@
 	outline-offset: 2px;
 }
 
-/* --- Сенсорные устройства и низкие экраны (телефон в альбомной ориентации) --- */
+/* Просьба повернуть экран: значок телефона, который поворачивается. */
+.hud-dialog--orientation {
+	text-align: center;
+}
 
+.hud-orientation__icon {
+	display: block;
+	box-sizing: border-box;
+	inline-size: 2.4rem;
+	block-size: 4rem;
+	margin: 0 auto 0.75rem;
+	border: 0.25rem solid var(--hud-fg);
+	border-radius: 0.5rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.hud-orientation__icon {
+		animation: hud-rotate-hint 2.4s ease-in-out infinite;
+	}
+}
+
+@keyframes hud-rotate-hint {
+	0%,
+	25% {
+		transform: rotate(0deg);
+	}
+	65%,
+	100% {
+		transform: rotate(-90deg);
+	}
+}
+
+/* --- Компактные карточки: одна строка на стол (номер и ряд значков блюд, под каждым значком полоса терпения) --- */
+
+.hud-orders[data-density="compact"] {
+	grid-auto-columns: max-content;
+}
+
+.hud-orders[data-density="compact"] .hud-card {
+	display: flex;
+	align-items: center;
+	gap: var(--hud-compact-inner-gap, 4px);
+	block-size: var(--hud-compact-card-height, 32px);
+	padding: 0 var(--hud-compact-pad-x, 4px);
+	border-radius: 0.45rem;
+	/* Цветная полоска слева рисуется тенью, а не рамкой: рамка добавила бы ширину, которой нет в расчёте раскладки. */
+	border-inline-start: 0;
+	box-shadow: inset 3px 0 0 #4cd964;
+}
+
+.hud-orders[data-density="compact"] .hud-card[data-urgent="true"] {
+	box-shadow: inset 3px 0 0 var(--hud-danger);
+}
+
+.hud-orders[data-density="compact"] .hud-card__header {
+	display: contents;
+}
+
+.hud-orders[data-density="compact"] .hud-card__title {
+	margin: 0;
+	flex: none;
+}
+
+.hud-orders[data-density="compact"] .hud-card__title-number {
+	display: grid;
+	place-items: center;
+	inline-size: var(--hud-compact-badge, 18px);
+	block-size: var(--hud-compact-badge, 18px);
+	border-radius: 50%;
+	background: rgb(255 255 255 / 0.2);
+	font-size: 0.7rem;
+	font-weight: 800;
+	font-variant-numeric: tabular-nums;
+}
+
+.hud-orders[data-density="compact"] .hud-card[data-state="served"] .hud-card__title-number {
+	background: #1f7a3a;
+}
+
+/* Слово "Стол", название блюда и надпись "Стол обслужен" на компактной карточке не видны, но остаются для вспомогательных технологий. */
+.hud-orders[data-density="compact"] .hud-card__title-word,
+.hud-orders[data-density="compact"] .hud-card__state,
+.hud-orders[data-density="compact"] .hud-order__name {
+	position: absolute;
+	inline-size: 1px;
+	block-size: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.hud-orders[data-density="compact"] .hud-card__orders {
+	display: flex;
+	gap: var(--hud-compact-icon-gap, 3px);
+	margin: 0;
+}
+
+.hud-orders[data-density="compact"] .hud-order {
+	display: block;
+	inline-size: var(--hud-compact-icon, 20px);
+	padding: 0;
+}
+
+.hud-orders[data-density="compact"] .hud-order__icon {
+	display: block;
+	inline-size: var(--hud-compact-icon, 20px);
+	block-size: var(--hud-compact-icon, 20px);
+	font-size: 0.65rem;
+}
+
+.hud-orders[data-density="compact"] .hud-order__patience {
+	display: block;
+	inline-size: 100%;
+	block-size: 3px;
+	margin-top: 2px;
+}
+
+/* Статус заказа значком в углу значка блюда: цвет и знак показывают состояние, текст остаётся для вспомогательных технологий. */
+.hud-orders[data-density="compact"] .hud-order__status {
+	position: absolute;
+	inset-block-start: -3px;
+	inset-inline-end: -4px;
+	display: grid;
+	place-items: center;
+	inline-size: 11px;
+	block-size: 11px;
+	padding: 0;
+	border-radius: 50%;
+	background: rgb(0 0 0 / 0.75);
+	color: #fff;
+	font-size: 0;
+}
+
+.hud-orders[data-density="compact"] .hud-order__status::before {
+	font-size: 8px;
+	font-weight: 800;
+	line-height: 1;
+	content: "\2026";
+}
+
+.hud-orders[data-density="compact"] .hud-order[data-status="delivering"] .hud-order__status {
+	background: #ffcc4d;
+	color: #231a00;
+}
+
+.hud-orders[data-density="compact"] .hud-order[data-status="delivering"] .hud-order__status::before {
+	content: "\2192";
+}
+
+.hud-orders[data-density="compact"] .hud-order[data-status="served"] .hud-order__status {
+	background: #1f7a3a;
+}
+
+.hud-orders[data-density="compact"] .hud-order[data-status="served"] .hud-order__status::before {
+	content: "\2713";
+}
+
+/* --- Низкий экран (телефон в альбомной ориентации): компактный центральный блок --- */
+
+.cooking-hud[data-screen="low"] .hud-timer {
+	min-inline-size: 0;
+	padding: 0.05rem 0.7rem;
+	font-size: 1.4rem;
+}
+
+.cooking-hud[data-screen="low"] .hud-counters {
+	flex-wrap: nowrap;
+	gap: 0.25rem;
+}
+
+.cooking-hud[data-screen="low"] .hud-counter {
+	flex-direction: column;
+	align-items: center;
+	gap: 0;
+	padding: 0.05rem 0.4rem;
+	line-height: 1.1;
+}
+
+.cooking-hud[data-screen="low"] .hud-counter__label {
+	font-size: 0.62em;
+}
+
+.cooking-hud[data-screen="low"] .hud-counter__value {
+	font-size: 0.85em;
+}
+
+/* Диалоги на низком экране тесные: отступы и заголовок меньше. */
 @media (max-height: 520px) {
-	.cooking-hud {
-		--hud-gap: 0.3rem;
-	}
-
-	.hud-card {
-		padding: 0.2rem 0.4rem 0.3rem;
-	}
-
-	.hud-order {
-		grid-template-columns: 1.5rem minmax(0, 1fr) auto;
-		padding: 0.1rem 0.2rem;
-	}
-
-	.hud-order__icon {
-		inline-size: 1.5rem;
-		block-size: 1.5rem;
-	}
-
-	.hud-order__name {
-		font-size: 0.85em;
-		line-height: 1.15;
-	}
-
-	/* Статус на низком экране сжимается до значка: цвет и знак показывают состояние, текст остаётся для вспомогательных технологий. */
-	.hud-order__status {
-		display: grid;
-		place-items: center;
-		inline-size: 1.3rem;
-		block-size: 1.3rem;
-		padding: 0;
-		border-radius: 50%;
-		font-size: 0;
-	}
-
-	.hud-order__status::before {
-		font-size: 0.8rem;
-		font-weight: 800;
-		line-height: 1;
-		content: "\2026";
-	}
-
-	.hud-order[data-status="delivering"] .hud-order__status::before {
-		content: "\2192";
-	}
-
-	.hud-order[data-status="served"] .hud-order__status::before {
-		content: "\2713";
-	}
-
-	.hud-order__patience {
-		block-size: 0.35rem;
-	}
-
-	.hud-timer {
-		font-size: 1.4rem;
-	}
-
 	.hud-dialog {
 		padding: 0.75rem 1rem;
 	}
 
 	.hud-dialog__title {
 		font-size: 1.25em;
+	}
+
+	.hud-tutorial__image {
+		max-block-size: 30dvh;
 	}
 }
 

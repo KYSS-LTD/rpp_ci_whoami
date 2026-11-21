@@ -1,0 +1,34 @@
+<!doctype html>
+<!--
+	Только для разработки: открывает игру во фрейме и отправляет ей старт с прогрессом, как это делает портал.
+	Так в автономном режиме можно сразу увидеть нужный рабочий день и подсказки рецептов.
+	Адрес: /tutorial-preview.html?day=3&level=easy (день 1..5, уровень easy|medium|hard).
+-->
+<html lang="ru">
+	<head>
+		<meta charset="utf-8" />
+		<title>Просмотр рабочего дня</title>
+		<style>
+			html, body { margin: 0; height: 100%; background: #000; }
+			iframe { border: 0; width: 100%; height: 100%; }
+		</style>
+	</head>
+	<body>
+		<script>
+			const params = new URLSearchParams(location.search);
+			const day = Math.min(5, Math.max(1, Number(params.get("day")) || 1));
+			const level = ["easy", "medium", "hard"].includes(params.get("level")) ? params.get("level") : "easy";
+			// Блюда меню по дням: окорок, стейк, бургер, веган-бургер, рагу. Приготовленными считаются блюда прошлых дней.
+			const order = ["ham", "steak", "burger", "veggieBurger", "stew"];
+			const completedDays = { easy: 0, medium: 0, hard: 0 };
+			completedDays[level] = day - 1;
+			const progress = { version: 2, cookedDishes: order.slice(0, day - 1), completedDays };
+			const frame = document.createElement("iframe");
+			frame.src = `/index.html?level=${level}`;
+			frame.addEventListener("load", () => {
+				frame.contentWindow.postMessage({ source: "portal", version: 1, type: "start", gameId: "cooking", levelId: level, progress }, "*");
+			});
+			document.body.append(frame);
+		</script>
+	</body>
+</html>

@@ -1,7 +1,7 @@
 // Расстановка статичных объектов по данным уровня (задача 6.2): пол по зонам, стены и мебель (props), столы и стулья.
 // Станции расставляет stations.ts. Все объекты ставятся в те же координаты, что использует игровая логика: центр модели
 // в центре прямоугольника, поворот rotationDeg по yaw, масштаб MODEL_SCALE (по Y дополнительно heightScale).
-import { BoxGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, Object3D, Quaternion, Vector3 } from "three";
+import { BoxGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, Object3D, Quaternion, SphereGeometry, Vector3 } from "three";
 import { MODEL_SCALE, type FloorConfig, type LevelConfig, type PropConfig, type Rect, type Rotation, type ZoneKind } from "../contracts";
 import { rectCenter } from "../common/math";
 import type { LoadedAssets } from "./assets";
@@ -127,6 +127,40 @@ export function buildStaticLayout(level: LevelConfig, assets: LoadedAssets): Sta
 
 	level.floors.forEach((floor, index) => addPlaced(`floor-${index}`, createFloor(floor, assets, disposables)));
 	level.props.forEach((prop) => addPlaced(prop.id, createProp(prop, assets)));
+
+	// Наружная тротуарная полоса и зелёные кадки создают улицу вокруг входа, не добавляя коллизий навигации.
+	const street = level.floors.find((floor) => floor.zone === "street");
+	if (street) {
+		const sidewalkGeometry = new BoxGeometry(street.rect.width, 0.035, Math.min(1.4, street.rect.depth));
+		const sidewalkMaterial = new MeshStandardMaterial({ color: 0xc7bba7, roughness: 0.94 });
+		disposables.push(sidewalkGeometry, sidewalkMaterial);
+		const sidewalk = new Mesh(sidewalkGeometry, sidewalkMaterial);
+		sidewalk.position.set(street.rect.x + street.rect.width / 2, 0.012, street.rect.z + 0.8);
+		addPlaced("street-sidewalk", sidewalk);
+
+		const planterMaterial = new MeshStandardMaterial({ color: 0xb86642, roughness: 0.86 });
+		const leafMaterial = new MeshStandardMaterial({ color: 0x49864e, roughness: 0.9 });
+		const planterGeometry = new BoxGeometry(0.88, 0.34, 0.62);
+		const leafGeometry = new SphereGeometry(0.28, 10, 8);
+		disposables.push(planterMaterial, leafMaterial, planterGeometry, leafGeometry);
+		const plantXs = [level.door.rect.x + level.door.rect.width + 2.25, street.rect.x + street.rect.width - 1.25];
+		plantXs.forEach((x, index) => {
+			if (x < street.rect.x + 0.5 || x > street.rect.x + street.rect.width - 0.5) return;
+			const planter = new Group();
+			const box = new Mesh(planterGeometry, planterMaterial);
+			box.position.y = 0.18;
+			planter.add(box);
+			for (let leaf = 0; leaf < 4; leaf += 1) {
+				const crown = new Mesh(leafGeometry, leafMaterial);
+				const angle = (leaf / 4) * Math.PI * 2;
+				crown.position.set(Math.cos(angle) * 0.18, 0.48 + (leaf % 2) * 0.12, Math.sin(angle) * 0.16);
+				crown.scale.set(1, 1.35, 0.9);
+				planter.add(crown);
+			}
+			planter.position.set(x, 0, street.rect.z + 1.15 + index * 0.2);
+			addPlaced(`street-plant-${index + 1}`, planter);
+		});
+	}
 
 	for (const table of level.tables) {
 		const tableWrapper = new Group();

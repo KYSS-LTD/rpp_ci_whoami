@@ -50,6 +50,28 @@ export function readGameRatings(storage: PlatformStorage = platformStorage): Rec
 	return storage.read<Record<string, number>>(storageKeys.gameRatings, {});
 }
 
+// Возвращает сохранённый блок данных указанной игры для сообщения старта iframe.
+export function readGameProgress(gameId: string, storage: PlatformStorage = platformStorage): unknown {
+	const progress = storage.read<Record<string, unknown>>(storageKeys.gameProgress, {});
+	return Object.prototype.hasOwnProperty.call(progress, gameId) ? progress[gameId] : null;
+}
+
+// Сохраняет блок данных игры до 4096 байт JSON. Ограничение повторно проверяется мостом до записи.
+export function saveGameProgress(gameId: string, data: Record<string, unknown>, storage: PlatformStorage = platformStorage): boolean {
+	let serialized: string;
+	try {
+		serialized = JSON.stringify(data);
+	} catch {
+		return false;
+	}
+	if (new TextEncoder().encode(serialized).length > 4096) return false;
+	const current = storage.read<Record<string, unknown>>(storageKeys.gameProgress, {});
+	const result = storage.write(storageKeys.gameProgress, { ...current, [gameId]: data });
+	if (!result.ok) return false;
+	notifyProgressChanged();
+	return true;
+}
+
 // Причины отказа при сохранении оценки.
 export type RatingSaveResult = { ok: true } | { ok: false; reason: "invalid" | "not-played" | "quota" | "failed" };
 

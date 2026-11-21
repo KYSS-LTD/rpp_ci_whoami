@@ -34,11 +34,15 @@ export const HUD_GAP_LOW_PX = 4;
 export const HUD_CENTER_WIDTH_PX = 264;
 export const HUD_CENTER_WIDTH_LOW_PX = 160;
 
-// Нижний запас под сенсорные стик и кнопки, которые рисует слой касаний (input/touch.css): стик 128, отступ 16, запас 8.
-// Карточки заказов в сенсорном режиме не опускаются ниже этой границы.
-export const TOUCH_CONTROLS_RESERVE_PX = 152;
-export const ORDERS_MAX_HEIGHT_PERCENT_TOUCH = 48;
-export const ORDERS_MAX_HEIGHT_PERCENT_KEYBOARD = 78;
+// Экранные кнопки "Взять" и "Резать" слоя касаний (input/touch.css) стоят столбиком у правого нижнего угла: размер кнопки
+// clamp(72px, 20vmin, 104px), зазор между ними 16, отступ от края 16. Карточки заказов стоят вверху справа и не опускаются
+// к кнопкам ближе запаса. Стик слева внизу занимает 128 + 16, он ниже кнопок, поэтому в запас не входит.
+export const TOUCH_BUTTON_MIN_PX = 72;
+export const TOUCH_BUTTON_MAX_PX = 104;
+export const TOUCH_BUTTON_VMIN_RATIO = 0.2;
+export const TOUCH_BUTTON_GAP_PX = 16;
+export const TOUCH_EDGE_INSET_PX = 16;
+export const TOUCH_RESERVE_MARGIN_PX = 12;
 
 // Наибольшее число мест (и заказов) у одного стола.
 export const MAX_ORDERS_PER_TABLE = 4;
@@ -50,9 +54,10 @@ export const FULL_CARD_HEADER_PX = 30;
 export const FULL_CARD_PADDING_PX = 14;
 export const FULL_ORDER_ROW_PX = 52;
 
-// Возврат из компактного вида в полный только если полная раскладка занимает не больше этой доли зоны по высоте
-// (гистерезис: вид не мигает, когда число заказов колеблется у границы).
-export const FULL_RETURN_FILL_RATIO = 0.8;
+// Полный вид занимает много места и закрывает кухню: он допустим, пока блок не выше этой доли высоты зоны. Возврат из компактного
+// вида в полный только при заполнении не выше второй, меньшей доли (гистерезис: вид не мигает, когда число заказов колеблется у границы).
+export const FULL_MAX_FILL_RATIO = 0.6;
+export const FULL_RETURN_FILL_RATIO = 0.45;
 
 // Компактная карточка стола (одна строка: номер и ряд значков блюд, под каждым значком полоса терпения).
 export const COMPACT_ICON_PX = 20;

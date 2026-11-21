@@ -5,7 +5,7 @@
 export const floorColors = {
 	kitchen: 0xdfe4e8,
 	hall: 0xc89f72,
-	street: 0x6b7279,
+	street: 0x78965c,
 } as const;
 
 // Цвет фона сцены (за краем улицы).
@@ -15,10 +15,12 @@ export const backgroundColor = 0x1f2a30;
 export const targetHighlightColor = 0xffd23f;
 export const rejectHighlightColor = 0xff4d3d;
 
-// Цвета индикаторов над станциями: подложка, прогресс, предупреждение о подгорании.
+// Цвета индикаторов над станциями: подложка, зелёная полоса готовки, красная полоса подгорания.
 export const barBackgroundColor = 0x1b2025;
 export const barProgressColor = 0x4cd964;
 export const barBurnColor = 0xff3b30;
+// Цвет красной полосы подгорания в момент мигания, когда блюдо скоро сгорит.
+export const barBurnWarningColor = 0xffa21a;
 
 // Тёмный цвет для сгоревших предметов без своей модели в паке.
 export const burntTintColor = 0x2b2523;

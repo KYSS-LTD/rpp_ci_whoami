@@ -2,11 +2,11 @@
 // с габаритами настоящих glTF (читаются из public/models), поэтому проверяются положения и размеры, а не вид.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { BoxGeometry, Box3, Group, Mesh, MeshStandardMaterial, Vector3, type Camera, type Object3D, type Scene } from "three";
+import { BoxGeometry, Box3, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Vector3, type Camera, type Object3D, type Scene } from "three";
 import { describe, expect, it, vi } from "vitest";
 import { getLevelConfig } from "../config/levels";
 import { assetModelNames } from "../config/assets";
-import { LEVEL_IDS, MODEL_SCALE, type DebugInfo, type LevelConfig, type NavGridView } from "../contracts";
+import { LEVEL_IDS, MODEL_SCALE, type DebugInfo, type GameSnapshot, type LevelConfig, type NavGridView, type StationSnapshot } from "../contracts";
 import { createTestLevel } from "../sim/testing/testLevel";
 import { createLoadedAssets, type LoadedAssets } from "./assets";
 import { projectWorldPoint } from "./camera";
@@ -313,6 +313,89 @@ describe("персонажи (6.4, 6.6)", () => {
 			renderer.render(facing(Math.PI), 1 / 60);
 		}
 		expect(Math.abs(Math.abs(chefRoot().rotation.y) - Math.PI)).toBeLessThan(0.05);
+	});
+});
+
+describe("индикаторы над станциями: зелёная полоса готовки и красная полоса подгорания", () => {
+	// Снимок с заданным состоянием одной станции.
+	function snapshotWithStation(level: LevelConfig, stationId: string, patch: Partial<StationSnapshot>): GameSnapshot {
+		const base = createDemoSnapshot(level, 3);
+		return { ...base, stations: base.stations.map((station) => (station.id === stationId ? { ...station, ...patch } : station)) };
+	}
+
+	const cookedPatty = { type: "ingredient" as const, kind: "patty" as const, state: "cooked" as const };
+	const rawPatty = { type: "ingredient" as const, kind: "patty" as const, state: "raw" as const };
+
+	function readBars(indicator: Object3D): { progress: number; burn: number | null; burnColor: number | null } {
+		const progress = indicator.getObjectByName("bar-progress") as Mesh;
+		const burn = indicator.getObjectByName("bar-burn") as Mesh | undefined;
+		return {
+			progress: progress.scale.x,
+			burn: burn ? burn.scale.x : null,
+			burnColor: burn ? (burn.material as MeshBasicMaterial).color.getHex() : null,
+		};
+	}
+
+	it("готовка: зелёная полоса заполняется по прогрессу, красная пуста", () => {
+		const level = getLevelConfig("easy");
+		const { renderer } = createScene(level);
+		renderer.render(snapshotWithStation(level, "pan-1", { phase: "processing", progress: 0.4, burnProgress: 0, items: [rawPatty] }), 1 / 60);
+		const indicator = renderer.scene.getObjectByName("indicator-pan-1") as Object3D;
+		expect(indicator.visible).toBe(true);
+		const bars = readBars(indicator);
+		expect(bars.progress).toBeCloseTo(0.4, 5);
+		expect(bars.burn).toBeLessThan(0.01);
+	});
+
+	it("готово: зелёная полна, красная заполняется от пустой до полной по доле до подгорания, а не убывает", () => {
+		const level = getLevelConfig("easy");
+		const { renderer } = createScene(level);
+		const burnValues: number[] = [];
+		for (const burnProgress of [0, 0.25, 0.5, 0.9, 1]) {
+			renderer.render(snapshotWithStation(level, "pan-1", { phase: "ready", progress: 1, burnProgress, items: [cookedPatty] }), 1 / 60);
+			const bars = readBars(renderer.scene.getObjectByName("indicator-pan-1") as Object3D);
+			expect(bars.progress).toBeCloseTo(1, 5);
+			burnValues.push(bars.burn ?? -1);
+		}
+		expect(burnValues[1]).toBeCloseTo(0.25, 5);
+		expect(burnValues[2]).toBeCloseTo(0.5, 5);
+		expect(burnValues[4]).toBeCloseTo(1, 5);
+		// Красная полоса только растёт вместе с долей до подгорания.
+		for (let index = 1; index < burnValues.length; index += 1) {
+			expect(burnValues[index]).toBeGreaterThanOrEqual(burnValues[index - 1]);
+		}
+	});
+
+	it("почти сгорело: красная полоса мигает красным и оранжевым не чаще трёх раз в секунду", () => {
+		const level = getLevelConfig("easy");
+		const { renderer } = createScene(level);
+		const colors: number[] = [];
+		const state = snapshotWithStation(level, "pan-1", { phase: "ready", progress: 1, burnProgress: 0.85, items: [cookedPatty] });
+		for (let frame = 0; frame < 60; frame += 1) {
+			renderer.render(state, 1 / 60);
+			colors.push(readBars(renderer.scene.getObjectByName("indicator-pan-1") as Object3D).burnColor ?? 0);
+		}
+		const distinct = new Set(colors);
+		expect(distinct.size).toBe(2);
+		const switches = colors.filter((color, index) => index > 0 && color !== colors[index - 1]).length;
+		// За секунду (60 кадров) переключений не больше шести (три полных вспышки).
+		expect(switches).toBeLessThanOrEqual(6);
+		expect(switches).toBeGreaterThanOrEqual(2);
+	});
+
+	it("сгорело и пустая станция: индикаторов нет; у разделочной доски одна полоса резки без красной", () => {
+		const level = getLevelConfig("easy");
+		const { renderer } = createScene(level);
+		renderer.render(snapshotWithStation(level, "pan-1", { phase: "burnt", progress: 0, burnProgress: 0, items: [{ type: "ingredient", kind: "patty", state: "burnt" }] }), 1 / 60);
+		expect((renderer.scene.getObjectByName("indicator-pan-1") as Object3D).visible).toBe(false);
+		renderer.render(snapshotWithStation(level, "pan-2", { phase: "idle", progress: 0, burnProgress: 0, items: [] }), 1 / 60);
+		expect((renderer.scene.getObjectByName("indicator-pan-2") as Object3D).visible).toBe(false);
+		renderer.render(snapshotWithStation(level, "board-1", { phase: "processing", progress: 0.6, burnProgress: 0, items: [{ type: "ingredient", kind: "steak", state: "raw" }] }), 1 / 60);
+		const board = renderer.scene.getObjectByName("indicator-board-1") as Object3D;
+		expect(board.visible).toBe(true);
+		const bars = readBars(board);
+		expect(bars.progress).toBeCloseTo(0.6, 5);
+		expect(bars.burn).toBeNull();
 	});
 });
 

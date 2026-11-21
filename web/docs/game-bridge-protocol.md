@@ -9,8 +9,8 @@
 1. Портал открывает стартовую страницу сборки во фрейме: `runtime.entry?level=<levelId>`, например `/game-builds/city-builder/index.html?level=easy`.
 2. Фрейм изолирован: `sandbox="allow-scripts"` без `allow-same-origin`. У игры непрозрачный источник `null`: нет доступа к LocalStorage, IndexedDB, cookie и странице портала.
 3. Игра загружается и отправляет `ready`.
-4. Портал отвечает `start` с идентификаторами игры и уровня и передаёт фокус фрейму.
-5. Игра отправляет `level-result`, `exit` или `error`.
+4. Портал отвечает `start` с идентификаторами игры и уровня, сохранённым блоком `progress` или `null`, и передаёт фокус фрейму.
+5. Игра может сохранять блок `progress`, затем отправляет `level-result`, `exit` или `error`.
 
 ## Сообщения
 
@@ -22,6 +22,12 @@
 { "source": "portal-game", "version": 1, "type": "ready" }
 ```
 Игра готова принять уровень. Отправляется один раз после загрузки.
+
+```json
+{ "source": "portal-game", "version": 1, "type": "progress", "data": { "version": 1, "items": [] } }
+```
+
+Блок игры: JSON-объект размером не больше 4096 байт UTF-8. Портал принимает его только от iframe текущей попытки после `ready`, хранит отдельно для каждого `gameId` и передаёт в следующем `start`. Игра должна считать блок недоверенным и проверять его структуру. Команда «Сбросить результаты» удаляет блоки прогресса вместе с результатами.
 
 ```json
 { "source": "portal-game", "version": 1, "type": "level-result", "score": 8, "maxScore": 10, "completed": true }
@@ -49,9 +55,9 @@
 ### Портал -> игра (`source: "portal"`)
 
 ```json
-{ "source": "portal", "version": 1, "type": "start", "gameId": "city-builder", "levelId": "easy" }
+{ "source": "portal", "version": 1, "type": "start", "gameId": "city-builder", "levelId": "easy", "progress": null }
 ```
-Уровень можно начинать. Приходит только после `ready`.
+Уровень можно начинать. Приходит только после `ready`. Старые игры могут игнорировать `progress`; старые версии портала не отправляют его.
 
 Для БПЛА родитель может передавать стандартные оси и кнопки геймпада отдельным сообщением `{ source: "portal", type: "gamepad", sample: { axes, buttons } }`. В `axes` четыре оси стандартной раскладки, в `buttons` пять состояний A, B, X, Y и Menu. `sample: null` сбрасывает состояние переданного контроллера.
 

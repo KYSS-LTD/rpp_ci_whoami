@@ -362,8 +362,9 @@ describe("раздувание и тестовый уровень (задача 
 		const level: LevelConfig = createTestLevel({ nav: { agentRadius: 0.5 } });
 		const geometry = buildGeometry(level);
 		const pathfinder = createPathfinder(geometry.navGrid);
-		const from = level.door.spawnPoint;
-		const targets = [level.tables[0].seats[0].approachPoint, level.tables[1].seats[3].approachPoint, level.window.pickupPoint, level.chefStart.position];
+		// Радиус 0.5 закрывает проём двери шириной 1 (диаметр агента равен проёму), поэтому ходим внутри зала.
+		const from = level.waiters.waitPoints[0];
+		const targets = [level.tables[0].seats[0].approachPoint, level.tables[1].seats[3].approachPoint, level.tables[2].seats[0].approachPoint, level.window.pickupPoint];
 		for (const to of targets) {
 			const path = pathfinder.findPath(from, to);
 			expect(path, `цель ${to.x},${to.z}`).not.toBeNull();

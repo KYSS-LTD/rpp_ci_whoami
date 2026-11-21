@@ -29,7 +29,7 @@ describe("согласованность SDK", () => {
 	it("плагин Unity вызывает только существующие методы веб-SDK", () => {
 		const jslib = readWebFile("sdk/unity/Plugins/PortalBridge.jslib");
 		const calledMethods = new Set(Array.from(jslib.matchAll(/window\.PortalBridge\.(\w+)\(/g), (match) => match[1]));
-		expect([...calledMethods].sort()).toEqual(["exit", "finish", "getLevelId", "onStart", "reportError"]);
+		expect([...calledMethods].sort()).toEqual(["exit", "finish", "getLevelId", "getProgress", "onStart", "reportError", "saveProgress"]);
 		const fakeWindow: Record<string, unknown> = { location: { search: "" }, addEventListener: () => undefined };
 		fakeWindow.parent = fakeWindow;
 		new Function("window", readWebFile(originalBridgePath))(fakeWindow);
@@ -43,7 +43,7 @@ describe("согласованность SDK", () => {
 		const jslib = readWebFile("sdk/unity/Plugins/PortalBridge.jslib");
 		const csharp = readWebFile("sdk/unity/Scripts/PortalBridge.cs");
 		const pluginFunctions = Array.from(jslib.matchAll(/^\t(PortalBridge_\w+): function/gm), (match) => match[1]);
-		expect(pluginFunctions.length).toBe(5);
+		expect(pluginFunctions.length).toBe(7);
 		const externLines = csharp.split(/\r?\n/).filter((line) => line.includes("static extern"));
 		for (const functionName of pluginFunctions) {
 			expect(externLines.some((line) => line.includes(` ${functionName}(`)), functionName).toBe(true);

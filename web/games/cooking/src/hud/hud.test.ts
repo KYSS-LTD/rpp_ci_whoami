@@ -6,7 +6,10 @@ import { getLevelConfig } from "../config/levels";
 import type { DishId, FailureInfo, GameSnapshot, HudCallbacks, InputMode, OrderSnapshot, PortalBridgeApi, TableSnapshot, TableState } from "../contracts";
 import { createDemoSnapshot } from "../render/demoSnapshot";
 import { controlsTexts, hudTexts } from "../texts";
+import { HUD_EDGE_PADDING_PX } from "./constants";
 import { createHud } from "./index";
+import { createOrdersPanel } from "./orders";
+import { computeHudMetrics, getTouchControlsReservePx, type HudEnvironment } from "./ordersLayout";
 import { createResultReporter } from "./reporter";
 
 const level = getLevelConfig("easy");
@@ -33,6 +36,7 @@ function createFakeBridge(): FakeBridge {
 		}),
 		exit: vi.fn<PortalBridgeApi["exit"]>(),
 		reportError: vi.fn<PortalBridgeApi["reportError"]>(),
+		saveProgress: vi.fn<PortalBridgeApi["saveProgress"]>(() => true),
 	};
 }
 
@@ -55,7 +59,7 @@ function setupHud(inputMode: InputMode = "keyboard") {
 	const bridge = createFakeBridge();
 	const onClosed = vi.fn();
 	const reporter = createResultReporter(bridge, onClosed);
-	const hud = createHud({ root, level, callbacks, reporter, dishIcons: {}, inputMode });
+	const hud = createHud({ root, level, callbacks, reporter, dishIcons: {}, inputMode, tutorialDishes: [] });
 	return { root, hud, callbacks, bridge, onClosed, reporter };
 }
 
@@ -114,12 +118,17 @@ describe("карточки столов (7.2)", () => {
 		expect(rows[0].querySelector(".hud-order__status")?.textContent).toBe(hudTexts.orders.status.waiting);
 	});
 
-	it("карточки лежат в панели вверху слева, свободный стол карточки не имеет", () => {
+	it("карточки лежат в панели вверху справа, пауза и очередь слева сверху, свободный стол карточки не имеет", () => {
 		const { root, hud } = setupHud();
 		hud.update(createSnapshot({ tables: [createTable(1, "free", []), createTable(2, "waiting", [createOrder("table-2", 0, "ham", "waiting", 1)])] }), 0);
 		expect(getCard(root, 1)).toBeNull();
 		expect(getCard(root, 2)).not.toBeNull();
-		expect(root.querySelector(".hud-orders")?.getAttribute("data-zone")).toBe("top-left");
+		expect(root.querySelector(".hud-orders")?.getAttribute("data-zone")).toBe("top-right");
+		const left = root.querySelector(".hud-left");
+		expect(left?.getAttribute("data-zone")).toBe("top-left");
+		expect(left?.contains(root.querySelector(".hud-pause-button"))).toBe(true);
+		expect(left?.contains(root.querySelector(".hud-queue"))).toBe(true);
+		expect(root.querySelector(".hud-orders")?.contains(root.querySelector(".hud-pause-button"))).toBe(false);
 	});
 
 	it("есть иконка блюда, а без иконки показывается первая буква названия", () => {
@@ -127,7 +136,7 @@ describe("карточки столов (7.2)", () => {
 		document.body.append(root);
 		const reporter = createResultReporter(createFakeBridge(), vi.fn());
 		const callbacks = { onStartPressed: vi.fn(), onPauseRequested: vi.fn(), onResumeRequested: vi.fn() };
-		const hud = createHud({ root, level, callbacks, reporter, dishIcons: { burger: "data:image/png;base64,AAAA" }, inputMode: "keyboard" });
+		const hud = createHud({ root, level, callbacks, reporter, dishIcons: { burger: "data:image/png;base64,AAAA" }, inputMode: "keyboard", tutorialDishes: [] });
 		hud.update(
 			createSnapshot({ tables: [createTable(1, "waiting", [createOrder("table-1", 0, "burger", "waiting", 1), createOrder("table-1", 1, "stew", "waiting", 1)])] }),
 			0,
@@ -435,14 +444,17 @@ describe("провал, выход и отправка результата (7.6
 		return createSnapshot({ phase: "failed", failure, score: 34, maxScore: 120, result: { completed: false, score: 34, maxScore: 120, reason: "failed" } });
 	}
 
-	it("Причина показана: оверлей сообщает о столе 3 и рагу, результат порталу ещё не передан", () => {
+	it("Причина показана: оверлей называет блюдо «Рагу» и не называет номер стола, результат порталу ещё не передан", () => {
 		const { root, hud, bridge } = setupHud();
 		hud.update(failedSnapshot(), 0);
 		const dialog = getDialog(root, "failure");
 		expect(dialog.hasAttribute("open")).toBe(true);
 		const reason = dialog.querySelector(".hud-failure__reason")?.textContent ?? "";
-		expect(reason).toContain("3");
 		expect(reason).toContain(hudTexts.dishNames.stew);
+		expect(reason).toBe(hudTexts.failure.reason("table", hudTexts.dishNames.stew));
+		// Номер стола, из-за которого гость ушёл, игроку не показывается.
+		expect(reason).not.toMatch(/\d/);
+		expect(reason.toLowerCase()).not.toContain("стол");
 		expect(dialog.querySelector(".hud-failure__score")?.textContent).toBe(hudTexts.failure.scoreSummary(34, 120));
 		expect(dialog.querySelector("button")?.textContent).toBe(hudTexts.failure.continueButton);
 		expect(bridge.finish).not.toHaveBeenCalled();
@@ -452,7 +464,7 @@ describe("провал, выход и отправка результата (7.6
 	it("причина для очереди называет улицу, а не стол", () => {
 		const { root, hud } = setupHud();
 		hud.update(createSnapshot({ phase: "failed", failure: { place: "queue", groupId: "g-1", customerId: "c-1-1", tableId: null, tableNumber: null, dish: null }, result: { completed: false, score: 5, maxScore: 50, reason: "failed" } }), 0);
-		expect(getDialog(root, "failure").querySelector(".hud-failure__reason")?.textContent).toBe(hudTexts.failure.reason("queue", null, null));
+		expect(getDialog(root, "failure").querySelector(".hud-failure__reason")?.textContent).toBe(hudTexts.failure.reason("queue", null));
 	});
 
 	it("оверлей провала не закрывается Escape и жестом отмены", () => {
@@ -520,26 +532,28 @@ describe("раскладка (7.7)", () => {
 		hud.update(createSnapshot({ tables: [createTable(1, "waiting", [createOrder("table-1", 0, "burger", "waiting", 0.5)])] }), 0);
 		const hudRoot = root.querySelector<HTMLElement>(".cooking-hud");
 		expect(hudRoot?.getAttribute("data-input-mode")).toBe("touch");
+		expect(hudRoot?.getAttribute("data-screen")).toBe("low");
 		expect(hudRoot?.getAttribute("data-orientation-blocked")).toBeNull();
-		expect(root.querySelector(".hud-orders")?.getAttribute("data-zone")).toBe("top-left");
-		// Карточки не опускаются ниже верхней половины экрана, где начинается область стика и кнопок.
-		const maxHeight = Number.parseFloat(hudRoot?.style.getPropertyValue("--hud-orders-max-height") ?? "");
-		expect(maxHeight).toBeGreaterThan(0);
-		expect(maxHeight).toBeLessThanOrEqual(50);
+		expect(root.querySelector(".hud-orders")?.getAttribute("data-zone")).toBe("top-right");
+		expect(getDialog(root, "orientation").hasAttribute("open")).toBe(false);
 		// Нет блоков HUD в нижних зонах.
 		const zones = collectZones(root);
 		expect(zones.length).toBeGreaterThan(0);
 		expect(zones.every((zone) => zone.startsWith("top-"))).toBe(true);
 	});
 
-	it("на клавиатурном устройстве колонка карточек может быть выше, при смене режима высота пересчитывается", () => {
+	it("смена режима ввода и размера окна пересчитывает раскладку: на широком экране три стола полным видом, на телефоне компактным", () => {
+		setWindowSize(1280, 800);
 		const { root, hud } = setupHud("keyboard");
-		const hudRoot = root.querySelector<HTMLElement>(".cooking-hud");
-		const keyboardHeight = Number.parseFloat(hudRoot?.style.getPropertyValue("--hud-orders-max-height") ?? "");
+		hud.update(createSnapshot({ tables: createSixTables([2, 1, 2]) }), 0);
+		const orders = root.querySelector<HTMLElement>(".hud-orders");
+		expect(orders?.getAttribute("data-density")).toBe("full");
+		setWindowSize(844, 390);
+		expect(orders?.getAttribute("data-density")).toBe("compact");
+		expect(root.querySelector(".cooking-hud")?.getAttribute("data-screen")).toBe("low");
 		hud.setInputMode("touch");
-		const touchHeight = Number.parseFloat(hudRoot?.style.getPropertyValue("--hud-orders-max-height") ?? "");
-		expect(touchHeight).toBeLessThan(keyboardHeight);
-		expect(hudRoot?.getAttribute("data-input-mode")).toBe("touch");
+		expect(root.querySelector(".cooking-hud")?.getAttribute("data-input-mode")).toBe("touch");
+		expect(orders?.getAttribute("data-fits")).toBe("true");
 	});
 
 	it("кнопка паузы не меньше сенсорной цели 44 пикселя (стиль)", async () => {
@@ -560,5 +574,97 @@ describe("раскладка (7.7)", () => {
 		expect(root.querySelector("dialog")).toBeNull();
 		window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
 		expect(callbacks.onPauseRequested).not.toHaveBeenCalled();
+	});
+});
+
+// Шесть столов hard: у каждого заданное число заказов (2-4), срочность по-разному.
+function createSixTables(orderCounts: readonly number[]): TableSnapshot[] {
+	const dishes: DishId[] = ["burger", "ham", "veggieBurger", "stew"];
+	return orderCounts.map((count, tableIndex) => {
+		const number = tableIndex + 1;
+		const orders = Array.from({ length: count }, (_, seat) => createOrder(`table-${number}`, seat, dishes[(tableIndex + seat) % dishes.length], seat === 1 ? "delivering" : "waiting", Math.max(0.05, 0.95 - tableIndex * 0.15 - seat * 0.05)));
+		return createTable(number, "waiting", orders);
+	});
+}
+
+describe("карточки заказов на телефоне: все столы видны, ничего не обрезается (дефект H1)", () => {
+	const phoneSizes: Array<[number, number]> = [
+		[844, 390],
+		[667, 375],
+		[740, 360],
+		[932, 430],
+	];
+
+	describe.each(phoneSizes)("окно %i x %i, сенсорный режим", (width, height) => {
+		const environment: HudEnvironment = {
+			viewportWidthPx: width,
+			viewportHeightPx: height,
+			paddingLeftPx: HUD_EDGE_PADDING_PX,
+			paddingRightPx: HUD_EDGE_PADDING_PX,
+			paddingTopPx: HUD_EDGE_PADDING_PX,
+			touch: true,
+		};
+
+		it.each([
+			["два стола на четыре места и четыре на два (hard)", [4, 4, 2, 2, 2, 2]],
+			["шесть столов по четыре заказа", [4, 4, 4, 4, 4, 4]],
+			["шесть столов по два заказа", [2, 2, 2, 2, 2, 2]],
+		])("%s: все шесть карточек в DOM, внутри блока, а блок внутри своей зоны", (_label, orderCounts) => {
+			const panel = createOrdersPanel({}, () => environment);
+			document.body.append(panel.element);
+			panel.update(createSnapshot({ tables: createSixTables(orderCounts) }), 0);
+
+			// Все шесть карточек есть в DOM, ни одна не скрыта, число строк заказов совпадает со снимком.
+			const cards = Array.from(panel.element.querySelectorAll<HTMLElement>(".hud-card"));
+			expect(cards).toHaveLength(6);
+			expect(cards.every((card) => !card.hidden && card.isConnected)).toBe(true);
+			const shownCounts = cards.map((card) => card.querySelectorAll(".hud-order").length).sort();
+			expect(shownCounts).toEqual([...orderCounts].sort());
+
+			// План: компактный вид, всё помещается.
+			const plan = panel.getPlan();
+			expect(plan).not.toBeNull();
+			expect(plan?.fits).toBe(true);
+			expect(panel.element.getAttribute("data-density")).toBe("compact");
+			expect(panel.element.getAttribute("data-fits")).toBe("true");
+			expect(Number(panel.element.style.getPropertyValue("--hud-orders-rows")) * Number(panel.element.style.getPropertyValue("--hud-orders-columns"))).toBeGreaterThanOrEqual(6);
+
+			// Каждая карточка внутри блока, блок внутри зоны справа от таймера и выше экранных кнопок (проверка по расчётным размерам).
+			const metrics = computeHudMetrics(environment);
+			expect(plan?.placements).toHaveLength(6);
+			for (const placement of plan?.placements ?? []) {
+				expect(placement.xPx + placement.widthPx).toBeLessThanOrEqual((plan?.widthPx ?? 0) + 1e-6);
+				expect(placement.yPx + placement.heightPx).toBeLessThanOrEqual((plan?.heightPx ?? 0) + 1e-6);
+			}
+			expect(plan?.widthPx ?? Infinity).toBeLessThanOrEqual(metrics.zoneWidthPx + 1e-6);
+			expect((plan?.heightPx ?? Infinity) + environment.paddingTopPx).toBeLessThanOrEqual(height - getTouchControlsReservePx(width, height) + 1e-6);
+			// Блок прижат к правому краю и не заходит в центральный блок с таймером.
+			expect(width - environment.paddingRightPx - (plan?.widthPx ?? 0)).toBeGreaterThanOrEqual(width / 2 + metrics.centerWidthPx / 2 - 1e-6);
+			panel.dispose();
+		});
+	});
+
+	it("HUD целиком: на 844 x 390 шесть столов видны, названия блюд и слово 'Стол' остаются в DOM для вспомогательных технологий", () => {
+		setWindowSize(844, 390);
+		const { root, hud } = setupHud("touch");
+		hud.update(createSnapshot({ tables: createSixTables([4, 4, 2, 2, 2, 2]) }), 0);
+		const orders = root.querySelector<HTMLElement>(".hud-orders");
+		expect(orders?.getAttribute("data-density")).toBe("compact");
+		const cards = root.querySelectorAll(".hud-card");
+		expect(cards).toHaveLength(6);
+		for (const card of Array.from(cards)) {
+			expect(card.querySelector(".hud-card__title")?.textContent).toMatch(/^Стол \d$/);
+			card.querySelectorAll(".hud-order").forEach((row) => {
+				expect(row.querySelector(".hud-order__name")?.textContent?.length).toBeGreaterThan(2);
+				expect(row.querySelector("progress")?.getAttribute("aria-label")).toBeTruthy();
+			});
+		}
+	});
+
+	it("стиль: блок карточек не скрывает переполнение и не обрезает колонки", async () => {
+		const css = await import("node:fs").then((fs) => fs.readFileSync(`${process.cwd()}/game-src/cooking/src/hud/hud.css`, "utf8"));
+		const ordersRule = css.slice(css.indexOf(".hud-orders {"), css.indexOf("}", css.indexOf(".hud-orders {")));
+		expect(ordersRule).not.toMatch(/overflow\s*:\s*(hidden|clip|auto|scroll)/);
+		expect(ordersRule).not.toContain("max-block-size");
 	});
 });

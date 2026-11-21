@@ -1,6 +1,6 @@
 // Подменные таблица заказов (OrderBoard) и окно выдачи (ServingWindow) для тестов официантов: настоящие кухню и клиентов
 // пишет SONNET-1 параллельно. Реализуют только то, что нужно официанту и тестам. Владелец: SONNET-2 (geometry-control-nav).
-import type { DishId, LevelConfig, Order, OrderBoard, OrderId, PlateItem, ServingWindow, SimClock, WindowAcceptResult, WindowDish } from "../../contracts";
+import type { AssemblyItem, DishId, LevelConfig, Order, OrderBoard, OrderId, ServingWindow, SimClock, WindowAcceptResult, WindowDish } from "../../contracts";
 
 // Таблица заказов для тестов.
 export interface FakeOrderBoard extends OrderBoard {
@@ -99,7 +99,7 @@ export function createFakeServingWindow(level: LevelConfig, orders: OrderBoard, 
 
 	return {
 		addDish,
-		tryAccept(plate: PlateItem): WindowAcceptResult {
+		tryAccept(plate: AssemblyItem): WindowAcceptResult {
 			if (plate.dish === null) {
 				return { ok: false, reason: "dishNotReady" };
 			}

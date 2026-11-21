@@ -18,7 +18,8 @@
 // ============================================================================
 
 // Версия контрактов. Увеличивается при каждой правке, журнал правок лежит в .coordination/game-cooking/interfaces.md.
-export const CONTRACTS_VERSION = 1;
+// Версия 2: сборка блюд без тарелки, переносимая кастрюля, кран, прогресс игры через мост, подсказки (second stage, D17-D25).
+export const CONTRACTS_VERSION = 2;
 
 // ============================================================================
 // 1. БАЗОВЫЕ ТИПЫ И КОНСТАНТЫ
@@ -102,15 +103,17 @@ export type WindowDishId = string;
 // ============================================================================
 
 // Четыре блюда игры: бургер, окорок (готовая ветчина), овощной бургер, рагу.
-export const DISH_IDS = ["burger", "ham", "veggieBurger", "stew"] as const;
-// Идентификатор блюда: burger, ham (окорок), veggieBurger, stew (рагу).
+export const DISH_IDS = ["ham", "steak", "burger", "veggieBurger", "stew"] as const;
+// Идентификатор блюда: ham (окорок), steak (стейк), burger, veggieBurger, stew (рагу).
 export type DishId = (typeof DISH_IDS)[number];
 
-// Вид предмета (ингредиента или полуфабриката). Тарелка описывается отдельно (PlateItem).
+// Вид предмета (ингредиента или полуфабриката). Сборка из нескольких ингредиентов (AssemblyItem) и кастрюля (PotItem)
+// описываются отдельно.
 // steak - стейк (сырой или нарезанный), bun - булочка, ham - ветчина, potato/carrot/onion - овощи,
 // patty - котлета из нарезанного стейка (готовится на сковороде), veggiePatty - овощная котлета из нарезанных
-// картофеля и моркови (сковорода), stew - рагу (кастрюля; порция на тарелке).
-export type IngredientKind = "steak" | "bun" | "ham" | "potato" | "carrot" | "onion" | "patty" | "veggiePatty" | "stew";
+// картофеля и моркови (сковорода), friedSteak - жареный стейк из цельного сырого стейка (сковорода, без резки),
+// stew - рагу (кастрюля; порция на тарелке).
+export type IngredientKind = "steak" | "bun" | "ham" | "potato" | "carrot" | "onion" | "patty" | "veggiePatty" | "friedSteak" | "stew";
 
 // Состояние предмета: raw - исходный (из ящика, ещё не обработанный, у булочки это и есть вид "булочка"),
 // chopped - нарезанный (доска), cooked - готовый (сковорода, кастрюля, духовка), burnt - сгоревший.
@@ -129,23 +132,42 @@ export interface IngredientItem {
 	state: ItemState;
 }
 
-// Тарелка-контейнер. contents - ингредиенты на тарелке (мультимножество). Как только содержимое совпало с рецептом
-// блюда меню, поле dish становится равным блюду (тарелка "превращается" в готовое блюдо), иначе dish = null.
-// Тарелка вместе с содержимым занимает руку целиком (один предмет).
-export interface PlateItem {
-	type: "plate";
+// Сборка: несколько ингредиентов вместе (мультимножество), с тарелкой или без. Лежит в руке, на прилавке или доске.
+// Появляется, когда соединяются два предмета (жареная котлета и булочка в руках) или предмет кладут на тарелку.
+// Сборка занимает руку целиком (один предмет). Одиночный ингредиент остаётся IngredientItem.
+export interface AssemblyItem {
+	type: "assembly";
+	// Ингредиенты сборки. Пусто только у пустой тарелки.
 	contents: IngredientItem[];
+	// Блюдо, если contents совпало с рецептом меню (сборка на тарелке или без неё), иначе null.
 	dish: DishId | null;
+	// Лежит ли сборка на тарелке. Пустая тарелка: plated = true, contents = [], dish = null.
+	// Окно выдачи принимает только plated = true и dish не null.
+	plated: boolean;
+}
+
+// Кастрюля для рагу: переносимый предмет. Стоит на столе в начале смены, наполняется водой из крана, ставится на конфорку.
+export interface PotItem {
+	type: "pot";
+	// Налита ли вода. Овощи кладутся только в кастрюлю с водой.
+	hasWater: boolean;
+	// Нарезанные овощи (carrot, potato, onion в состоянии chopped, не больше KitchenParams.potCapacity) до варки; после варки пусто.
+	contents: IngredientItem[];
+	// Накопленная варка в секундах (0 .. время варки). Идёт только на включённой конфорке и сохраняется при снятии кастрюли.
+	cookProgressSec: number;
+	// Сколько порций готового рагу осталось (0, пока не сварено). Подгорания нет.
+	portions: number;
 }
 
 // Любой переносимый предмет.
-export type Item = IngredientItem | PlateItem;
+export type Item = IngredientItem | AssemblyItem | PotItem;
 
 // Перечень всех допустимых пар "вид + состояние". Источник истины для таблиц SONNET-1 и для соответствия моделям
 // (SONNET-3 сопоставляет каждой паре модель glTF). Другие пары в игре возникать не должны.
-// Цепочки: steak raw -> chopped (доска) -> patty raw -> cooked -> burnt (сковорода); potato и carrot raw -> chopped (доска),
+// Цепочки: steak raw -> chopped (доска) -> patty raw -> cooked -> burnt (сковорода); steak raw -> friedSteak raw -> cooked -> burnt
+// (сковорода, без резки); potato и carrot raw -> chopped (доска),
 // пара chopped potato + chopped carrot -> veggiePatty raw -> cooked -> burnt (сковорода); ham raw -> cooked -> burnt (духовка);
-// carrot, potato, onion chopped (до трёх) -> stew cooked -> burnt (кастрюля); bun raw без обработки.
+// carrot, potato, onion chopped (по одному) в кастрюле с водой -> stew cooked (порции, без подгорания); bun raw без обработки.
 export const ITEM_CATALOG: readonly ItemSpec[] = [
 	{ kind: "steak", state: "raw" },
 	{ kind: "steak", state: "chopped" },
@@ -165,42 +187,56 @@ export const ITEM_CATALOG: readonly ItemSpec[] = [
 	{ kind: "veggiePatty", state: "raw" },
 	{ kind: "veggiePatty", state: "cooked" },
 	{ kind: "veggiePatty", state: "burnt" },
+	{ kind: "friedSteak", state: "raw" },
+	{ kind: "friedSteak", state: "cooked" },
+	{ kind: "friedSteak", state: "burnt" },
 	{ kind: "stew", state: "cooked" },
-	{ kind: "stew", state: "burnt" },
 ];
 
-// Рецепт блюда: набор ингредиентов на тарелке (мультимножество, порядок не важен). Таблица рецептов лежит в
-// sim/kitchen/recipes.ts (SONNET-1). Цена, чаевые и трудоёмкость блюда лежат в параметрах уровня (DishParams).
+// Рецепт блюда: набор ингредиентов сборки (мультимножество, порядок не важен; тарелка не входит в рецепт, она последний этап).
+// Таблица рецептов лежит в sim/kitchen/recipes.ts (SONNET-1). Цена, чаевые и трудоёмкость блюда лежат в параметрах уровня (DishParams).
 export interface DishRecipe {
 	dish: DishId;
 	ingredients: ItemSpec[];
 }
 
 // Процесс готовки на станции. Идентификатор переходов в таблицах и в параметрах времени (KitchenParams.cooking).
-// patty - сковорода, нарезанный стейк; veggiePatty - сковорода, нарезанные картофель и морковь;
-// ham - духовка, сырая ветчина; stew - кастрюля, нарезанные морковь, картофель и лук.
-export type CookRecipeId = "patty" | "veggiePatty" | "ham" | "stew";
+// patty - сковорода, нарезанный стейк; veggiePatty - сковорода, нарезанные картофель и морковь; friedSteak - сковорода, целый сырой стейк;
+// ham - духовка, сырая ветчина; stew - кастрюля на конфорке (PotRecipe), нарезанные морковь, картофель и лук, без подгорания.
+export type CookRecipeId = "patty" | "veggiePatty" | "friedSteak" | "ham" | "stew";
 
-// Резка на доске: вход -> выход после удержания рабочего действия KitchenParams.cutSec секунд. Таблица в sim/kitchen.
+// Резка на доске и прилавке: вход -> выход после удержания рабочего действия KitchenParams.cutSec секунд на прилавке и
+// cutSec * boardCutDurationFactor на доске. Таблица в sim/kitchen.
 export interface CutTransition {
 	input: ItemSpec;
 	output: ItemSpec;
 }
 
-// Готовка на станции: набор входов (мультимножество) -> готовый предмет -> сгоревший предмет. Время cookSec и burnSec
-// берутся из KitchenParams.cooking по id. Таблица в sim/kitchen.
+// Готовка на сковороде и в духовке: набор входов (мультимножество) -> готовый предмет -> сгоревший предмет. Время cookSec
+// (умножается на KitchenParams.cookDurationFactor) и burnSec берутся из KitchenParams.cooking по id. Таблица в sim/kitchen.
+// Рагу в кастрюле описывает PotRecipe.
 export interface CookTransition {
 	id: CookRecipeId;
 	// Вид станции, на которой идёт готовка.
-	stationKind: "pan" | "pot" | "oven";
+	stationKind: "pan" | "oven";
 	// Что нужно положить (мультимножество). Для pan со стейком: один нарезанный steak.
 	inputs: ItemSpec[];
-	// Предмет, который лежит на станции, пока идёт готовка (patty raw, veggiePatty raw, ham raw, для рагу не используется).
+	// Предмет, который лежит на станции, пока идёт готовка (patty raw, veggiePatty raw, ham raw).
 	cooking: ItemSpec | null;
 	// Готовый предмет (cooked).
 	cooked: ItemSpec;
 	// Сгоревший предмет (burnt), если готовое не забрать за burnSec.
 	burnt: ItemSpec;
+}
+
+// Рецепт рагу в кастрюле: нарезанные овощи (мультимножество) в кастрюле с водой на включённой конфорке -> порции рагу.
+// Подгорания нет. Время варки KitchenParams.cooking.stew.cookSec * cookDurationFactor. Таблица в sim/kitchen.
+export interface PotRecipe {
+	id: "stew";
+	// Овощи в кастрюле (carrot, potato, onion chopped): полный набор запускает варку.
+	inputs: ItemSpec[];
+	// Порция готового рагу (stew cooked), которую берёт тарелка.
+	portion: ItemSpec;
 }
 
 // ============================================================================
@@ -209,12 +245,16 @@ export interface CookTransition {
 // Один источник данных: из него строятся расстановка моделей, коллизии, навигационная сетка, цели взаимодействия,
 // слоты очереди. Три уровня используют один набор моделей и отличаются раскладкой и параметрами.
 
-// Вид станции. Станция - то, с чем взаимодействует повар. Сковорода и кастрюля закреплены на плитах: вид "pan" означает
-// плиту со сковородой, "pot" - плиту с кастрюлей.
-// crate - ящик, бесконечно выдаёт один вид сырого ингредиента; counter - прилавок для одного предмета;
-// cuttingBoard - разделочная доска; pan - плита со сковородой; pot - плита с кастрюлей (рагу, только hard);
-// oven - духовка; plateStack - стопка тарелок; trash - урна; servingWindow - окно выдачи.
-export type StationKind = "crate" | "counter" | "cuttingBoard" | "pan" | "pot" | "oven" | "plateStack" | "trash" | "servingWindow";
+// Вид станции. Станция - то, с чем взаимодействует повар. Сковорода закреплена на плите: вид "pan" означает плиту со
+// сковородой. Кастрюля переносимая (PotItem) и ставится на конфорку "stove".
+// crate - ящик, бесконечно выдаёт один вид сырого ингредиента; counter - прилавок для одного предмета (в том числе сборки и
+// кастрюли), на нём можно резать; cuttingBoard - разделочная доска (резка быстрее); pan - плита со сковородой;
+// stove - конфорка для кастрюли (рагу в пятый день кампании); oven - духовка; plateStack - стопка тарелок (у окна выдачи);
+// trash - урна (у плит); servingWindow - окно выдачи; tap - кран с водой для кастрюли (есть на всех сложностях).
+export type StationKind = "crate" | "counter" | "cuttingBoard" | "pan" | "stove" | "oven" | "plateStack" | "trash" | "servingWindow" | "tap";
+
+// Какой предмет лежит на прилавке в начале смены (сейчас только пустая кастрюля без воды).
+export type StartItemKind = "pot";
 
 // Станция уровня.
 export interface StationConfig {
@@ -226,8 +266,10 @@ export interface StationConfig {
 	rotationDeg: Rotation;
 	// Только для crate: какой сырой ингредиент выдаёт ящик.
 	ingredient?: IngredientKind;
-	// Необязательное имя модели KayKit без расширения (визуальный выбор, например прилавок с раковиной). Иначе модель
-	// выбирает render по виду станции.
+	// Только для counter: предмет на прилавке в начале смены (стол с кастрюлей на уровне с рагу).
+	startItem?: StartItemKind;
+	// Необязательное имя модели KayKit без расширения (визуальный выбор). Иначе модель выбирает render по виду станции.
+	// Модели раковины в игре нет.
 	model?: string;
 }
 
@@ -389,12 +431,23 @@ export interface CustomerParams {
 	speed: number;
 }
 
+// Время одного процесса готовки: через cookSec * cookDurationFactor предмет готов, ещё через burnSec сгорает.
+// burnSec = null: готовое не подгорает (рагу в кастрюле).
+export interface CookTiming {
+	cookSec: number;
+	burnSec: number | null;
+}
+
 // Параметры станций и времени готовки (sim/kitchen).
 export interface KitchenParams {
-	// Время резки при удержании рабочего действия, секунды (начально 2).
+	// Базовое время резки при удержании рабочего действия, секунды (начально 2): так режет обычный прилавок.
 	cutSec: number;
-	// Время готовки и подгорания по процессам: через cookSec предмет готов, ещё через burnSec сгорает.
-	cooking: Record<CookRecipeId, { cookSec: number; burnSec: number }>;
+	// Множитель длительности резки на разделочной доске: 0.8 означает на 20% быстрее (резка на доске cutSec * 0.8).
+	boardCutDurationFactor: number;
+	// Множитель длительности готовки (сковорода, духовка, кастрюля): 0.8 означает на 20% быстрее. На время подгорания не влияет.
+	cookDurationFactor: number;
+	// Время готовки и подгорания по процессам (до умножения на cookDurationFactor).
+	cooking: Record<CookRecipeId, CookTiming>;
 	// Сколько нарезанных овощей принимает кастрюля (начально 3).
 	potCapacity: number;
 	// Сколько порций рагу даёт один полный набор (начально 2).
@@ -526,7 +579,8 @@ export type InputMode = "keyboard" | "touch";
 // или нет места; itemNotAccepted - станция не принимает этот предмет; burntItem - сгоревшее нельзя использовать;
 // plateRequired - для этого нужна тарелка в руке; plateNotAccepted - тарелка не принимает ингредиент (не подходит ни к одному
 // рецепту меню); dishNotReady - в окно сдают не готовое блюдо; noOpenOrder - в окно сдают блюдо без открытого заказа;
-// windowFull - в окне нет места.
+// windowFull - в окне нет места; dishNotPlated - готовое блюдо без тарелки в окно не принимается; needsWater - в кастрюле нет
+// воды, овощи не кладутся.
 export type ActionRejectReason =
 	| "handBusy"
 	| "handEmpty"
@@ -538,7 +592,9 @@ export type ActionRejectReason =
 	| "plateNotAccepted"
 	| "dishNotReady"
 	| "noOpenOrder"
-	| "windowFull";
+	| "windowFull"
+	| "dishNotPlated"
+	| "needsWater";
 
 // Где был клиент, когда у него истекло терпение.
 export type PatiencePlace = "queue" | "table";
@@ -607,7 +663,11 @@ export type SimEventBody =
 	| { type: "cookingStarted"; stationId: StationId; recipe: CookRecipeId }
 	| { type: "cookingDone"; stationId: StationId; recipe: CookRecipeId }
 	| { type: "itemBurnt"; stationId: StationId }
-	| { type: "dishAssembled"; dish: DishId };
+	// Предметы соединены (в руке, на поверхности, на тарелке): item это результат соединения, stationId станция, где действие.
+	| { type: "itemCombined"; stationId: StationId; item: Item }
+	| { type: "potWaterFilled"; stationId: StationId }
+	// Сборка стала блюдом (plated: уже на тарелке).
+	| { type: "dishAssembled"; dish: DishId; plated: boolean };
 
 // Добавляет время к каждому варианту объединения отдельно (распределённое условное).
 type WithTime<T> = T extends unknown ? T & { t: number } : never;
@@ -639,26 +699,29 @@ export interface SimClock {
 // Снимок читается без доступа к внутренностям симуляции. Это обычные данные (копии): потребитель их не меняет.
 
 // Состояние станции для отрисовки. idle: пусто; holding: что-то лежит, процесса нет (прилавок с предметом, доска с сырым предметом,
-// кастрюля с неполным набором, резка прервана, progress может быть больше 0); processing: процесс идёт сейчас (удерживается резка
-// или идёт готовка); ready: готово, можно забирать (нарезано, приготовлено; идёт отсчёт до подгорания, см. burnProgress);
-// burnt: сгорело.
+// конфорка с кастрюлей без полного набора или без воды, резка прервана, progress может быть больше 0); processing: процесс идёт
+// сейчас (удерживается резка или идёт готовка); ready: готово, можно забирать (нарезано, приготовлено; для сковороды и духовки
+// идёт отсчёт до подгорания, см. burnProgress; для кастрюли это готовые порции, подгорания нет); burnt: сгорело.
 export type StationPhase = "idle" | "holding" | "processing" | "ready" | "burnt";
 
 // Станция в снимке.
 export interface StationSnapshot {
 	id: StationId;
 	kind: StationKind;
-	// Что лежит на станции или в ней. Прилавок и доска: 0 или 1 предмет (на доске меняет состояние raw -> chopped). Сковорода и
-	// духовка: 0 или 1 предмет (patty/veggiePatty/ham в состоянии raw, cooked или burnt). Кастрюля: до трёх нарезанных овощей
-	// до готовки, после готовки один предмет stew (cooked или burnt). Ящик: пусто (он показывает свою модель). Урна, окно: пусто.
+	// Что лежит на станции или в ней. Прилавок и доска: 0 или 1 предмет (ингредиент, сборка или кастрюля; на доске и прилавке
+	// режущийся предмет меняет состояние raw -> chopped). Сковорода и духовка: 0 или 1 ингредиент (patty/veggiePatty/ham в
+	// состоянии raw, cooked или burnt). Конфорка: 0 или 1 кастрюля (PotItem). Ящик, урна, окно, стопка, кран: пусто.
 	items: readonly Item[];
 	phase: StationPhase;
-	// Прогресс резки или готовки 0..1 (над станцией). 0, если процесса нет.
+	// Прогресс резки или готовки 0..1 (зелёная полоса над станцией). 0, если процесса нет; 1, когда готово.
 	progress: number;
-	// Прогресс до подгорания 0..1 после готовности (0 до готовности и для сгоревшего). Нужен для предупреждения над станцией.
+	// Прогресс до подгорания 0..1 после готовности (красная полоса над станцией, заполняется): 0 до готовности, растёт до 1 за
+	// время подгорания, 1 у сгоревшего. Для кастрюли и станций без подгорания всегда 0 (красной полосы нет).
 	burnProgress: number;
-	// Для pot: сколько порций рагу осталось (0, если рагу не готово).
+	// Для stove: сколько порций рагу осталось в кастрюле (0, если рагу не готово).
 	portions: number;
+	// Конфорка или плита сейчас включена: идёт готовка (рендер рисует огонь). Для остальных станций false.
+	isHeating: boolean;
 }
 
 // Цель взаимодействия повара.
@@ -1057,9 +1120,10 @@ export type WindowAcceptResult = { ok: true; windowDish: WindowDish } | { ok: fa
 
 // Окно выдачи: реализует кухня (sim/kitchen). Принимает готовые блюда с открытым заказом, хранит до забора официантом.
 export interface ServingWindow {
-	// Принимает тарелку: нужна готовая тарелка (dish не null), открытый заказ (OrderBoard.findEarliestWaitingOrder), свободный слот.
+	// Принимает блюдо: нужна сборка на тарелке (plated) с готовым блюдом (dish не null), открытый заказ
+	// (OrderBoard.findEarliestWaitingOrder), свободный слот. Блюдо без тарелки отклоняется (dishNotPlated).
 	// При успехе привязывает блюдо к самому раннему заказу (OrderBoard.markDelivering), кладёт в слот, шлёт dishAccepted.
-	tryAccept(plate: PlateItem): WindowAcceptResult;
+	tryAccept(dish: AssemblyItem): WindowAcceptResult;
 	// Блюда, ждущие официанта, в порядке приёма (FIFO).
 	getDishes(): readonly WindowDish[];
 	// Официант забирает блюдо: убирает его из окна. null, если блюда уже нет.
@@ -1079,9 +1143,36 @@ export interface KitchenDeps {
 	bus: EventSink;
 }
 
+// Правила "взять/положить" (E) версии 2 (design D17-D21). Соединение двух предметов допустимо, если вместе их содержимое входит в
+// рецепт меню уровня (сгоревшее не соединяется ни с чем); результат остаётся там, где указано.
+// - ящик: рука пуста: сырой ингредиент в руку. В руке предмет, с которым ингредиент ящика соединяется: ингредиент соединяется с ним,
+//   результат в руке (котлета в руке плюс булочка из ящика = бургер без тарелки). Иначе отказ handBusy.
+// - прилавок: пуст, рука занята: предмет на прилавок. Занят, рука пуста: предмет в руку. Заняты оба: соединение; если один из двух
+//   на тарелке, результат у носителя на тарелке (в руке остаётся в руке, на прилавке остаётся на прилавке); если оба без тарелки,
+//   результат на прилавке; две тарелки не соединяются (отказ stationOccupied). Сырой нарезаемый предмет на прилавке режется
+//   рабочим действием за cutSec.
+// - разделочная доска: как прилавок, но режет за cutSec * boardCutDurationFactor.
+// - сковорода и духовка: в руке ингредиент-вход: кладётся (по рецепту). Рука пуста: готовое или сгоревшее в руку. В руке предмет
+//   или сборка (в том числе тарелка): готовое соединяется с ним в руке (burntItem для сгоревшего).
+// - конфорка (stove): пустая, в руке кастрюля: кастрюля на конфорку. С кастрюлей, рука пуста: кастрюля в руку. Ингредиент в руке:
+//   нарезанный овощ в кастрюлю с водой (needsWater без воды, stationOccupied при переполнении). Сборка-тарелка в руке и готовая
+//   кастрюля: порция рагу на тарелку. Набор полный (вода и нарезанные carrot, potato, onion) и кастрюля на конфорке: конфорка
+//   включается сама (cookingStarted, isHeating), через cookSec * cookDurationFactor выключается (cookingDone), порции
+//   stewPortionsPerBatch, подгорания нет.
+// - прилавок с кастрюлей: как конфорка для овощей и порций ("смешать на столе"); кастрюля в руке плюс овощ на прилавке: овощ в кастрюлю.
+// - кран (tap): в руке кастрюля: hasWater = true (potWaterFilled). Иначе отказ itemNotAccepted или handEmpty.
+// - стопка тарелок: рука пуста: пустая тарелка. В руке пустая тарелка: возвращается. В руке ингредиент или сборка без тарелки,
+//   которые можно положить на тарелку (входят в рецепт меню): предмет кладётся на новую тарелку, результат на тарелке в руке.
+//   Остальное: itemNotAccepted или plateNotAccepted.
+// - урна: принимает любой предмет, кроме кастрюли (itemNotAccepted).
+// - окно выдачи: принимает только сборку на тарелке (plated) с готовым блюдом (dish) и открытым заказом; без тарелки отказ
+//   dishNotPlated, недоделанное dishNotReady.
+// Рабочее действие (резка) идёт над прилавком и доской с сырым нарезаемым предметом.
+
 // Кухня: рука повара, все станции, рецепты, окно выдачи.
 // sim/kitchen/index.ts: export function createKitchen(deps: KitchenDeps): Kitchen
-// sim/kitchen/recipes.ts: таблицы (dishRecipes: Record<DishId, DishRecipe>, cutTransitions: CutTransition[], cookTransitions: CookTransition[]).
+// sim/kitchen/recipes.ts: таблицы (dishRecipes: Record<DishId, DishRecipe>, cutTransitions: CutTransition[], cookTransitions: CookTransition[],
+// potRecipe: PotRecipe).
 export interface Kitchen {
 	readonly window: ServingWindow;
 	// "Взять/положить" над станцией stationId (Simulation вызывает при input.actionPressed, если у повара есть цель).
@@ -1238,6 +1329,40 @@ export interface InputSource {
 // Тип фабрики InputFactory: сигнатура экспортируемой функции модуля (см. комментарий выше).
 export type InputFactory = (options: InputOptions) => InputSource;
 
+// --- 7.9a Прогресс игры и подсказки (game.ts, src/progress.ts, Opus-агент; окно подсказок: hud, SONNET-3) ---
+
+// Версия формата блока данных игры.
+export const GAME_PROGRESS_VERSION = 2;
+
+// Наибольший размер блока данных игры в байтах (длина JSON в UTF-8): лимит портала.
+export const MAX_GAME_PROGRESS_BYTES = 4096;
+
+// Блок данных игры cooking, который портал хранит между запусками: какие блюда игрок уже готовил своими руками (блюдо принято
+// окном выдачи при ручном управлении, событие dishAccepted). Прогресс общий для игры, а не для уровня.
+export interface GameProgress {
+	version: typeof GAME_PROGRESS_VERSION;
+	cookedDishes: DishId[];
+	// Количество успешно завершённых рабочих дней по сложности (easy/medium/hard), от 0 до 5.
+	completedDays: Record<LevelId, number>;
+}
+
+// Один этап подсказки: анимация и ключ подписи. Подпись лежит в texts/hud.ts по id этапа.
+export interface TutorialStepConfig {
+	// Стабильный идентификатор этапа внутри блюда (например "chop").
+	id: string;
+	// Имя файла GIF в папке tutorial/ сборки (без пути), 480 x 300, до 250 КБ.
+	animationFile: string;
+	// Имя файла статичного первого кадра (PNG) для prefers-reduced-motion.
+	posterFile: string;
+}
+
+// Подсказка по блюду: этапы приготовления по порядку (бургер 4, окорок 4, овощной бургер 4, рагу 6).
+// Файл config/tutorial.ts (SONNET-3) экспортирует Record<DishId, DishTutorialConfig>.
+export interface DishTutorialConfig {
+	dish: DishId;
+	steps: readonly TutorialStepConfig[];
+}
+
 // --- 7.10 Рендер и HUD (src/render, src/hud, SONNET-3) ---
 
 // Мост с порталом (portal-bridge.js, sdk/web). Тип нужен main и тестам с подменой моста.
@@ -1246,8 +1371,12 @@ export interface PortalBridgeApi {
 	isEmbedded: boolean;
 	// Уровень из адреса (?level=easy).
 	getLevelId(): LevelId;
-	// Подписка на старт от портала. Первый вызов сообщает порталу о готовности.
-	onStart(callback: (start: { gameId: string; levelId: string }) => void): void;
+	// Подписка на старт от портала. Первый вызов сообщает порталу о готовности. progress: сохранённый блок данных игры (объект)
+	// или null (старый портал, нет блока, LocalStorage недоступен); его разбирает parseGameProgress.
+	onStart(callback: (start: { gameId: string; levelId: string; progress: unknown }) => void): void;
+	// Отправляет порталу блок данных игры (до 4096 байт JSON, объект); портал хранит последний блок и отдаёт в следующем старте.
+	// false: блок слишком большой, не сериализуется или сообщение не ушло (портала нет).
+	saveProgress(data: unknown): boolean;
 	// Итог уровня. false, если результат уже отправлен или числа неверные.
 	finish(result: { score: number; maxScore: number; completed?: boolean }): boolean;
 	// Выход без результата.
@@ -1362,6 +1491,11 @@ export interface HudOptions {
 	dishIcons: DishIcons;
 	// Начальный режим ввода (подсказки управления зависят от него).
 	inputMode: InputMode;
+	// Блюда меню, которые игрок ещё не готовил: перед стартовым экраном HUD показывает по ним окна подсказок (по одному на блюдо,
+	// в порядке массива). Пустой массив: подсказок нет. Список определяет game.ts один раз при запуске уровня.
+	tutorialDishes: readonly DishId[];
+	// Рабочий день текущей недели (1..5), меню раскрывается постепенно.
+	campaignDay: number;
 }
 
 // HUD: заказы по столам, терпение, таймер, "X из N", очки, очередь, баннер, экраны (начало, пауза, провал, ориентация).

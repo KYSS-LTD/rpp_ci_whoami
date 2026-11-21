@@ -17,6 +17,7 @@ export const storageKeys = {
 	achievements: "achievements",
 	diplomas: "diplomas",
 	gameRatings: "gameRatings",
+	gameProgress: "gameProgress",
 } as const;
 
 export type StorageKeyName = (typeof storageKeys)[keyof typeof storageKeys];

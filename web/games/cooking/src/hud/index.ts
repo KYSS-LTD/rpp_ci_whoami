@@ -1,19 +1,21 @@
-// HUD игры (задачи 7.1-7.7): DOM-слой над canvas. Собирает карточки заказов (слева сверху), таймер и счётчики (сверху по центру),
-// очередь и кнопку паузы (справа сверху) и экраны (старт, пауза, провал, поворот). Нижняя часть экрана HUD не занимает:
-// на сенсорных устройствах там стик и кнопки. Тексты лежат в texts/hud.ts, стили в hud.css.
-import type { Hud, HudOptions, InputMode, SimEvent } from "../contracts";
+// HUD игры (задачи 7.1-7.7): DOM-слой над canvas. Собирает карточки заказов (справа сверху), таймер и счётчики (сверху по центру),
+// кнопку паузы и очередь (слева сверху) и экраны (старт, пауза, провал, поворот). Нижняя часть экрана HUD не занимает:
+// на сенсорных устройствах там стик (слева) и кнопки (справа). Тексты лежат в texts/hud.ts, стили в hud.css.
+import type { Hud, HudOptions, SimEvent } from "../contracts";
 import { hudTexts } from "../texts";
-import { HINT_VISIBLE_MS, ORDERS_MAX_HEIGHT_PERCENT_KEYBOARD, ORDERS_MAX_HEIGHT_PERCENT_TOUCH } from "./constants";
+import { HINT_VISIBLE_MS, HUD_EDGE_PADDING_PX } from "./constants";
 import { createElement, setAttribute, setCssVariable } from "./dom";
 import { createOrdersPanel } from "./orders";
+import { computeHudMetrics, type HudEnvironment } from "./ordersLayout";
 import { createScreens } from "./screens";
 import { createStatsBar } from "./stats";
 import { createSnapshotStore } from "./store";
 import "./hud.css";
 
-// Максимальная высота колонки карточек (проценты высоты экрана) для режима ввода.
-function getOrdersMaxHeight(mode: InputMode): string {
-	return String(mode === "touch" ? ORDERS_MAX_HEIGHT_PERCENT_TOUCH : ORDERS_MAX_HEIGHT_PERCENT_KEYBOARD);
+// Число пикселей из значения стиля; запасное значение, если стиль ещё не посчитан (тестовое окружение без раскладки).
+function readPixels(value: string, fallback: number): number {
+	const parsed = Number.parseFloat(value);
+	return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 // Создаёт HUD в корневом элементе игры.
@@ -21,23 +23,54 @@ export function createHud(options: HudOptions): Hud {
 	const { root, level, callbacks, reporter, dishIcons } = options;
 	let inputMode = options.inputMode;
 
+	const ownerWindow = root.ownerDocument.defaultView ?? window;
 	const element = createElement("div", { className: "cooking-hud" });
 	const store = createSnapshotStore();
-	const orders = createOrdersPanel(dishIcons);
-	const stats = createStatsBar(level);
-	const screens = createScreens({ root: element, callbacks, reporter, inputMode });
 
-	// Правая зона: очередь и кнопка паузы.
-	const right = createElement("div", { className: "hud-right", attributes: { "data-zone": "top-right" } });
-	right.append(stats.queueElement, screens.pauseButton);
-	element.append(orders.element, stats.centerElement, right);
+	// Окружение для раскладки: размер окна, отступы корня HUD (в них входят вырезы экрана) и режим ввода.
+	function readEnvironment(): HudEnvironment {
+		const style = ownerWindow.getComputedStyle(element);
+		return {
+			viewportWidthPx: ownerWindow.innerWidth,
+			viewportHeightPx: ownerWindow.innerHeight,
+			paddingLeftPx: readPixels(style.paddingLeft, HUD_EDGE_PADDING_PX),
+			paddingRightPx: readPixels(style.paddingRight, HUD_EDGE_PADDING_PX),
+			paddingTopPx: readPixels(style.paddingTop, HUD_EDGE_PADDING_PX),
+			touch: inputMode === "touch",
+		};
+	}
+
+	const orders = createOrdersPanel(dishIcons, readEnvironment);
+	const stats = createStatsBar(level);
+	const screens = createScreens({ root: element, callbacks, reporter, inputMode, tutorialDishes: options.tutorialDishes, campaignDay: options.campaignDay });
+
+	// Левая зона: кнопка паузы и очередь (справа сверху карточки заказов, по центру таймер).
+	const left = createElement("div", { className: "hud-left", attributes: { "data-zone": "top-left" } });
+	left.append(screens.pauseButton, stats.queueElement);
+	element.append(left, stats.centerElement, orders.element);
 	root.append(element);
+
+	// Размеры блоков HUD по окну: на низком экране центральный блок уже, а зазоры меньше (карточкам заказов остаётся больше места).
+	function applyMetrics(): void {
+		const metrics = computeHudMetrics(readEnvironment());
+		setAttribute(element, "data-screen", metrics.lowScreen ? "low" : "normal");
+		setCssVariable(element, "--hud-gap", `${metrics.gapPx}px`);
+		setCssVariable(element, "--hud-center-width", `${metrics.centerWidthPx}px`);
+	}
+
+	// Окно или режим ввода изменились: размеры блоков и раскладка карточек пересчитываются.
+	function relayout(): void {
+		applyMetrics();
+		orders.relayout();
+	}
 
 	function applyInputMode(): void {
 		setAttribute(element, "data-input-mode", inputMode);
-		setCssVariable(element, "--hud-orders-max-height", `${getOrdersMaxHeight(inputMode)}dvh`);
+		relayout();
 	}
 	applyInputMode();
+	ownerWindow.addEventListener("resize", relayout);
+	ownerWindow.addEventListener("orientationchange", relayout);
 
 	// Последнее время кадра: от него считается срок показа подсказки.
 	let lastNowMs = 0;
@@ -82,6 +115,8 @@ export function createHud(options: HudOptions): Hud {
 			screens.setPaused(paused);
 		},
 		dispose() {
+			ownerWindow.removeEventListener("resize", relayout);
+			ownerWindow.removeEventListener("orientationchange", relayout);
 			unsubscribe();
 			screens.dispose();
 			orders.dispose();

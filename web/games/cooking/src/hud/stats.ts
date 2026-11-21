@@ -41,7 +41,7 @@ export function createStatsBar(level: LevelConfig): StatsBar {
 	centerElement.append(timer, counters, banner, hint);
 
 	// Очередь.
-	const queueElement = createElement("section", { className: "hud-queue", attributes: { "data-zone": "top-right" } });
+	const queueElement = createElement("section", { className: "hud-queue" });
 	const queueLabel = createElement("span", { className: "hud-queue__label", text: hudTexts.stats.queueLabel });
 	const queueValue = createElement("span", { className: "hud-queue__value" });
 	const queuePatience = createElement("progress", { className: "hud-queue__patience hud-order__patience", attributes: { max: "1", value: "1" } });

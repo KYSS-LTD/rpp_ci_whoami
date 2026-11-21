@@ -17,6 +17,7 @@ export function createDefaultParams(): LevelParams {
 			// Значения для тестов областей. Откалиброванные значения настоящих уровней: dishes.ts.
 			burger: { price: 10, maxTip: 5, effort: 16 },
 			ham: { price: 14, maxTip: 6, effort: 10 },
+			steak: { price: 11, maxTip: 5, effort: 12 },
 			veggieBurger: { price: 12, maxTip: 6, effort: 20 },
 			stew: { price: 18, maxTip: 8, effort: 22 },
 		},
@@ -43,11 +44,16 @@ export function createDefaultParams(): LevelParams {
 		},
 		kitchen: {
 			cutSec: 2,
+			// Доска режет на 20% быстрее прилавка, готовка на плите, в духовке и в кастрюле на 20% быстрее (подгорание не меняется).
+			boardCutDurationFactor: 0.8,
+			cookDurationFactor: 0.8,
 			cooking: {
 				patty: { cookSec: 6, burnSec: 6 },
 				veggiePatty: { cookSec: 6, burnSec: 6 },
+				friedSteak: { cookSec: 6, burnSec: 6 },
 				ham: { cookSec: 8, burnSec: 8 },
-				stew: { cookSec: 10, burnSec: 10 },
+				// Рагу в кастрюле не пригорает: конфорка выключается сама.
+				stew: { cookSec: 10, burnSec: null },
 			},
 			potCapacity: 3,
 			stewPortionsPerBatch: 2,

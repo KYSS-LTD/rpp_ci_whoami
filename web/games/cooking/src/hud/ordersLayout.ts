@@ -6,7 +6,7 @@
 // - full: полная карточка (номер стола, значок, название и статус каждого заказа, полоса терпения под строкой);
 // - compact: одна строка на стол (номер и ряд значков блюд, статус значком, полоса терпения под каждым значком).
 // Карточки идут по колонкам сверху вниз (самый срочный стол первым), число колонок и строк выбирается так, чтобы блок поместился
-// в свою зону: слева сверху между краем экрана и центральным блоком (таймер), сверху вниз до запаса под стик.
+// в свою зону: справа сверху между центральным блоком (таймер) и краем экрана, сверху вниз до запаса под экранные кнопки.
 import {
 	COMPACT_BADGE_PX,
 	COMPACT_CARD_GAP_PX,
@@ -18,6 +18,7 @@ import {
 	FULL_CARD_HEADER_PX,
 	FULL_CARD_PADDING_PX,
 	FULL_CARD_WIDTH_PX,
+	FULL_MAX_FILL_RATIO,
 	FULL_ORDER_ROW_PX,
 	FULL_RETURN_FILL_RATIO,
 	HUD_CENTER_WIDTH_LOW_PX,
@@ -26,7 +27,12 @@ import {
 	HUD_GAP_LOW_PX,
 	HUD_GAP_PX,
 	LOW_SCREEN_MAX_HEIGHT_PX,
-	TOUCH_CONTROLS_RESERVE_PX,
+	TOUCH_BUTTON_GAP_PX,
+	TOUCH_BUTTON_MAX_PX,
+	TOUCH_BUTTON_MIN_PX,
+	TOUCH_BUTTON_VMIN_RATIO,
+	TOUCH_EDGE_INSET_PX,
+	TOUCH_RESERVE_MARGIN_PX,
 } from "./constants";
 
 // Вид карточки стола.
@@ -39,7 +45,7 @@ export interface HudEnvironment {
 	paddingLeftPx: number;
 	paddingRightPx: number;
 	paddingTopPx: number;
-	// Сенсорный режим: снизу слева стик, снизу справа кнопки, под карточками нужен запас.
+	// Сенсорный режим: снизу справа кнопки "Взять" и "Резать", под карточками нужен запас.
 	touch: boolean;
 }
 
@@ -49,9 +55,16 @@ export interface HudMetrics {
 	lowScreen: boolean;
 	gapPx: number;
 	centerWidthPx: number;
-	// Зона карточек заказов: слева сверху.
+	// Зона карточек заказов: справа сверху (правая зона сетки HUD).
 	zoneWidthPx: number;
 	zoneHeightPx: number;
+}
+
+// Запас снизу под экранные кнопки "Взять" и "Резать" (они у правого края, как и карточки заказов): две кнопки столбиком
+// с зазором, отступ от края и запас. Размер кнопки считается так же, как в input/touch.css: clamp(72px, 20vmin, 104px).
+export function getTouchControlsReservePx(viewportWidthPx: number, viewportHeightPx: number): number {
+	const buttonPx = Math.min(TOUCH_BUTTON_MAX_PX, Math.max(TOUCH_BUTTON_MIN_PX, Math.min(viewportWidthPx, viewportHeightPx) * TOUCH_BUTTON_VMIN_RATIO));
+	return 2 * buttonPx + TOUCH_BUTTON_GAP_PX + TOUCH_EDGE_INSET_PX + TOUCH_RESERVE_MARGIN_PX;
 }
 
 // Размеры блоков HUD по окружению.
@@ -61,7 +74,7 @@ export function computeHudMetrics(environment: HudEnvironment): HudMetrics {
 	const centerWidthPx = lowScreen ? HUD_CENTER_WIDTH_LOW_PX : HUD_CENTER_WIDTH_PX;
 	// Сетка корня: левая зона, центр фиксированной ширины, правая зона (левая и правая равны).
 	const zoneWidthPx = Math.max(0, (environment.viewportWidthPx - environment.paddingLeftPx - environment.paddingRightPx - centerWidthPx - 2 * gapPx) / 2);
-	const bottomReservePx = environment.touch ? TOUCH_CONTROLS_RESERVE_PX : HUD_EDGE_PADDING_PX;
+	const bottomReservePx = environment.touch ? getTouchControlsReservePx(environment.viewportWidthPx, environment.viewportHeightPx) : HUD_EDGE_PADDING_PX;
 	const zoneHeightPx = Math.max(0, environment.viewportHeightPx - environment.paddingTopPx - bottomReservePx);
 	return { lowScreen, gapPx, centerWidthPx, zoneWidthPx, zoneHeightPx };
 }
@@ -156,6 +169,9 @@ function arrange(density: OrdersDensity, orderCounts: readonly number[], rows: n
 // Если не помещается ни одна, возвращает самую низкую из тех, что умещаются по ширине (fits = false), либо самую узкую.
 function chooseArrangement(density: OrdersDensity, orderCounts: readonly number[], zone: { widthPx: number; heightPx: number }, gapPx: number): OrdersLayoutPlan {
 	const cardCount = orderCounts.length;
+	if (cardCount === 0) {
+		return { density, ...arrange(density, orderCounts, 1, gapPx), zoneWidthPx: zone.widthPx, zoneHeightPx: zone.heightPx, fits: true };
+	}
 	const candidates: Array<ReturnType<typeof arrange>> = [];
 	for (let rows = cardCount; rows >= 1; rows -= 1) {
 		candidates.push(arrange(density, orderCounts, rows, gapPx));
@@ -176,13 +192,13 @@ export interface OrdersLayoutInput {
 	previousDensity: OrdersDensity;
 }
 
-// Выбирает вид карточек и число колонок. Полный вид, пока он помещается (возврат в него из компактного только с запасом),
-// иначе компактный: при шести столах по четыре заказа он занимает две колонки по три строки на любом из телефонов.
+// Выбирает вид карточек и число колонок. Полный вид, пока он помещается и не занимает больше FULL_MAX_FILL_RATIO высоты зоны
+// (возврат в него из компактного только при заполнении не выше FULL_RETURN_FILL_RATIO), иначе компактный: при шести столах по четыре заказа он занимает две колонки по три строки на любом из телефонов.
 export function planOrdersLayout(input: OrdersLayoutInput): OrdersLayoutPlan {
 	const { metrics, orderCounts, previousDensity } = input;
 	const zone = { widthPx: metrics.zoneWidthPx, heightPx: metrics.zoneHeightPx };
 	const fullPlan = chooseArrangement("full", orderCounts, zone, metrics.gapPx);
-	const returnZone = { widthPx: zone.widthPx, heightPx: zone.heightPx * (previousDensity === "full" ? 1 : FULL_RETURN_FILL_RATIO) };
+	const returnZone = { widthPx: zone.widthPx, heightPx: zone.heightPx * (previousDensity === "full" ? FULL_MAX_FILL_RATIO : FULL_RETURN_FILL_RATIO) };
 	const fullFits = fullPlan.fits && fullPlan.widthPx <= returnZone.widthPx && fullPlan.heightPx <= returnZone.heightPx;
 	if (fullFits) {
 		return fullPlan;

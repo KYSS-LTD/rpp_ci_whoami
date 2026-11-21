@@ -1,10 +1,13 @@
 // Визуальные объекты предметов (задача 6.5): ингредиенты, тарелки с содержимым и готовые блюда из моделей пака.
 // Все объекты строятся в единицах мира (с MODEL_SCALE), начало координат в центре основания: предмет можно ставить на поверхность.
-import { Box3, Group, Object3D, Vector3 } from "three";
-import { burntTintItems, dishModelNames, getItemKey, getItemModelName } from "../config/assets";
+import { Box3, CylinderGeometry, Group, Mesh, MeshBasicMaterial, Object3D, Vector3 } from "three";
+import { burntTintItems, dishModelNames, getItemKey, getItemModelName, itemTints } from "../config/assets";
 import { MODEL_SCALE, type DishId, type Item, type ItemSpec } from "../contracts";
 import type { LoadedAssets } from "./assets";
 import { burntTintColor } from "./palette";
+
+const potWaterGeometry = new CylinderGeometry(0.23, 0.27, 0.018, 16);
+const potWaterMaterial = new MeshBasicMaterial({ color: 0x57bde0 });
 
 // Результат построения: объект и его высота в единицах мира (для укладки предметов стопкой).
 export interface ItemVisual {
@@ -31,7 +34,9 @@ export function getItemSignature(item: Item | null): string {
 		return `i:${getItemKey(item)}`;
 	}
 	const contents = item.contents.map((content) => getItemKey(content)).sort();
-	return `p:${item.dish ?? "-"}:${contents.join(",")}`;
+	return item.type === "pot"
+		? `pot:${item.hasWater}:${item.portions}:${item.cookProgressSec}:${contents.join(",")}`
+		: `a:${item.plated}:${item.dish ?? "-"}:${contents.join(",")}`;
 }
 
 // Создаёт фабрику поверх загруженных моделей.
@@ -59,7 +64,8 @@ export function createItemVisualFactory(assets: LoadedAssets): ItemVisualFactory
 			// Пары вне каталога не возникают; заглушка нужна, чтобы сцена не падала при ошибке данных.
 			return createNormalizedModel("__missing__");
 		}
-		const tint = burntTintItems.has(getItemKey(spec)) ? burntTintColor : undefined;
+		const itemKey = getItemKey(spec);
+		const tint = burntTintItems.has(itemKey) ? burntTintColor : itemTints[itemKey];
 		return createNormalizedModel(modelName, tint);
 	}
 
@@ -71,14 +77,35 @@ export function createItemVisualFactory(assets: LoadedAssets): ItemVisualFactory
 		if (item.type === "ingredient") {
 			return createSpecVisual(item);
 		}
-		if (item.dish !== null) {
+		if (item.type === "pot") {
+			const pot = createNormalizedModel(item.portions > 0 ? "pot_A_stew" : "pot_A");
+			const group = new Group();
+			group.add(pot.object);
+			if (item.hasWater && item.portions === 0) {
+				const water = new Mesh(potWaterGeometry, potWaterMaterial);
+				water.position.y = 0.34;
+				group.add(water);
+			}
+			item.contents.forEach((content, index) => {
+				const visual = createSpecVisual(content);
+				const angle = (index / Math.max(1, item.contents.length)) * Math.PI * 2;
+				visual.object.position.set(Math.cos(angle) * 0.11, 0.37, Math.sin(angle) * 0.11);
+				visual.object.scale.multiplyScalar(0.55);
+				group.add(visual.object);
+			});
+			return { object: group, height: pot.height };
+		}
+		if (item.dish !== null && item.plated) {
 			return createDishVisual(item.dish);
 		}
-		// Тарелка с неполным набором: тарелка и содержимое стопкой.
-		const plate = createNormalizedModel("plate");
+		// Сборка без тарелки или тарелка с ингредиентами: содержимое лежит стопкой, блюдо готово визуально только на тарелке.
 		const group = new Group();
-		group.add(plate.object);
-		let height = plate.height;
+		let height = 0;
+		if (item.plated) {
+			const plate = createNormalizedModel("plate");
+			group.add(plate.object);
+			height = plate.height;
+		}
 		for (const content of item.contents) {
 			const visual = createSpecVisual(content);
 			visual.object.position.y = height;

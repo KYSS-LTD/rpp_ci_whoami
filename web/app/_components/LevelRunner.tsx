@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { gameRegistry } from "@/core/registry";
-import { recordLevelResult } from "@/core/progress";
+import { readGameProgress, recordLevelResult, saveGameProgress } from "@/core/progress";
 import type { LevelResult } from "@/core/contract/types";
 import { achievementDefinitions, type AwardedAchievement } from "@/core/achievements";
 import { commonTexts } from "@/texts/common";
@@ -187,6 +187,8 @@ export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
 				onFinish={handleFinish}
 				onPracticeFinish={isFree ? handlePractice : undefined}
 				onExitWithoutResult={() => setHasExitedWithoutResult(true)}
+				progress={readGameProgress(game.manifest.gameId)}
+				onSaveProgress={(data) => saveGameProgress(game.manifest.gameId, data)}
 			/>
 		);
 	}

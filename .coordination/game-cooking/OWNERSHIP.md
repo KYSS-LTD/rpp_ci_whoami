@@ -66,3 +66,11 @@
 7. Слои экрана (снизу вверх): canvas (рендер), слой касаний (ввод, SONNET-2), HUD (`pointer-events: none` везде, кроме интерактивных элементов), оверлеи (старт, пауза, провал, ориентация). Карточки заказов HUD вверху слева, нижняя часть и правый край на сенсорных устройствах свободны для стика и кнопок.
 8. Новые параметры баланса (числа) агенты в код не пишут: просят Opus-агента добавить поле в `LevelParams` и значение в `config/levels/defaults.ts`.
 9. Общие файлы проекта вне `games/cooking` и `games/cooking` правит только Opus-агент.
+
+## Второй этап (задачи 10-16 в tasks.md)
+
+Добавлены исключения и новые файлы (владелец указан):
+- SONNET-2 дополнительно (исключение из правила 9): `web/core/bridge/`, `web/core/storage/`, `web/app/_components/IframeLevel.tsx`, `web/sdk/` (веб-SDK, копии `portal-bridge.js`, Unity SDK, README, тесты согласованности), `web/docs/game-bridge-protocol.md`, `web/docs/adding-game.md`; правки точечные, остальной код портала не трогать.
+- SONNET-3 дополнительно: `web/scripts/capture-tutorial.mjs`, `web/games/cooking/src/config/tutorial.ts`, `web/games/cooking/public/tutorial/`, `web/games/cooking/src/texts/hud.ts` (подсказки); модель раковины `kitchencounter_sink` удаляется (задача 14.3).
+- Opus-агент: `progress.ts` (разбор и обновление блока данных игры), `bot/tutorialScript.ts`, `config/levels/*`, `game.ts`, `web/docs/cooking.md`, `web/package.json` (devDependency `gifenc` и скрипт `capture:tutorial` уже добавлены).
+- Нумерация задач: ARCH 10.1 (готово), 15.1-15.5, 16.1-16.2; S1 11.1-11.7; S2 12.1-12.6, 13.1; S3 14.1-14.6.

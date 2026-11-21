@@ -28,6 +28,7 @@ function createFakeBridge(): FakeBridge {
 		}),
 		exit: vi.fn<PortalBridgeApi["exit"]>(),
 		reportError: vi.fn<PortalBridgeApi["reportError"]>(),
+		saveProgress: vi.fn<PortalBridgeApi["saveProgress"]>(() => true),
 	};
 }
 

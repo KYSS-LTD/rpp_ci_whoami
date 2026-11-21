@@ -55,7 +55,7 @@ describe("веб-SDK моста", () => {
 		deliver({ source: "portal", version: 2, type: "start", gameId: "city-builder", levelId: "medium" });
 		expect(onStart).not.toHaveBeenCalled();
 		deliver({ source: "portal", version: 1, type: "start", gameId: "city-builder", levelId: "medium" });
-		expect(onStart).toHaveBeenCalledWith({ gameId: "city-builder", levelId: "medium" });
+		expect(onStart).toHaveBeenCalledWith({ gameId: "city-builder", levelId: "medium", progress: null });
 	});
 
 	it("finish отправляет level-result в формате протокола и только один раз", () => {
@@ -95,7 +95,7 @@ describe("веб-SDK моста", () => {
 		const onStart = vi.fn();
 		bridge.onStart(onStart);
 		expect(bridge.isEmbedded).toBe(false);
-		expect(onStart).toHaveBeenCalledWith({ gameId: "standalone", levelId: "medium" });
+		expect(onStart).toHaveBeenCalledWith({ gameId: "standalone", levelId: "medium", progress: null });
 		expect(bridge.getLevelId()).toBe("medium");
 		infoSpy.mockRestore();
 	});

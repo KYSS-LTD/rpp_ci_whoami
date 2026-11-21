@@ -18,7 +18,7 @@ const MINI_LEVEL_MAP = [
 	"#.....####.#",
 	"#..........#",
 	"#..........#",
-	"####...#####",
+	"#####..#####",
 ];
 
 // Рисует сетку так же, как MINI_LEVEL_MAP.
@@ -68,7 +68,7 @@ describe("геометрия уровня: сетки", () => {
 		expect(drawGrid(testGeometry.navGrid)).toEqual(drawGrid(testGeometry.collisionGrid));
 	});
 
-	it("препятствия: блокирующие props, станции, столы и стулья; проём двери не входит", () => {
+	it("препятствия: блокирующие props, станции, столы, стулья и стойки проёма; сам проём двери не входит", () => {
 		const level = createMiniLevel();
 		const geometry = buildGeometry(level);
 		const doorWay = level.door.rect;
@@ -77,8 +77,8 @@ describe("геометрия уровня: сетки", () => {
 		expect(geometry.obstacles).toContainEqual(level.tables[0].seats[0].chairRect);
 		expect(geometry.obstacles).toContainEqual(level.tables[0].seats[1].chairRect);
 		expect(geometry.obstacles.some((obstacle) => rectsOverlap(obstacle, doorWay))).toBe(false);
-		// Блокирующих props 5, станция 1, стол 1, стульев 2.
-		expect(geometry.obstacles).toHaveLength(9);
+		// Блокирующих props 5, станция 1, стол 1, стульев 2, стойки проёма 2.
+		expect(geometry.obstacles).toHaveLength(11);
 	});
 
 	it("коллайдеры без модели блокируют так же, как мебель", () => {

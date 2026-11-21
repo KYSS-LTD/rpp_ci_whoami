@@ -6,6 +6,7 @@
 import {
 	ITEM_CATALOG,
 	type ActionRejectReason,
+	type AssemblyItem,
 	type CookTransition,
 	type CutTransition,
 	type DishId,
@@ -15,7 +16,7 @@ import {
 	type Item,
 	type ItemSpec,
 	type ItemState,
-	type PlateItem,
+	type PotItem,
 	type StationKind,
 } from "../../contracts";
 
@@ -24,19 +25,23 @@ import {
 // ============================================================================
 
 // Рецепты блюд: набор ингредиентов на тарелке (мультимножество, порядок не важен).
-// burger: булочка и жареная котлета из нарезанного стейка; ham (окорок): одна готовая ветчина;
+// ham (окорок): готовая ветчина; steak: целый жареный стейк (без резки); burger: стейк с булочкой;
 // veggieBurger: булочка и жареная овощная котлета; stew: одна порция рагу из кастрюли.
 export const dishRecipes: Record<DishId, DishRecipe> = {
+	ham: {
+		dish: "ham",
+		ingredients: [{ kind: "ham", state: "cooked" }],
+	},
+	steak: {
+		dish: "steak",
+		ingredients: [{ kind: "friedSteak", state: "cooked" }],
+	},
 	burger: {
 		dish: "burger",
 		ingredients: [
 			{ kind: "bun", state: "raw" },
 			{ kind: "patty", state: "cooked" },
 		],
-	},
-	ham: {
-		dish: "ham",
-		ingredients: [{ kind: "ham", state: "cooked" }],
 	},
 	veggieBurger: {
 		dish: "veggieBurger",
@@ -83,6 +88,14 @@ export const cookTransitions: CookTransition[] = [
 		burnt: { kind: "veggiePatty", state: "burnt" },
 	},
 	{
+		id: "friedSteak",
+		stationKind: "pan",
+		inputs: [{ kind: "steak", state: "raw" }],
+		cooking: { kind: "friedSteak", state: "raw" },
+		cooked: { kind: "friedSteak", state: "cooked" },
+		burnt: { kind: "friedSteak", state: "burnt" },
+	},
+	{
 		id: "ham",
 		stationKind: "oven",
 		inputs: [{ kind: "ham", state: "raw" }],
@@ -90,20 +103,18 @@ export const cookTransitions: CookTransition[] = [
 		cooked: { kind: "ham", state: "cooked" },
 		burnt: { kind: "ham", state: "burnt" },
 	},
-	{
-		// Рагу: полный набор из одного нарезанного овоща каждого вида; овощи остаются в кастрюле, пока идёт варка.
-		id: "stew",
-		stationKind: "pot",
-		inputs: [
-			{ kind: "carrot", state: "chopped" },
-			{ kind: "potato", state: "chopped" },
-			{ kind: "onion", state: "chopped" },
-		],
-		cooking: null,
-		cooked: { kind: "stew", state: "cooked" },
-		burnt: { kind: "stew", state: "burnt" },
-	},
 ];
+
+// Полный набор для кастрюли: овощи остаются внутри во время варки.
+export const potRecipe = {
+	id: "stew" as const,
+	inputs: [
+		{ kind: "carrot", state: "chopped" },
+		{ kind: "potato", state: "chopped" },
+		{ kind: "onion", state: "chopped" },
+	] satisfies ItemSpec[],
+	portion: { kind: "stew", state: "cooked" } satisfies ItemSpec,
+};
 
 // Виды сырья, которые выдают ящики (состояние raw): с них начинается каждая цепочка блюда.
 export const crateIngredientKinds: readonly IngredientKind[] = ["steak", "bun", "ham", "potato", "carrot", "onion"];
@@ -123,14 +134,22 @@ export function createIngredientFromSpec(spec: ItemSpec): IngredientItem {
 }
 
 // Новая чистая тарелка: пустая, блюда нет.
-export function createEmptyPlate(): PlateItem {
-	return { type: "plate", contents: [], dish: null };
+export function createEmptyPlate(): AssemblyItem {
+	return { type: "assembly", contents: [], dish: null, plated: true };
+}
+
+// Создаёт пустую переносимую кастрюлю.
+export function createEmptyPot(): PotItem {
+	return { type: "pot", hasWater: false, contents: [], cookProgressSec: 0, portions: 0 };
 }
 
 // Глубокая копия предмета: для снимков и событий, чтобы потребитель не мог изменить состояние кухни.
 export function cloneItem<T extends Item>(item: T): T {
-	if (item.type === "plate") {
-		return { type: "plate", contents: item.contents.map((ingredient) => ({ ...ingredient })), dish: item.dish } as T;
+	if (item.type === "assembly") {
+		return { ...item, contents: item.contents.map((ingredient) => ({ ...ingredient })) } as T;
+	}
+	if (item.type === "pot") {
+		return { ...item, contents: item.contents.map((ingredient) => ({ ...ingredient })) } as T;
 	}
 	return { ...item } as T;
 }
@@ -217,7 +236,7 @@ export function findDishForContents(menu: readonly DishId[], contents: readonly 
 
 // Может ли тарелка принять ингредиент. null: может. Иначе причина отказа: burntItem (сгоревшее не годится никуда) или
 // plateNotAccepted (ингредиент не подходит ни к одному рецепту меню вместе с тем, что уже лежит на тарелке).
-export function checkPlateAccepts(menu: readonly DishId[], plate: PlateItem, ingredient: IngredientItem): ActionRejectReason | null {
+export function checkPlateAccepts(menu: readonly DishId[], plate: AssemblyItem, ingredient: IngredientItem): ActionRejectReason | null {
 	if (ingredient.state === "burnt") {
 		return "burntItem";
 	}
@@ -228,7 +247,48 @@ export function checkPlateAccepts(menu: readonly DishId[], plate: PlateItem, ing
 
 // Новая тарелка с добавленным ингредиентом. Если содержимое совпало с рецептом меню, dish равен блюду.
 // Допустимость ингредиента проверяет checkPlateAccepts: эта функция её не повторяет.
-export function addIngredientToPlate(menu: readonly DishId[], plate: PlateItem, ingredient: IngredientItem): PlateItem {
+export function addIngredientToPlate(menu: readonly DishId[], plate: AssemblyItem, ingredient: IngredientItem): AssemblyItem {
 	const contents = [...plate.contents.map((existing) => ({ ...existing })), { ...ingredient }];
-	return { type: "plate", contents, dish: findDishForContents(menu, contents) };
+	return { type: "assembly", contents, dish: findDishForContents(menu, contents), plated: plate.plated };
+}
+
+// Превращает ингредиент или сборку в контейнер и пересчитывает распознанное блюдо.
+export function makeAssembly(menu: readonly DishId[], items: readonly IngredientItem[], plated: boolean): AssemblyItem {
+	const contents = items.map((item) => ({ ...item }));
+	return { type: "assembly", contents, dish: findDishForContents(menu, contents), plated };
+}
+
+// Проверяет, что ингредиенты пока подходят хотя бы к одному блюду меню.
+export function ingredientsFitMenu(menu: readonly DishId[], items: readonly IngredientItem[]): boolean {
+	if (items.some((item) => item.state === "burnt")) {
+		return false;
+	}
+	const specs = items.map(specOf);
+	return menu.some((dish) => isSubMultiset(specs, dishRecipes[dish].ingredients));
+}
+
+// Объединяет ингредиент или сборку с ингредиентом, если вместе они остаются частью блюда меню.
+export function combineWithIngredient(menu: readonly DishId[], carrier: Item, ingredient: IngredientItem): Item | null {
+	if (ingredient.state === "burnt" || carrier.type === "pot" || carrier.type === "ingredient" && carrier.state === "burnt") {
+		return null;
+	}
+	const plated = carrier.type === "assembly" && carrier.plated;
+	const contents = carrier.type === "assembly" ? carrier.contents : [carrier];
+	const combined = [...contents, ingredient];
+	if (!ingredientsFitMenu(menu, combined)) {
+		return null;
+	}
+	return makeAssembly(menu, combined, plated);
+}
+
+// Проверяет, можно ли перенести предмет на тарелку как последний этап.
+export function plateItem(menu: readonly DishId[], item: Item): AssemblyItem | null {
+	if (item.type === "pot" || item.type === "ingredient" && item.state === "burnt") {
+		return null;
+	}
+	const contents = item.type === "assembly" ? item.contents : [item];
+	if (!ingredientsFitMenu(menu, contents)) {
+		return null;
+	}
+	return makeAssembly(menu, contents, true);
 }
