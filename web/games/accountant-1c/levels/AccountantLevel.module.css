@@ -68,6 +68,10 @@
 	border-left: 1px solid #b8ae96;
 }
 
+.openLetter {
+	margin-top: 12px;
+}
+
 .letter {
 	display: flex;
 	flex-direction: column;

@@ -6,6 +6,7 @@ import { useDrag, type DragHandleProps, type DropTargetResolver } from "./useDra
 
 export interface UsePickAndDropOptions {
 	targetIds: string[];
+	tutorialTarget?: string;
 	// Возвращает true, если элемент принят целью. При false элемент возвращается на место.
 	onPlace: (itemId: string, targetId: string) => boolean;
 	resolveTarget?: DropTargetResolver;
@@ -28,6 +29,7 @@ export interface PickItemProps extends DragHandleProps {
 	type: "button";
 	"aria-pressed": boolean;
 	"data-item-id": string;
+	"data-tutorial-id": string;
 	onClick: (event: MouseEvent<HTMLElement>) => void;
 	onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
 	onKeyUp: (event: KeyboardEvent<HTMLElement>) => void;
@@ -38,6 +40,7 @@ export interface PickTargetProps {
 	tabIndex: number;
 	"aria-disabled": boolean;
 	"data-drop-target": string;
+	"data-tutorial-id": string;
 	"data-active"?: "true";
 	onClick: () => void;
 	onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
@@ -50,7 +53,7 @@ function findInside(container: HTMLElement | null, attribute: string, value: str
 	return root?.querySelector<HTMLElement>(`[${attribute}="${value}"]`) ?? null;
 }
 
-export function usePickAndDrop({ targetIds, onPlace, resolveTarget, onFreeDrop, getMovingElement }: UsePickAndDropOptions) {
+export function usePickAndDrop({ targetIds, tutorialTarget, onPlace, resolveTarget, onFreeDrop, getMovingElement }: UsePickAndDropOptions) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 	const [activeTargetId, setActiveTargetId] = useState<string | null>(null);
@@ -110,6 +113,10 @@ export function usePickAndDrop({ targetIds, onPlace, resolveTarget, onFreeDrop, 
 		getMovingElement,
 		onDrop(event) {
 			if (event.targetId === null || !targetIds.includes(event.targetId)) {
+				if (tutorialTarget) {
+					place(event.itemId, "", { offset: event.offset, rect: event.rect }, false);
+					return;
+				}
 				if (onFreeDrop && event.targetId === null) {
 					onFreeDrop(event.itemId, event.offset);
 					return;
@@ -128,7 +135,7 @@ export function usePickAndDrop({ targetIds, onPlace, resolveTarget, onFreeDrop, 
 			return;
 		}
 		setSelectedItemId(itemId);
-		const firstTargetId = targetIds[0] ?? null;
+		const firstTargetId = tutorialTarget ?? targetIds[0] ?? null;
 		setActiveTargetId(firstTargetId);
 		if (fromKeyboard && firstTargetId) {
 			pendingFocusRef.current = { kind: "target", targetId: firstTargetId };
@@ -150,6 +157,7 @@ export function usePickAndDrop({ targetIds, onPlace, resolveTarget, onFreeDrop, 
 			type: "button",
 			"aria-pressed": selectedItemId === itemId,
 			"data-item-id": itemId,
+			"data-tutorial-id": `item-${itemId}`,
 			onClick(event) {
 				// detail = 0 у нажатия без мыши (например, экранным диктором): тогда фокус тоже переходит на цели.
 				selectItem(itemId, event.detail === 0);
@@ -175,7 +183,7 @@ export function usePickAndDrop({ targetIds, onPlace, resolveTarget, onFreeDrop, 
 	}
 
 	function moveActiveTarget(step: number) {
-		if (targetIds.length === 0) {
+		if (tutorialTarget || targetIds.length === 0) {
 			return;
 		}
 		const currentIndex = activeTargetId ? targetIds.indexOf(activeTargetId) : 0;
@@ -192,6 +200,7 @@ export function usePickAndDrop({ targetIds, onPlace, resolveTarget, onFreeDrop, 
 			tabIndex: isActive ? 0 : -1,
 			"aria-disabled": selectedItemId === null,
 			"data-drop-target": targetId,
+			"data-tutorial-id": `target-${targetId}`,
 			...(isActive ? { "data-active": "true" as const } : {}),
 			onClick() {
 				if (selectedItemId) {

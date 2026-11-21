@@ -68,6 +68,7 @@ export function Paper({
 		<article
 			className={`${styles.paper} ${className ?? ""}`}
 			data-paper={id}
+			data-tutorial-id={id}
 			data-variant={variant}
 			data-expanded={isExpanded ? "true" : undefined}
 			style={style}

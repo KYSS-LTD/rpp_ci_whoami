@@ -4,6 +4,8 @@
 // Выбрать документ и нажать штамп, перетащить документ на штамп или пройти клавиатурой (Tab, Enter, стрелки, Enter).
 // Неверный штамп возвращает документ, главбух печатает замечание. Разложенные документы улетают в журнал программы.
 import { useState } from "react";
+import { miniGameTutorials } from "../data/tutorials";
+import { useTutorial } from "../hooks/useTutorial";
 import { miniGameMaxScore, type DocumentSortingData, type SortingSectionId } from "../data/levels";
 import { fillTemplate } from "../logic/feedback";
 import { scoreDocumentSorting } from "../logic/scoring";
@@ -33,14 +35,16 @@ interface SortingDeskProps {
 	// Исходный порядок стопки: место бумаги на столе не меняется, когда соседние документы убирают.
 	orderIds: string[];
 	sections: SortingSectionId[];
+	tutorialTarget?: string;
 	onPlace: (documentId: string, sectionId: string) => boolean;
 }
 
 // Стол: документы-кнопки и лоток штампов. Внутри рабочего места, чтобы двигать бумаги по столу.
-function SortingDesk({ documents, orderIds, sections, onPlace }: SortingDeskProps) {
+function SortingDesk({ documents, orderIds, sections, tutorialTarget, onPlace }: SortingDeskProps) {
 	const layout = useDeskLayout();
 	const { selectedItemId, getItemProps, getTargetProps, cancelSelection } = usePickAndDrop({
 		targetIds: sections,
+		tutorialTarget,
 		onPlace,
 		getMovingElement: findMovingPaper,
 		onFreeDrop(itemId, offset) {
@@ -62,7 +66,7 @@ function SortingDesk({ documents, orderIds, sections, onPlace }: SortingDeskProp
 					</Paper>
 				);
 			})}
-			<section className={styles.stampTray} aria-label={accountantTexts.stamps.barLabel}>
+			<section data-tutorial-id="stamp-tray" className={styles.stampTray} aria-label={accountantTexts.stamps.barLabel}>
 				<p className={styles.trayHint}>{accountantTexts.stamps.stampHint}</p>
 				<div className={styles.stampRow} aria-label={texts.sectionsLabel}>
 					{sections.map((sectionId) => (
@@ -82,7 +86,7 @@ function SortingDesk({ documents, orderIds, sections, onPlace }: SortingDeskProp
 	);
 }
 
-export function DocumentSorting({ data, random, onComplete, onMistake, onProgress }: MiniGameProps<DocumentSortingData>) {
+export function DocumentSorting({ data, random, tutorialEnabled = false, onComplete, onMistake, onProgress }: MiniGameProps<DocumentSortingData>) {
 	const [documentOrder] = useState(() => shuffle(data.documents, random));
 	// Разделы, куда документ положен верно.
 	const [placements, setPlacements] = useState<Record<string, SortingSectionId>>({});
@@ -91,11 +95,16 @@ export function DocumentSorting({ data, random, onComplete, onMistake, onProgres
 	const [mistakeIds, setMistakeIds] = useState<string[]>([]);
 
 	const pile = documentOrder.filter((document) => placements[document.id] === undefined);
+	const tutorial = useTutorial(tutorialEnabled, miniGameTutorials.documentSorting(pile[0]));
+	const tutorialTarget = tutorial.current?.action === "sort" ? tutorial.current.targets[1].slice("target-".length) : undefined;
 	const isDone = pile.length === 0;
 
 	function handlePlace(documentId: string, sectionId: string): boolean {
 		const document = data.documents.find((candidate) => candidate.id === documentId);
 		if (!document || placements[documentId] !== undefined) {
+			return false;
+		}
+		if (!tutorial.accept("sort", documentId === pile[0]?.id && document.sectionId === sectionId)) {
 			return false;
 		}
 		const nextAttempts = firstAttempts[documentId] ? firstAttempts : { ...firstAttempts, [documentId]: sectionId as SortingSectionId };
@@ -125,6 +134,7 @@ export function DocumentSorting({ data, random, onComplete, onMistake, onProgres
 
 	return (
 		<Workplace
+			tutorial={tutorial}
 			booth={{ character: "courier", name: accountantTexts.boothCharacters.courier, speech: accountantTexts.boothSpeech.documentSorting }}
 			monitorSection="home"
 			monitorTitle={texts.tab}
@@ -157,7 +167,7 @@ export function DocumentSorting({ data, random, onComplete, onMistake, onProgres
 				</div>
 			}
 			desk={
-				<SortingDesk documents={pile} orderIds={documentOrder.map((document) => document.id)} sections={data.sections} onPlace={handlePlace} />
+				<SortingDesk documents={pile} orderIds={documentOrder.map((document) => document.id)} sections={data.sections} tutorialTarget={tutorialTarget} onPlace={handlePlace} />
 			}
 		/>
 	);

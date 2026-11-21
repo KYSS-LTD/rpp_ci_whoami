@@ -12,6 +12,7 @@ import {
 import { buildChiefReply } from "../logic/feedback";
 import { createSeededRandom } from "../logic/shuffle";
 import { accountantTexts } from "../texts";
+import { tutorialTexts } from "../texts/tutorial";
 import { buildMoveKeyframes, chooseMoveAnimation, chooseRejectAnimation, playMove, playReject } from "../ui/motion";
 import { FormToolbar } from "../ui/parts";
 import { useDrag } from "../ui/useDrag";
@@ -40,6 +41,10 @@ function byAttribute(attribute: string, value: string): HTMLElement {
 	}
 	return element;
 }
+
+const target = (id: string) => byAttribute("data-tutorial-id", id);
+const acknowledge = () => fireEvent.click(screen.getByRole("button", { name: tutorialTexts.next }));
+const enter = (element: HTMLElement, value: string) => fireEvent.change(element, { target: { value } });
 
 const documentButton = (documentId: string) => byAttribute("data-item-id", documentId);
 const stamp = (sectionId: string) => byAttribute("data-drop-target", sectionId);
@@ -137,6 +142,41 @@ describe("перетаскивание на Pointer Events", () => {
 		fireEvent.pointerUp(element, { pointerId, pointerType: "mouse", clientX: dx, clientY: dy });
 	}
 
+	it("учебная сортировка: неверное перетаскивание без штрафа, верный перенос с клавиатуры и повтор", () => {
+		const handlers = createHandlers();
+		render(<DocumentSorting data={easyDocuments} hintsEnabled={false} tutorialEnabled random={() => 0.99} {...handlers} />);
+		const first = easyDocuments.documents[0];
+		expect(screen.getByText(tutorialTexts.steps.sortRead)).toBeTruthy();
+		acknowledge();
+		const wrong = easyDocuments.sections.find((section) => section !== first.sectionId)!;
+		Object.defineProperty(document, "elementsFromPoint", { configurable: true, value: () => [stamp(wrong)] });
+		try {
+			dragElement(documentButton(first.id), 1, 50, 50);
+		} finally {
+			Reflect.deleteProperty(document, "elementsFromPoint");
+		}
+		expect(screen.getByText(tutorialTexts.retry)).toBeTruthy();
+		expect(handlers.onMistake).not.toHaveBeenCalled();
+		expect(handlers.onProgress).not.toHaveBeenCalled();
+		fireEvent.keyDown(documentButton(first.id), { key: "Enter" });
+		expect(document.activeElement).toBe(stamp(first.sectionId));
+		fireEvent.keyDown(stamp(first.sectionId), { key: "Enter" });
+		expect(journalZone(first.id)).toBe(first.sectionId);
+		expect(screen.queryByText(tutorialTexts.steps.sortPlace)).toBeNull();
+
+		fireEvent.click(screen.getByRole("button", { name: tutorialTexts.replay }));
+		acknowledge();
+		expect(screen.getByText(tutorialTexts.steps.sortPlace)).toBeTruthy();
+		fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+		expect(screen.queryByRole("button", { name: tutorialTexts.skip })).toBeNull();
+		for (const document of easyDocuments.documents.slice(1)) {
+			fireEvent.keyDown(documentButton(document.id), { key: "Enter" });
+			fireEvent.click(stamp(document.sectionId));
+		}
+		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.postAndClose }));
+		expect(handlers.onComplete).toHaveBeenCalledWith({ score: 10, hintsUsed: 0, mistakes: [] });
+	});
+
 	it("документ, брошенный на штамп, раскладывается; следующее нажатие не теряется", () => {
 		const handlers = createHandlers();
 		render(<DocumentSorting data={easyDocuments} hintsEnabled={false} random={createSeededRandom(1)} {...handlers} />);
@@ -177,8 +217,42 @@ describe("перетаскивание на Pointer Events", () => {
 		const header = within(cashBox).getByText(accountantTexts.cashPapers.boxTitle);
 		dragElement(header, 6, 30, 15);
 		expect(cashBox.style.getPropertyValue("--x")).toBe("50px");
-		expect(pads).toBeTruthy();
+		expect(Number(cashBox.style.zIndex)).toBeGreaterThan(Number(pads.style.zIndex));
 		Reflect.deleteProperty(document, "elementsFromPoint");
+	});
+});
+
+describe("учебные задания hard", () => {
+	it("сверка: совпавшие строки, отметка и причина расхождения", () => {
+		const handlers = createHandlers();
+		render(<BankReconciliation data={hardStatement} hintsEnabled={false} tutorialEnabled random={() => 0.99} {...handlers} />);
+		acknowledge();
+		const [bankRow, ledgerRow] = hardStatement.matchingPairs[0];
+		fireEvent.click(target(`item-${bankRow}`));
+		fireEvent.click(target(`target-${ledgerRow}`));
+		expect(screen.getByText(tutorialTexts.steps.bankFlag)).toBeTruthy();
+		const discrepancy = hardStatement.discrepancies[0];
+		const rowId = discrepancy.rowIds[0];
+		fireEvent.click(target(`flag-${rowId}`));
+		expect(screen.getByText(tutorialTexts.steps.bankReason)).toBeTruthy();
+		enter(target(`reason-${rowId}`), "duplicate");
+		expect(screen.getByText(tutorialTexts.retry)).toBeTruthy();
+		expect((target(`reason-${rowId}`) as HTMLSelectElement).value).toBe("");
+		enter(target(`reason-${rowId}`), discrepancy.reason);
+		expect(screen.queryByText(tutorialTexts.steps.bankReason)).toBeNull();
+		expect(handlers.onMistake).not.toHaveBeenCalled();
+	});
+
+	it("баланс: учебная карточка переносится на статью и даёт обычное очко", () => {
+		const handlers = createHandlers();
+		render(<BalanceSheet data={hardBalance} hintsEnabled={false} tutorialEnabled random={() => 0.99} {...handlers} />);
+		acknowledge();
+		const item = hardBalance.items[0];
+		fireEvent.click(target(`item-${item.id}`));
+		fireEvent.click(target(`target-${item.lineId}`));
+		expect(document.querySelector(`[data-placed-id="${item.id}"]`)).toBeTruthy();
+		expect(screen.queryByText(tutorialTexts.steps.balancePlace)).toBeNull();
+		expect(handlers.onProgress).toHaveBeenCalledWith({ earned: 1, possible: 1 });
 	});
 });
 
@@ -212,6 +286,23 @@ describe("касса у окошка", () => {
 		fireEvent.change(screen.getByLabelText(accountantTexts.miniGames.cashDesk.amountLabel, { selector: "input" }), { target: { value: amount } });
 		fireEvent.click(screen.getByRole("button", { name: paperTexts.handOver }));
 	}
+
+	it("учебный ордер: ошибочная сумма не проводится, верная даёт обычные два очка", () => {
+		const handlers = createHandlers();
+		render(<CashDesk data={easyCash} hintsEnabled={false} tutorialEnabled {...handlers} />);
+		acknowledge();
+		const visitor = easyCash.visitors[0];
+		fireEvent.click(target(`pad-${visitor.documentType}`));
+		expect(screen.getByText(tutorialTexts.steps.cashHand)).toBeTruthy();
+		enter(target("cash-amount"), "1");
+		fireEvent.click(target("cash-hand"));
+		expect(handlers.onMistake).not.toHaveBeenCalled();
+		expect(handlers.onProgress).not.toHaveBeenCalled();
+		enter(target("cash-amount"), String(visitor.amount));
+		fireEvent.click(target("cash-hand"));
+		expect(handlers.onProgress).toHaveBeenCalledWith({ earned: 2, possible: 2 });
+		expect(screen.queryByText(tutorialTexts.steps.cashHand)).toBeNull();
+	});
 
 	it("посетитель в окошке и его просьба берутся из данных уровня", () => {
 		render(<CashDesk data={easyCash} hintsEnabled={false} {...createHandlers()} />);
@@ -276,6 +367,25 @@ describe("проводки Дт/Кт", () => {
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.post }));
 	}
 
+	it("учебная проводка: проверка до записи в журнал и оттиска штампа", () => {
+		const handlers = createHandlers();
+		render(<Postings data={mediumOperations} hintsEnabled tutorialEnabled {...handlers} />);
+		acknowledge();
+		const operation = mediumOperations.operations[0];
+		postCurrent(operation.debit, operation.credit, "1");
+		expect(handlers.onMistake).not.toHaveBeenCalled();
+		expect(handlers.onProgress).not.toHaveBeenCalled();
+		expect(screen.queryByRole("img", { name: accountantTexts.stamps.posted })).toBeNull();
+		postCurrent(operation.debit, operation.credit, String(operation.amount));
+		expect(screen.getByRole("img", { name: accountantTexts.stamps.posted })).toBeTruthy();
+		expect(handlers.onProgress).toHaveBeenCalledTimes(1);
+		for (const remaining of mediumOperations.operations.slice(1)) {
+			postCurrent(remaining.debit, remaining.credit, String(remaining.amount));
+		}
+		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.postAndClose }));
+		expect(handlers.onComplete).toHaveBeenCalledWith({ score: 10, hintsUsed: 0, mistakes: [] });
+	});
+
 	it("форма принимает счета из данных уровня, первичка лежит на столе", () => {
 		render(<Postings data={mediumOperations} hintsEnabled {...createHandlers()} />);
 		const debitSelect = screen.getByLabelText(accountantTexts.miniGames.postings.debitLabel) as HTMLSelectElement;
@@ -326,6 +436,20 @@ describe("зарплата с НДФЛ", () => {
 		fireEvent.change(screen.getByLabelText(`${texts.deductionColumn}: ${name}`), { target: { value: deduction } });
 		fireEvent.change(screen.getByLabelText(`${texts.ndflColumn}: ${name}`), { target: { value: ndfl } });
 	}
+
+	it("учебная ведомость: черновик ошибочного ввода не попадает в очки", () => {
+		const handlers = createHandlers();
+		render(<Payroll data={mediumStaff} hintsEnabled tutorialEnabled {...handlers} />);
+		acknowledge();
+		enter(target("pay-deduction-petrov"), "10");
+		expect(handlers.onProgress).not.toHaveBeenCalled();
+		enter(target("pay-deduction-petrov"), "1400");
+		expect(screen.getByText(tutorialTexts.steps.payTax)).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.hint }));
+		enter(target("pay-tax-petrov"), "6578");
+		expect(handlers.onProgress).toHaveBeenLastCalledWith({ earned: 2.5, possible: 2.5 });
+		expect(screen.queryByText(tutorialTexts.steps.payTax)).toBeNull();
+	});
 
 	it("дети видны только в заявлениях на столе, у кого заявления нет, вычета нет", () => {
 		render(<Payroll data={mediumStaff} hintsEnabled={false} {...createHandlers()} />);

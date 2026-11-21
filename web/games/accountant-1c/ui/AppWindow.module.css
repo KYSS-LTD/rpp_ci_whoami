@@ -288,6 +288,10 @@
 	pointer-events: none;
 }
 
+.notifications[hidden] {
+	display: none;
+}
+
 .toast {
 	display: flex;
 	gap: 8px;

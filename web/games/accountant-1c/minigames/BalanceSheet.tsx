@@ -4,6 +4,8 @@
 // карточку перетаскивают на строку или выбирают её и затем строку. Нераспределённую прибыль игрок считает сам
 // (калькулятор на столе). Весы показывают, сходится ли актив с пассивом.
 import { useState } from "react";
+import { miniGameTutorials } from "../data/tutorials";
+import { useTutorial } from "../hooks/useTutorial";
 import { type BalanceItem, type BalanceLineId, type BalanceSheetData } from "../data/levels";
 import { formatRubles, parseAmountInput } from "../logic/money";
 import { calculateComputedLine, retainedEarningsPoints, scoreBalanceSheet } from "../logic/scoring";
@@ -47,14 +49,16 @@ interface BalanceDeskProps {
 	isFinished: boolean;
 	assetsTotal: number;
 	liabilitiesTotal: number;
+	tutorialTarget?: string;
 	onPlace: (itemId: string, lineId: string) => boolean;
 }
 
-function BalanceDesk({ data, pile, orderIds, placements, computedInput, onComputedChange, isFinished, assetsTotal, liabilitiesTotal, onPlace }: BalanceDeskProps) {
+function BalanceDesk({ data, pile, orderIds, placements, computedInput, onComputedChange, isFinished, assetsTotal, liabilitiesTotal, tutorialTarget, onPlace }: BalanceDeskProps) {
 	const layout = useDeskLayout();
 	const targetLineIds = [...data.assetLines, ...data.liabilityLines].filter((lineId) => lineId !== data.computedLineId);
 	const { selectedItemId, getItemProps, getTargetProps, cancelSelection } = usePickAndDrop({
 		targetIds: targetLineIds,
+		tutorialTarget,
 		onPlace,
 		getMovingElement: findMovingPaper,
 		onFreeDrop(itemId, offset) {
@@ -73,6 +77,7 @@ function BalanceDesk({ data, pile, orderIds, placements, computedInput, onComput
 						<AmountInput
 							className={styles.cellInput}
 							label={texts.computedLabel}
+							data-tutorial-id="balance-computed"
 							value={computedInput}
 							disabled={isFinished}
 							onValueChange={onComputedChange}
@@ -148,7 +153,7 @@ function BalanceDesk({ data, pile, orderIds, placements, computedInput, onComput
 	);
 }
 
-export function BalanceSheet({ data, random, onComplete, onMistake, onProgress }: MiniGameProps<BalanceSheetData>) {
+export function BalanceSheet({ data, random, tutorialEnabled = false, onComplete, onMistake, onProgress }: MiniGameProps<BalanceSheetData>) {
 	const [itemOrder] = useState(() => shuffle(data.items, random));
 	// Строки, куда карточка положена верно.
 	const [placements, setPlacements] = useState<Record<string, BalanceLineId>>({});
@@ -159,6 +164,8 @@ export function BalanceSheet({ data, random, onComplete, onMistake, onProgress }
 	const [isFinished, setIsFinished] = useState(false);
 
 	const pile = itemOrder.filter((item) => placements[item.id] === undefined);
+	const tutorial = useTutorial(tutorialEnabled, miniGameTutorials.balanceSheet(pile[0]));
+	const tutorialTarget = tutorial.current?.action === "balance" ? tutorial.current.targets[1].slice("target-".length) : undefined;
 	const computedAmount = parseAmountInput(computedInput);
 
 	const sumPlaced = (lineIds: BalanceLineId[]) =>
@@ -169,6 +176,9 @@ export function BalanceSheet({ data, random, onComplete, onMistake, onProgress }
 	function handlePlace(itemId: string, lineId: string): boolean {
 		const item = data.items.find((candidate) => candidate.id === itemId);
 		if (!item || placements[itemId] !== undefined) {
+			return false;
+		}
+		if (!tutorial.accept("balance", itemId === pile[0]?.id && item.lineId === lineId)) {
 			return false;
 		}
 		const nextAttempts = firstAttempts[itemId] ? firstAttempts : { ...firstAttempts, [itemId]: lineId as BalanceLineId };
@@ -210,6 +220,7 @@ export function BalanceSheet({ data, random, onComplete, onMistake, onProgress }
 
 	return (
 		<Workplace
+			tutorial={tutorial}
 			booth={{ character: "inspector", name: accountantTexts.boothCharacters.inspector, speech: accountantTexts.boothSpeech.balanceSheet }}
 			monitorSection="reports"
 			monitorTitle={texts.tab}
@@ -245,6 +256,7 @@ export function BalanceSheet({ data, random, onComplete, onMistake, onProgress }
 					isFinished={isFinished}
 					assetsTotal={assetsTotal}
 					liabilitiesTotal={liabilitiesTotal}
+					tutorialTarget={tutorialTarget}
 					onPlace={handlePlace}
 				/>
 			}

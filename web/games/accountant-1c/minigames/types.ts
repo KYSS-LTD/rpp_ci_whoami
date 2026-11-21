@@ -19,6 +19,7 @@ export interface MiniGameProps<TData> {
 	data: TData;
 	// Доступна ли подсказка (только уровень medium).
 	hintsEnabled: boolean;
+	tutorialEnabled?: boolean;
 	// Генератор для перемешивания карточек. В тестах передаётся детерминированный.
 	random?: RandomSource;
 	onComplete: (outcome: MiniGameOutcome) => void;

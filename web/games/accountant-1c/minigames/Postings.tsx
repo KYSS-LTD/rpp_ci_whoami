@@ -4,6 +4,8 @@
 // "Провести" записывает документ в журнал с отметкой проведения и ставит штамп на бумагу,
 // "Дт/Кт" показывает движения проведённых документов, подсказка стоит одно очко.
 import { useState } from "react";
+import { miniGameTutorials } from "../data/tutorials";
+import { useTutorial } from "../hooks/useTutorial";
 import { type PostingsData } from "../data/levels";
 import { fillTemplate } from "../logic/feedback";
 import { formatRubles, parseAmountInput } from "../logic/money";
@@ -19,7 +21,7 @@ import styles from "./MiniGames.module.css";
 const texts = accountantTexts.miniGames.postings;
 const tilts = [-2, 1.5, -1, 2.5];
 
-export function Postings({ data, hintsEnabled, onComplete, onMistake, onNotice, onProgress }: MiniGameProps<PostingsData>) {
+export function Postings({ data, tutorialEnabled = false, hintsEnabled, onComplete, onMistake, onNotice, onProgress }: MiniGameProps<PostingsData>) {
 	const [answers, setAnswers] = useState<Record<string, PostingAnswer>>({});
 	const [currentId, setCurrentId] = useState(data.operations[0]?.id ?? "");
 	const [debit, setDebit] = useState("");
@@ -32,6 +34,8 @@ export function Postings({ data, hintsEnabled, onComplete, onMistake, onNotice, 
 	const currentOperation = data.operations.find((operation) => operation.id === currentId) ?? null;
 	const isCurrentPosted = currentOperation !== null && answers[currentOperation.id] !== undefined;
 	const isAllPosted = data.operations.every((operation) => answers[operation.id] !== undefined);
+	const teachingOperation = isCurrentPosted ? data.operations.find((operation) => answers[operation.id] === undefined) : currentOperation;
+	const tutorial = useTutorial(tutorialEnabled, miniGameTutorials.postings(teachingOperation?.id));
 	const parsedAmount = parseAmountInput(amountInput);
 
 	function openOperation(operationId: string) {
@@ -41,14 +45,24 @@ export function Postings({ data, hintsEnabled, onComplete, onMistake, onNotice, 
 		setAmountInput("");
 	}
 
+	function replayTutorial() {
+		if (isCurrentPosted && teachingOperation) {
+			openOperation(teachingOperation.id);
+		}
+		tutorial.replay();
+	}
+
 	function handlePost() {
 		if (!currentOperation || isCurrentPosted || debit === "" || credit === "" || parsedAmount === null) {
 			return;
 		}
 		const answer: PostingAnswer = { debit, credit, amount: parsedAmount };
+		const check = checkPosting(data, currentOperation.id, answer);
+		if (!tutorial.accept("post", check.debit && check.credit && check.amount)) {
+			return;
+		}
 		const nextAnswers = { ...answers, [currentOperation.id]: answer };
 		setAnswers(nextAnswers);
-		const check = checkPosting(data, currentOperation.id, answer);
 		if (!check.debit || !check.credit || !check.amount) {
 			const explanationId = `postings.${currentOperation.id}`;
 			setMistakeIds((previous) => [...previous, explanationId]);
@@ -138,7 +152,7 @@ export function Postings({ data, hintsEnabled, onComplete, onMistake, onNotice, 
 						<p className={styles.operationText} data-testid="current-operation">
 							{accountantTexts.operations[currentOperation.id]}
 						</p>
-						<div className={styles.postingFields}>
+						<div className={styles.postingFields} data-tutorial-id="posting-fields">
 							<label className={styles.field}>
 								<span>{texts.debitLabel}</span>
 								<select value={debit} onChange={(event) => setDebit(event.target.value)} disabled={isCurrentPosted}>
@@ -167,6 +181,7 @@ export function Postings({ data, hintsEnabled, onComplete, onMistake, onNotice, 
 							onPostAndClose={handleFinish}
 							isPostAndCloseDisabled={!isAllPosted}
 							onPost={handlePost}
+							postTutorialId="posting-submit"
 							isPostDisabled={isCurrentPosted || debit === "" || credit === "" || parsedAmount === null}
 							onMovements={() => setIsMovementsOpen((open) => !open)}
 							isMovementsPressed={isMovementsOpen}
@@ -246,6 +261,7 @@ export function Postings({ data, hintsEnabled, onComplete, onMistake, onNotice, 
 
 	return (
 		<Workplace
+			tutorial={{ ...tutorial, replay: replayTutorial }}
 			booth={{ character: "director", name: accountantTexts.boothCharacters.director, speech: accountantTexts.boothSpeech.postings }}
 			monitorSection="operations"
 			monitorTitle={texts.tab}

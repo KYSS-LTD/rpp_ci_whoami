@@ -17,6 +17,7 @@ interface FormToolbarProps {
 	onPostAndClose?: () => void;
 	onSave?: () => void;
 	onPost?: () => void;
+	postTutorialId?: string;
 	onMovements?: () => void;
 	isPostAndCloseDisabled?: boolean;
 	isPostDisabled?: boolean;
@@ -30,6 +31,7 @@ export function FormToolbar({
 	onPostAndClose,
 	onSave,
 	onPost,
+	postTutorialId,
 	onMovements,
 	isPostAndCloseDisabled = false,
 	isPostDisabled = false,
@@ -50,7 +52,7 @@ export function FormToolbar({
 				</button>
 			) : null}
 			{onPost ? (
-				<button type="button" onClick={onPost} disabled={isPostDisabled}>
+				<button type="button" onClick={onPost} disabled={isPostDisabled} data-tutorial-id={postTutorialId}>
 					{buttonTexts.post}
 				</button>
 			) : null}

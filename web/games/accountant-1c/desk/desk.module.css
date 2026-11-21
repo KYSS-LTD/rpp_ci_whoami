@@ -106,6 +106,21 @@
 	background: #e0193a;
 }
 
+.workplace .tutorialHelp {
+	min-width: 32px;
+	min-height: 30px;
+	padding: 3px 8px;
+	color: #39271c;
+	background: var(--yellow);
+	border: 2px solid var(--yellow-dark);
+	border-radius: 0;
+	font: inherit;
+}
+
+.workplace .tutorialHelp:hover:not(:disabled) {
+	background: #ffe787;
+}
+
 /* ---------- Окошко и монитор ---------- */
 
 .upper {

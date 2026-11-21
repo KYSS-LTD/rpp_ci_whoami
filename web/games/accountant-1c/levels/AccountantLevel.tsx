@@ -10,6 +10,8 @@ import { debugLog } from "@/core/debug";
 import { LevelChromeProvider, type LevelChrome, type Slip } from "../desk/contexts";
 import { Paper } from "../desk/Paper";
 import { Workplace } from "../desk/Workplace";
+import { levelTutorials } from "../data/tutorials";
+import { useTutorial } from "../hooks/useTutorial";
 import { hintLevels, levelMaxScore, levelScenarios, miniGameMaxScore, type MiniGameData } from "../data/levels";
 import { buildChiefReply, fillTemplate, type MistakeRecord } from "../logic/feedback";
 import { buildLevelResult, getNextPhase, type LevelPhase } from "../logic/levelFlow";
@@ -45,6 +47,12 @@ export function AccountantLevel({ level, onFinish, random }: AccountantLevelProp
 	const scenario = levelScenarios[levelId];
 	const [startedAtMs] = useState(() => Date.now());
 	const [phase, setPhase] = useState<LevelPhase>("intro");
+	const [isLetterOpen, setIsLetterOpen] = useState(false);
+	const [isOverviewOpen, setIsOverviewOpen] = useState(false);
+	const overview = useTutorial(isOverviewOpen, levelTutorials[levelId], () => {
+		setIsOverviewOpen(false);
+		goToPhase(getNextPhase("intro"));
+	});
 	const [outcomes, setOutcomes] = useState<MiniGameOutcome[]>([]);
 	const [liveProgress, setLiveProgress] = useState<MiniGameProgress>(emptyProgress);
 	const [messages, setMessages] = useState<WindowMessage[]>([]);
@@ -55,6 +63,9 @@ export function AccountantLevel({ level, onFinish, random }: AccountantLevelProp
 	// Флаг отправки в ref: защищает от двойного вызова onFinish даже при двух быстрых нажатиях до перерисовки.
 	const isSentRef = useRef(false);
 	const nextMessageIdRef = useRef(1);
+	const focusLetterHeading = useCallback((heading: HTMLHeadingElement | null) => {
+		heading?.focus();
+	}, []);
 
 	const finalScores = outcomes.map((outcome) => applyHintPenalty(levelId, outcome.score, outcome.hintsUsed));
 	const levelScore = finalScores.reduce((total, score) => total + score, 0);
@@ -156,9 +167,11 @@ export function AccountantLevel({ level, onFinish, random }: AccountantLevelProp
 				booth={{
 					character: isFromDirector ? "director" : "chief",
 					name: isFromDirector ? accountantTexts.boothCharacters.director : accountantTexts.boothCharacters.chief,
-					speech: intro.body[0],
+					speech: isLetterOpen ? intro.body[0] : paper.greeting,
 				}}
 				monitorSection="home"
+				rulebookTab="documents"
+				tutorial={overview}
 				monitorTitle={null}
 				monitor={
 					<div className={styles.monitorNote}>
@@ -181,28 +194,35 @@ export function AccountantLevel({ level, onFinish, random }: AccountantLevelProp
 										<p key={article}>{article}</p>
 									))}
 								</div>
+								{!isLetterOpen ? (
+									<button type="button" className={`${styles.bigButton} ${styles.openLetter}`} onClick={() => setIsLetterOpen(true)}>
+										{paper.openLetter}
+									</button>
+								) : null}
 							</div>
 						</Paper>
-						<Paper id="letter" variant="form" defaultPosition={{ x: 410, y: 60 }} width={380} tilt={1.5} title={intro.from}>
-							<article className={styles.letter} aria-labelledby="accountant-intro-subject">
-								<h2 id="accountant-intro-subject" className={styles.letterSubject}>
-									{intro.subject}
-								</h2>
-								{intro.body.map((line) => (
-									<p key={line}>{line}</p>
-								))}
-								<button
-									type="button"
-									className={styles.bigButton}
-									onClick={() => {
-										notifyDirector("start");
-										goToPhase(getNextPhase("intro"));
-									}}
-								>
-									{paper.start}
-								</button>
-							</article>
-						</Paper>
+						{isLetterOpen ? (
+							<Paper id="letter" variant="form" defaultPosition={{ x: 410, y: 60 }} width={380} tilt={1.5} title={intro.from}>
+								<article className={styles.letter} aria-labelledby="accountant-intro-subject">
+									<h2 id="accountant-intro-subject" className={styles.letterSubject} ref={focusLetterHeading} tabIndex={-1}>
+										{intro.subject}
+									</h2>
+									{intro.body.map((line) => (
+										<p key={line}>{line}</p>
+									))}
+									<button
+										type="button"
+										className={styles.bigButton}
+										onClick={() => {
+											notifyDirector("start");
+											setIsOverviewOpen(true);
+										}}
+									>
+										{paper.start}
+									</button>
+								</article>
+							</Paper>
+						) : null}
 					</>
 				}
 			/>
@@ -291,6 +311,7 @@ export function AccountantLevel({ level, onFinish, random }: AccountantLevelProp
 					key={phase}
 					data={currentMiniGame}
 					hintsEnabled={hintLevels.includes(levelId)}
+					tutorialEnabled
 					random={random}
 					onComplete={handleMiniGameComplete}
 					onMistake={handleMistake}
