@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { achievementDefinitions } from "@/core/achievements";
 import { gameRegistry } from "@/core/registry";
 import { readAwardedAchievements, readGameRatings, readLevelResults, readPlayerName, readPracticeResults, saveGameRating } from "@/core/progress";
@@ -10,6 +10,7 @@ import { uavTexts } from "@/games/uav-operator/texts";
 import { profileTexts } from "@/texts/profile";
 import { professionNames } from "@/texts/professions";
 import { useProgressVersion } from "../_hooks/useProgressVersion";
+import { NameForm } from "./NameForm";
 import styles from "./ProfileView.module.css";
 import ui from "./ui.module.css";
 
@@ -18,6 +19,9 @@ import ui from "./ui.module.css";
 export function ProfileView() {
 	useProgressVersion();
 	const [ratingError, setRatingError] = useState<string | null>(null);
+	const [editingName, setEditingName] = useState(false);
+	const [nameSaved, setNameSaved] = useState(false);
+	const editNameButton = useRef<HTMLButtonElement>(null);
 	const playerName = readPlayerName();
 	const results = readLevelResults();
 	const practice = readPracticeResults();
@@ -37,9 +41,21 @@ export function ProfileView() {
 		<section className={ui.page}>
 			<div className={ui.pageHeader}>
 				<h1>{profileTexts.title}</h1>
-				<p className={styles.player}>
-					{profileTexts.nameLabel}: {playerName || profileTexts.nameMissing}
-				</p>
+				<div className={styles.identity}>
+					<p className={styles.player}>{playerName || profileTexts.nameMissing}</p>
+					<button ref={editNameButton} type="button" className="button-secondary" aria-expanded={editingName} onClick={() => {
+						setNameSaved(false);
+						setEditingName(!editingName);
+					}}>
+						{editingName ? profileTexts.cancelNameEdit : playerName ? profileTexts.editName : profileTexts.addName}
+					</button>
+					<p className="visually-hidden" role="status">{nameSaved ? profileTexts.nameSaved : ""}</p>
+				</div>
+				{editingName ? <NameForm initialName={playerName} onSaved={() => {
+					setEditingName(false);
+					setNameSaved(true);
+					editNameButton.current?.focus();
+				}} /> : null}
 			</div>
 			<p role="note" className={ui.note}>
 				{profileTexts.localAnalysisNotice}

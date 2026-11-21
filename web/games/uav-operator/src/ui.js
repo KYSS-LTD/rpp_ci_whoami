@@ -92,10 +92,10 @@ export function stage_Shell(index, scene, panel, controls = '', tutorial = '', t
 	return `<section class="mission-view ${mission.id}-view" aria-label="${title}">
 		${scene}${controls}
 		<p class="stage-status" id="stage-status" role="status">${statusPrefix}<span id="stage-status-text"></span></p>
-		<div class="complete-prompt" id="complete-prompt" role="region" aria-labelledby="complete-title" hidden>
+		${index === 1 && override.freeMode ? '<p class="complete-prompt flight-complete-notice" id="flight-complete-notice" role="status"></p>' : `<div class="complete-prompt" id="complete-prompt" role="region" aria-labelledby="complete-title" hidden>
 			<div><p class="micro" id="complete-title">${text.completeTitle}</p><p id="complete-message" data-initial="${completeNotice}"></p></div>
 			<button class="button button-primary" id="complete-submit" type="button">${submit}</button>
-		</div>
+		</div>`}
 		<div class="stage-tools">${tools}
 			<button class="button button-quiet stage-menu-button${index === 1 ? ' osd-button' : ''}" id="stage-menu-button" type="button" popovertarget="stage-menu" aria-label="${text.stageMenu}" title="${text.stageMenu}"><span aria-hidden="true">☰</span></button>
 		</div>
@@ -167,7 +167,7 @@ export function bind_Stage({ signal, restart, exit, submit, focusScene, showTuto
 		query('#cancel-submit').focus();
 	}, signal);
 	// Этап выполнен полностью, поэтому кнопка на плашке сдаёт работу без лишнего подтверждения.
-	bind_Click('#complete-submit', submit, signal);
+	query('#complete-submit')?.addEventListener('click', submit, { signal });
 	bind_Click('#restart', () => { close_StageMenu(); restart(); }, signal);
 	bind_Click('#stage-exit', exit, signal);
 	confirmation.addEventListener('close', () => {

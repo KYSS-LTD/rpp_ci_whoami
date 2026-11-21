@@ -10,7 +10,7 @@ import { bind_FlightInputs, bind_Joystick } from './inputs.js';
 import { add_Beacon } from './scenes.js';
 import { dispose_Scene, palette } from './models.js';
 import { create_Field, gate_Crossing } from './training-field.js';
-import { bind_Click, close_StageMenu, query, scene_Frame, set_Status, show_CompletePrompt, stage_OverlayOpen, stage_Shell, toggle_StageMenu } from './ui.js';
+import { bind_Click, close_StageMenu, query, scene_Frame, set_Status, show_CompletePrompt, stage_OverlayOpen, stage_Shell, toggle_StageMenu, vibrate_Device } from './ui.js';
 import { text } from './text.js';
 import { create_AnalogFeed } from './video.js';
 
@@ -215,6 +215,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	const speedText = query('#speed');
 	const stateText = query('#osd-state');
 	const throttleText = query('#throttle');
+	const completionNotice = query('#flight-complete-notice');
 	const updateDamageDisplay = bind_DamageDisplay(query('#damage-osd'), fieldDrone.propellers, kit.guards);
 	const markers = points.map(point => ({ point,
 		ring: beach ? add_Beacon(scene, point, point === base ? palette.mint : palette.lime, point === base ? padRadius : scanRadius) : null,
@@ -241,6 +242,17 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	let impactCooldown = 0;
 	let previousObstacle = false;
 	let nextGate = 0;
+	let completionTimer;
+	let completion = null;
+
+	function announce_Completion(message) {
+		if (!completionNotice) return show_CompletePrompt(message);
+		completion = { score: score_Flight(), duration: raceFinish ?? flightSeconds };
+		completionNotice.textContent = `${message} ${text.free.flightExitHint}`;
+		vibrate_Device([30, 60, 30]);
+		completionTimer = setTimeout(() => { completionNotice.textContent = ''; }, 3000);
+	}
+	signal.addEventListener('abort', () => clearTimeout(completionTimer), { once: true });
 	const previous = { x: motion.x, y: motion.y, z: motion.z };
 	const attitudeStick = bind_Joystick(query('#stick-move'), signal);
 	const throttleStick = bind_Joystick(query('#stick-view'), signal);
@@ -308,7 +320,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	function perform_Action() {
 		if (resetting || stage_OverlayOpen()) return;
 		if (raceFinish !== null || landed) {
-			queueMicrotask(() => { if (!signal.aborted) query('#complete-submit').click(); });
+			if (!freeMode) queueMicrotask(() => { if (!signal.aborted) query('#complete-submit').click(); });
 			return;
 		}
 		if (signalLost) return;
@@ -485,7 +497,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			raceFinish = Math.max(.01, flightSeconds - raceStart);
 			flightControls.hidden = true;
 		}
-		show_CompletePrompt(race ? text.free.raceDone : text.free.fieldDone);
+		announce_Completion(race ? text.free.raceDone : text.free.fieldDone);
 	}
 
 	function lose_Signal() {
@@ -496,7 +508,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		landButton.hidden = true;
 		frame.classList.add('signal-lost');
 		set_Status(copy.signalLost, 'warn');
-		lossTimer = setTimeout(() => request_Restart(copy.newAttempt), 1450);
+		if (!completion) lossTimer = setTimeout(() => request_Restart(copy.newAttempt), 1450);
 	}
 
 	function register_Touchdown(safePad) {
@@ -510,20 +522,24 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		if (landed || !beach || !safePad || !hasLifted || scanned.size !== sectors.length) return;
 		landed = true;
 		button.hidden = true;
-		show_CompletePrompt(freeMode ? text.free.beachDone : copy.completeNotice);
+		announce_Completion(freeMode ? text.free.beachDone : copy.completeNotice);
 	}
 
 	const raceScore = () => raceFinish === null ? Math.round(nextGate / sectors.length * 65)
 		: Math.max(30, Math.min(100, Math.round(100 - Math.max(0, raceFinish - 29) * 1.08 - errors * 4)));
 	const fieldScore = () => Math.max(0, Math.round(nextGate / sectors.length * 100) - errors * 4);
+	function score_Flight() {
+		if (beach) return Math.max(0, scanned.size * 25 + (hasLifted ? 10 : 0) + (landed ? 15 : 0) - errors * 5 - retryPenalty * Math.max(0, attempts - 1));
+		return race ? raceScore() : fieldScore();
+	}
 	const lapStamp = value => {
 		const hundredths = Math.round(value * 100);
 		return `${Math.floor(hundredths / 6000)}:${((hundredths % 6000) / 100).toFixed(2).padStart(5, '0')}`;
 	};
 	return { scene, camera, focus, motion, damage, points, limits, restart: request_Restart,
-		score: () => beach ? Math.max(0, scanned.size * 25 + (hasLifted ? 10 : 0) + (landed ? 15 : 0) - errors * 5 - retryPenalty * Math.max(0, attempts - 1))
-			: race ? raceScore() : fieldScore(),
-		duration: () => race ? raceFinish : null,
+		completed: () => completion !== null,
+		score: () => completion?.score ?? score_Flight(),
+		duration: () => completion?.duration ?? null,
 		summary: () => beach ? `${copy.attempts} · ${attempts} · ${copy.summarySectors} ${scanned.size} / ${sectors.length}`
 			: `${text.free.gates} ${nextGate} / ${sectors.length}${raceFinish === null ? '' : ` · ${text.free.timed} ${lapStamp(raceFinish)}`}`,
 		render(time) {
@@ -568,7 +584,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			else fieldDrone.drone.quaternion.copy(acro.attitude);
 			if (fieldDrone.body) fieldDrone.body.rotation.z = (1 - damage.hull) * .32;
 			if (chase) {
-				updateChase(camera, heading, grounded, groundAt);
+				updateChase(camera);
 			} else if (!stabilized) {
 				camera.position.set(x, y + .20, z);
 				camera.quaternion.copy(acro.attitude);

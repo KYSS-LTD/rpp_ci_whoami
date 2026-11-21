@@ -22,6 +22,7 @@ describe("страница ачивок", () => {
 		expect(lockedItems.length).toBeGreaterThan(0);
 		expect(lockedItems[0].textContent).toContain("Закрыто");
 		expect(screen.getByText("Гроза сложности")).toBeTruthy();
-		expect(container.querySelectorAll('img[src^="/achievement-icons/"]')).toHaveLength(6);
+		expect(container.querySelectorAll('img[src^="/achievement-icons/"]')).toHaveLength(9);
+		expect(awardedItem?.querySelector('img')?.getAttribute("src")).toBe("/achievement-icons/first-level.webp");
 	});
 });

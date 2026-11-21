@@ -36,9 +36,26 @@ export function notifyProgressChanged(): void {
 	progressListeners.forEach((listener) => listener());
 }
 
+export const maxPlayerNameLength = 120;
+
+export function normalizePlayerName(name: string): string {
+	return name.trim().replace(/\s+/g, " ").normalize("NFC").slice(0, maxPlayerNameLength).trimEnd();
+}
+
 // Возвращает имя пользователя или пустую строку, если имя еще не введено.
 export function readPlayerName(storage: PlatformStorage = platformStorage): string {
-	return storage.read(storageKeys.playerName, "");
+	const name = storage.read<unknown>(storageKeys.playerName, "");
+	return typeof name === "string" ? normalizePlayerName(name) : "";
+}
+
+export function savePlayerName(name: string, storage: PlatformStorage = platformStorage):
+	{ ok: true; name: string } | { ok: false; reason: "empty" | "quota" | "failed" } {
+	const normalized = normalizePlayerName(name);
+	if (!normalized) return { ok: false, reason: "empty" };
+	const result = storage.write(storageKeys.playerName, normalized);
+	if (!result.ok) return result;
+	notifyProgressChanged();
+	return { ok: true, name: normalized };
 }
 
 // Возвращает все попытки прохождения уровней.

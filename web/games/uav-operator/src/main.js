@@ -141,16 +141,21 @@ function show_Stage(index, showTutorial = true, resetMessage = '') {
 		query('#stage-exit').setAttribute('aria-label', text.free.back);
 		query('#stage-exit').title = text.free.back;
 	}
-	bind_Stage({ signal, restart: mode.restart ?? restart, showTutorial, exit: freeMode ? () => show_FreeMenu() : exit_Level, focusScene: mode.focus,
-		submit() {
-			const score = mode.score();
-			const summary = mode.summary?.();
-			if (freeMode) {
-				const duration = mode.duration?.() ?? (performance.now() - practiceStarted) / 1000;
-				show_PracticeResult(index, score, summary, !query('#complete-prompt').hidden, Math.round(duration));
-			} else save_Stage(index, score, summary);
-		},
-	});
+	function submit() {
+		const score = mode.score();
+		const summary = mode.summary?.();
+		if (freeMode) {
+			const duration = mode.duration?.() ?? (performance.now() - practiceStarted) / 1000;
+			const completed = mode.completed?.() ?? !query('#complete-prompt').hidden;
+			show_PracticeResult(index, score, summary, completed, Math.round(duration));
+		} else save_Stage(index, score, summary);
+	}
+	function exit() {
+		if (!freeMode) exit_Level();
+		else if (mode.completed?.()) submit();
+		else show_FreeMenu();
+	}
+	bind_Stage({ signal, restart: mode.restart ?? restart, showTutorial, exit, submit, focusScene: mode.focus });
 	track_Practice(record, signal);
 	schedule_Frame();
 }

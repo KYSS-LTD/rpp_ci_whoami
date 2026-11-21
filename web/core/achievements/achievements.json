@@ -3,18 +3,21 @@
 		"id": "first-level",
 		"title": "Первый уровень",
 		"description": "Завершите любой уровень в любой игре.",
+		"icon": "/achievement-icons/first-level.webp",
 		"condition": {}
 	},
 	{
 		"id": "confident-start",
 		"title": "Уверенный старт",
 		"description": "Наберите хотя бы половину очков на лёгком уровне.",
+		"icon": "/achievement-icons/confident-start.webp",
 		"condition": { "levelId": "easy", "minScorePercent": 50 }
 	},
 	{
 		"id": "hard-champion",
 		"title": "Гроза сложности",
 		"description": "Наберите хотя бы 80% очков на сложном уровне.",
+		"icon": "/achievement-icons/hard-champion.webp",
 		"condition": { "levelId": "hard", "minScorePercent": 80 }
 	},
 	{

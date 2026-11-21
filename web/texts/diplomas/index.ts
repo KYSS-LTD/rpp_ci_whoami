@@ -4,6 +4,7 @@ export const diplomasTexts = {
 	result: {
 		heading: "Диплом за прохождение",
 		name: "Фамилия, имя и отчество",
+		recipient: "Имя в дипломе",
 		nameRequired: "Введите имя для диплома.",
 		preparing: "Готовим PDF",
 		download: "Скачать диплом PDF",

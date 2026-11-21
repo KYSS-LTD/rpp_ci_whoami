@@ -1,9 +1,12 @@
 // Тексты личной страницы анализа.
 
 export const profileTexts = {
-	title: "Мой анализ",
-	nameLabel: "Имя",
+	title: "Мой профиль",
 	nameMissing: "Имя не введено",
+	addName: "Добавить имя",
+	editName: "Изменить имя",
+	cancelNameEdit: "Отмена",
+	nameSaved: "Имя сохранено",
 	gamesTitle: "Мои результаты",
 	noGames: "Пока ни один уровень не пройден.",
 	achievementsTitle: "Ачивки",

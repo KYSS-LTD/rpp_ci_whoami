@@ -205,6 +205,8 @@ h1, h2, p { margin: 0; }
 .photo-badge { top: var(--edge-top); left: var(--edge-left); pointer-events: none; }
 .complete-prompt, .next-photo { bottom: var(--edge-bottom); left: 50%; transform: translateX(-50%); width: max-content; max-width: 94%; display: flex; gap: .7rem; align-items: center; }
 .complete-prompt { z-index: 5; }
+.flight-complete-notice { pointer-events: none; text-align: center; }
+.flight-complete-notice:empty { opacity: 0; }
 .photo-legend .object-tire { background: radial-gradient(circle, transparent 27%, #839085 29%, #46534c 53%, #909c91 65%, transparent 67%); }
 .flight-controls.retry-flight { display: grid; }
 .retry-flight .joystick-group { visibility: hidden; }

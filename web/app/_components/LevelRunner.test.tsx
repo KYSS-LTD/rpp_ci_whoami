@@ -121,12 +121,15 @@ describe("запуск уровня и ввод имени", () => {
 		expect(platformStorage.read<unknown[]>(storageKeys.diplomas, [])).toEqual([]);
 	});
 
-	it("после завершения уровня сохраняет результат", () => {
+	it("сохраняет результат и использует имя из профиля в дипломе", () => {
 		platformStorage.write(storageKeys.playerName, "Анна");
 		render(<LevelRunner gameId="demo" levelId="hard" />);
 		fireEvent.click(screen.getByRole("button", { name: "Завершить уровень" }));
 		expect(screen.getByRole("heading", { name: commonTexts.levelCompletedTitle })).toBeTruthy();
 		expect(platformStorage.read<unknown[]>(storageKeys.levelResults, [])).toHaveLength(1);
+		expect(screen.queryByLabelText(diplomasTexts.result.name)).toBeNull();
+		expect(screen.getByText("Анна")).toBeTruthy();
+		expect(screen.getByRole("button", { name: diplomasTexts.result.download })).toBeTruthy();
 	});
 
 	it("неизвестный уровень показывает страницу не найдено", () => {
@@ -223,7 +226,8 @@ describe("запуск iframe-игры", () => {
 			});
 		}
 		expect(screen.getByRole("heading", { name: commonTexts.levelCompletedTitle })).toBeTruthy();
-		expect(screen.getByLabelText(diplomasTexts.result.name)).toBeTruthy();
+		expect(screen.queryByLabelText(diplomasTexts.result.name)).toBeNull();
+		expect(screen.getByRole("button", { name: diplomasTexts.result.download })).toBeTruthy();
 		expect(platformStorage.read<unknown[]>(storageKeys.levelResults, [])).toEqual([]);
 		expect(platformStorage.read<unknown[]>(storageKeys.practiceResults, [])).toEqual([
 			expect.objectContaining({ activity, score: 88, completed: true, durationSec: 29 }),
