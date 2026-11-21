@@ -1,0 +1,731 @@
+/* Рабочее место (design.md, D11). Палитра стола своя и не зависит от темы портала:
+   тёмное дерево, кремовая бумага, красные и жёлтые акценты программы. Шрифты: --acc-font-pixel и --acc-font-paper (ui/fonts.ts). */
+
+.workplace {
+	--wood: #4a3a30;
+	--wood-dark: #2f241e;
+	--wood-light: #5c4a3e;
+	--paper: #efe5cb;
+	--paper-shade: #ded1b0;
+	--paper-line: #c9b994;
+	--ink: #3b2f27;
+	--ink-muted: #6d5e4f;
+	--ink-red: #b3261e;
+	--ink-green: #2e7d3c;
+	--ink-blue: #2f4f8f;
+	--yellow: #f7d23e;
+	--yellow-dark: #c99a06;
+	--red: #c8102e;
+	--pixel: var(--acc-font-pixel), "Courier New", monospace;
+	--mono: var(--acc-font-paper), "Courier New", monospace;
+
+	container-type: inline-size;
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	overflow: hidden;
+	color: var(--ink);
+	background: var(--wood-dark);
+	border: 3px solid #15100c;
+	border-radius: 6px;
+	box-shadow: 0 14px 40px rgb(0 0 0 / 0.35);
+}
+
+/* ---------- Полоса дня ---------- */
+
+.dayBar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 16px;
+	padding: 6px 12px;
+	font-family: var(--pixel);
+	color: var(--yellow);
+	background: #1b1512;
+	border-bottom: 3px solid #0d0a08;
+}
+
+.dayLabel {
+	font-size: 1.1rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.levelName {
+	margin-left: 10px;
+	color: #f3ead4;
+	text-transform: none;
+	letter-spacing: 0.02em;
+}
+
+.clock {
+	padding: 2px 8px;
+	font-size: 1.1rem;
+	color: #ff5a3d;
+	letter-spacing: 0.12em;
+	background: #120b09;
+	border: 2px solid #3a2a22;
+	text-shadow: 0 0 6px rgb(255 90 61 / 0.6);
+}
+
+.dayFicus {
+	width: 30px;
+	height: 40px;
+	margin: -6px 0;
+}
+
+.dayFicus svg {
+	width: 30px;
+	height: 40px;
+}
+
+.dayScore {
+	margin-left: auto;
+	font-size: 1rem;
+	color: #f3ead4;
+}
+
+.dayScore strong {
+	color: var(--yellow);
+}
+
+.workplace .exitButton {
+	min-height: 30px;
+	padding: 4px 10px;
+	font-family: var(--pixel);
+	font-size: 0.9rem;
+	font-weight: 400;
+	color: #fff4e8;
+	background: var(--red);
+	border: 2px solid #5a0714;
+	border-radius: 0;
+	box-shadow: 0 3px 0 #5a0714;
+}
+
+.workplace .exitButton:hover:not(:disabled) {
+	background: #e0193a;
+}
+
+/* ---------- Окошко и монитор ---------- */
+
+.upper {
+	display: grid;
+	grid-template-columns: 280px minmax(0, 1fr);
+	grid-template-rows: 236px;
+	gap: 12px;
+	padding: 10px 12px;
+	background:
+		repeating-linear-gradient(0deg, transparent 0 22px, rgb(0 0 0 / 0.08) 22px 24px),
+		#55605f;
+	border-bottom: 6px solid #1f1814;
+}
+
+.booth {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	min-width: 0;
+	min-height: 0;
+}
+
+/* Окошко в коридор: рама, стекло, персонаж, табличка с именем и подоконник снизу. */
+.boothWindow {
+	position: relative;
+	display: flex;
+	flex: none;
+	align-items: flex-end;
+	justify-content: center;
+	height: 138px;
+	overflow: hidden;
+	background: linear-gradient(180deg, #a9c3c2 0%, #7f9c9c 70%, #5f7b7a 100%);
+	border: 4px solid #1a1411;
+	box-shadow:
+		inset 0 0 0 3px #6b5646,
+		0 0 0 4px #3a312b;
+}
+
+.boothCharacter {
+	width: 100px;
+	height: 112px;
+	margin-bottom: 14px;
+}
+
+.boothName {
+	position: absolute;
+	top: 6px;
+	left: 6px;
+	padding: 0 6px;
+	font-family: var(--pixel);
+	font-size: 0.8rem;
+	color: #1b1512;
+	background: var(--yellow);
+	border: 2px solid #1b1512;
+}
+
+.boothCounter {
+	position: absolute;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	min-height: 16px;
+	padding: 3px 6px;
+	background: #7b5f45;
+	border-top: 3px solid #1a1411;
+	box-shadow: inset 0 3px 0 #94765a;
+}
+
+.speech {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+	padding: 6px 9px;
+	overflow-y: auto;
+	font-family: var(--mono);
+	font-size: 0.78rem;
+	line-height: 1.3;
+	color: var(--ink);
+	background: #fffaf0;
+	border: 3px solid #1b1512;
+	box-shadow: 4px 4px 0 rgb(0 0 0 / 0.35);
+	animation: speechIn 0.4s steps(4) both;
+}
+
+.speech::before {
+	position: absolute;
+	top: -10px;
+	left: 40px;
+	width: 14px;
+	height: 7px;
+	content: "";
+	background: #fffaf0;
+	border-top: 3px solid #1b1512;
+	border-left: 3px solid #1b1512;
+	transform: skewX(30deg);
+}
+
+@keyframes speechIn {
+	from {
+		clip-path: inset(0 100% 0 0);
+	}
+}
+
+/* ---------- Стол ---------- */
+
+.desk {
+	position: relative;
+	height: var(--desk-height, 560px);
+	overflow: hidden;
+	background:
+		repeating-linear-gradient(90deg, transparent 0 118px, rgb(0 0 0 / 0.12) 118px 120px),
+		repeating-linear-gradient(0deg, rgb(255 255 255 / 0.02) 0 3px, transparent 3px 9px),
+		var(--wood);
+}
+
+/* ---------- Бумага ---------- */
+
+.paper {
+	position: absolute;
+	top: var(--y);
+	left: var(--x);
+	width: var(--paper-width, 240px);
+	font-family: var(--mono);
+	font-size: 0.8rem;
+	line-height: 1.35;
+	color: var(--ink);
+	background: var(--paper);
+	border: 1px solid var(--paper-line);
+	box-shadow:
+		0 1px 0 var(--paper-shade),
+		4px 6px 0 rgb(0 0 0 / 0.28);
+	transform: rotate(var(--tilt, 0deg));
+	transition: box-shadow 0.15s;
+}
+
+/* Развёрнутая бумага (открытый справочник) не уходит за край стола. */
+.paper[data-expanded="true"] {
+	top: min(var(--y), calc(var(--desk-height, 580px) - 400px));
+	left: min(var(--x), calc(100% - 370px));
+}
+
+.paper:focus-within {
+	box-shadow:
+		0 1px 0 var(--paper-shade),
+		6px 9px 0 rgb(0 0 0 / 0.32);
+}
+
+.paperHeader {
+	padding: 4px 8px;
+	font-family: var(--pixel);
+	font-size: 0.9rem;
+	letter-spacing: 0.02em;
+	color: var(--ink);
+	background: var(--paper-shade);
+	border-bottom: 1px dashed var(--paper-line);
+	user-select: none;
+}
+
+.paperHeader[data-handle="header"] {
+	cursor: grab;
+}
+
+.paperHeader[data-dragging="true"] {
+	cursor: grabbing;
+}
+
+.paper[data-variant="form"] {
+	background:
+		repeating-linear-gradient(0deg, transparent 0 21px, rgb(47 79 143 / 0.12) 21px 22px),
+		var(--paper);
+}
+
+.paper[data-variant="card"] {
+	background: #f6edc9;
+}
+
+.paper[data-variant="note"] {
+	background: #fff1a8;
+	border-color: #e2cf6a;
+}
+
+.paper[data-variant="newspaper"] {
+	background: #e7e1d1;
+	border-color: #b8ae96;
+}
+
+.paper[data-variant="device"] {
+	color: #f3ead4;
+	background: #2e2a27;
+	border: 2px solid #15100c;
+	border-radius: 8px;
+}
+
+.paper[data-variant="device"] .paperHeader {
+	color: var(--yellow);
+	background: #1f1c1a;
+	border-bottom-color: #45403b;
+	border-radius: 6px 6px 0 0;
+}
+
+.paper[data-variant="pad"] {
+	color: #fff4e8;
+	background: #7a1f1f;
+	border: 2px solid #3d0b0b;
+	border-radius: 4px 8px 8px 4px;
+}
+
+.paper[data-variant="pad"] .paperHeader {
+	color: #1b1512;
+	background: var(--yellow);
+	border-bottom: 2px solid #3d0b0b;
+}
+
+/* ---------- Оттиск штампа ---------- */
+
+.stampMark {
+	display: inline-block;
+	padding: 2px 8px;
+	font-family: var(--pixel);
+	font-size: 0.95rem;
+	color: var(--ink-red);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	border: 3px double var(--ink-red);
+	border-radius: 4px;
+	opacity: 0.88;
+	transform: rotate(-9deg);
+	mix-blend-mode: multiply;
+	animation: stampThump 0.35s steps(4) both;
+}
+
+.stampMark[data-tone="green"] {
+	color: var(--ink-green);
+	border-color: var(--ink-green);
+}
+
+.stampMark[data-tone="blue"] {
+	color: var(--ink-blue);
+	border-color: var(--ink-blue);
+}
+
+@keyframes stampThump {
+	from {
+		opacity: 0;
+		transform: rotate(-9deg) scale(1.9);
+	}
+	60% {
+		opacity: 0.95;
+		transform: rotate(-9deg) scale(0.92);
+	}
+}
+
+/* ---------- Калькулятор ---------- */
+
+.calculator {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px;
+	outline: none;
+}
+
+.calculator:focus-visible {
+	box-shadow: inset 0 0 0 2px var(--yellow);
+}
+
+.calculatorDisplay {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	min-height: 38px;
+	padding: 4px 8px;
+	font-family: var(--pixel);
+	font-size: 1.35rem;
+	color: #1d2a16;
+	text-align: right;
+	background: linear-gradient(#a9c58f, #8fae78);
+	border: 3px solid #15100c;
+	box-shadow: inset 0 2px 0 rgb(0 0 0 / 0.25);
+	overflow: hidden;
+	white-space: nowrap;
+}
+
+.calculatorOperator {
+	font-size: 0.9rem;
+	opacity: 0.7;
+}
+
+.calculatorKeys {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 5px;
+}
+
+.workplace .calculatorKey {
+	min-height: 32px;
+	padding: 0;
+	font-family: var(--pixel);
+	font-size: 1rem;
+	font-weight: 400;
+	color: #f3ead4;
+	background: #4a4440;
+	border: 2px solid #15100c;
+	border-radius: 4px;
+	box-shadow: 0 3px 0 #15100c;
+}
+
+.workplace .calculatorKey:hover:not(:disabled) {
+	background: #5a534e;
+}
+
+.workplace .calculatorKey[data-tone="operator"] {
+	color: #1b1512;
+	background: var(--yellow);
+}
+
+.workplace .calculatorKey[data-tone="danger"],
+.workplace .calculatorKey[data-tone="equals"] {
+	background: var(--red);
+}
+
+.workplace .calculatorKey[data-pressed="true"] {
+	animation: keyPress 0.12s steps(2);
+}
+
+@keyframes keyPress {
+	50% {
+		box-shadow: 0 1px 0 #15100c;
+		transform: translateY(2px);
+	}
+}
+
+.workplace .calculatorToField {
+	grid-column: span 3;
+	font-size: 0.8rem;
+	color: #1b1512;
+	background: var(--yellow);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.calculatorTape {
+	max-height: 56px;
+	padding: 4px 8px;
+	overflow-y: auto;
+	font-family: var(--mono);
+	font-size: 0.74rem;
+	color: var(--ink);
+	background:
+		repeating-linear-gradient(0deg, transparent 0 15px, rgb(0 0 0 / 0.05) 15px 16px),
+		#f7f1e1;
+	border-top: 2px dashed #b8ae96;
+}
+
+.calculatorTape li {
+	display: flex;
+	justify-content: flex-end;
+	gap: 6px;
+	font-variant-numeric: tabular-nums;
+}
+
+.calculatorTape li[data-mark="="] {
+	font-weight: 700;
+	border-top: 1px solid var(--ink);
+}
+
+.tapeEmpty {
+	color: var(--ink-muted);
+	text-align: center;
+}
+
+/* ---------- Справочник ---------- */
+
+.workplace .rulebookCover {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	min-height: 56px;
+	padding: 6px 8px 6px 18px;
+	font-family: var(--pixel);
+	font-size: 0.95rem;
+	color: #fff4e8;
+	background: transparent;
+	border: none;
+	border-radius: 0;
+}
+
+.rulebookSpine {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	width: 10px;
+	background: repeating-linear-gradient(0deg, #3d0b0b 0 6px, #a33 6px 8px);
+}
+
+.rulebookOpen {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px;
+	color: var(--ink);
+	background: var(--paper);
+}
+
+.rulebookTabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 3px;
+}
+
+.workplace .rulebookTab {
+	min-height: 24px;
+	padding: 2px 8px;
+	font-family: var(--pixel);
+	font-size: 0.8rem;
+	font-weight: 400;
+	color: var(--ink);
+	background: var(--paper-shade);
+	border: 2px solid #8a7a5a;
+	border-radius: 0;
+}
+
+.workplace .rulebookTab[aria-selected="true"] {
+	background: var(--yellow);
+	border-color: #1b1512;
+}
+
+.rulebookPage {
+	max-height: 210px;
+	overflow-y: auto;
+	font-size: 0.78rem;
+}
+
+.rulebookPage li {
+	padding: 3px 0;
+	border-bottom: 1px dotted var(--paper-line);
+}
+
+.workplace .rulebookToggle {
+	align-self: flex-end;
+	min-height: 26px;
+	padding: 2px 10px;
+	font-family: var(--pixel);
+	font-size: 0.85rem;
+	font-weight: 400;
+	color: #fff4e8;
+	background: #7a1f1f;
+	border: 2px solid #3d0b0b;
+	border-radius: 0;
+}
+
+/* ---------- Замечания ---------- */
+
+.slips {
+	position: absolute;
+	top: 0;
+	right: 240px;
+	z-index: 900;
+	width: 260px;
+	pointer-events: none;
+}
+
+.slips ul {
+	position: relative;
+}
+
+.slip {
+	position: absolute;
+	top: calc(var(--slip-index) * 14px);
+	left: calc(var(--slip-index) * -10px);
+	width: 260px;
+	padding: 6px 10px 8px;
+	font-family: var(--mono);
+	font-size: 0.78rem;
+	line-height: 1.35;
+	color: var(--ink);
+	background: #fbe9e4;
+	border: 1px solid #d9a99f;
+	border-top: 6px solid var(--red);
+	box-shadow: 4px 6px 0 rgb(0 0 0 / 0.3);
+	pointer-events: auto;
+	animation: slipPrint 0.6s steps(6) both;
+}
+
+.slip:not(:last-child) {
+	filter: brightness(0.92);
+}
+
+@keyframes slipPrint {
+	from {
+		clip-path: inset(0 0 100% 0);
+		transform: translateY(-20px);
+	}
+}
+
+.slipTitle {
+	font-family: var(--pixel);
+	font-size: 1rem;
+	color: var(--red);
+	text-transform: uppercase;
+	letter-spacing: 0.1em;
+}
+
+.slipFrom {
+	margin-bottom: 4px;
+	font-size: 0.7rem;
+	color: var(--ink-muted);
+}
+
+.slipText em {
+	color: var(--ink-muted);
+}
+
+.workplace .slipRemove {
+	min-height: 22px;
+	margin-top: 6px;
+	padding: 1px 8px;
+	font-family: var(--pixel);
+	font-size: 0.8rem;
+	font-weight: 400;
+	color: var(--ink);
+	background: #f3d4cc;
+	border: 2px solid #b3261e;
+	border-radius: 0;
+}
+
+/* Наведение на кнопки стола: свои цвета, иначе общий стиль кнопок портала затемняет их. */
+.workplace .rulebookCover:hover:not(:disabled) {
+	background: rgb(255 255 255 / 0.08);
+}
+
+.workplace .rulebookTab:hover:not(:disabled) {
+	background: #f3e7c5;
+}
+
+.workplace .rulebookTab[aria-selected="true"]:hover:not(:disabled) {
+	background: #ffe066;
+}
+
+.workplace .rulebookToggle:hover:not(:disabled) {
+	background: #8f2a2a;
+}
+
+.workplace .slipRemove:hover:not(:disabled) {
+	background: #f7c9be;
+}
+
+/* ---------- Узкое рабочее место: всё столбиком ---------- */
+
+@container (max-width: 760px) {
+	.upper {
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: none;
+	}
+
+	.boothWindow {
+		height: 120px;
+	}
+
+	.boothCharacter {
+		width: 84px;
+		height: 94px;
+	}
+
+	.desk {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		height: auto;
+		padding: 12px;
+	}
+
+	.paper {
+		position: relative;
+		top: auto;
+		left: auto;
+		width: 100%;
+		max-width: none;
+		transform: none;
+	}
+
+	.slips {
+		position: static;
+		order: -1;
+		width: 100%;
+	}
+
+	.slip {
+		position: static;
+		width: 100%;
+		margin-bottom: 6px;
+	}
+
+	.slip:not(:last-child) {
+		display: none;
+	}
+
+	.dayScore {
+		margin-left: 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.speech,
+	.slip,
+	.stampMark {
+		animation: plainAppear 0.25s ease both;
+	}
+
+	.workplace .calculatorKey[data-pressed="true"] {
+		animation: none;
+	}
+}
+
+@keyframes plainAppear {
+	from {
+		opacity: 0;
+	}
+}

@@ -1,0 +1,112 @@
+/* Уровень: заголовок над рабочим местом, утренняя газета, письмо, перерыв на чай. */
+
+.level {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin: 0 auto;
+}
+
+/* Название уровня видно на полосе дня, заголовок остаётся для экранных дикторов и не занимает место на экране. */
+.levelTitle {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.monitorNote {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.monitorHeading {
+	font-weight: 700;
+	color: var(--acc-accent);
+}
+
+.taskList {
+	padding-left: 18px;
+	list-style: decimal;
+}
+
+.newspaper {
+	padding: 8px 10px 10px;
+}
+
+.newsDate {
+	padding-bottom: 4px;
+	font-size: 0.7rem;
+	color: #6d5e4f;
+	text-align: center;
+	border-bottom: 3px double #6d5e4f;
+}
+
+.headline {
+	margin: 6px 0;
+	font-family: var(--acc-font-pixel), "Courier New", monospace;
+	font-size: 1.45rem;
+	line-height: 1.05;
+	text-align: center;
+	letter-spacing: 0.02em;
+}
+
+.newsColumns {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 10px;
+	font-size: 0.74rem;
+	text-align: justify;
+}
+
+.newsColumns p + p {
+	padding-left: 10px;
+	border-left: 1px solid #b8ae96;
+}
+
+.letter {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px 12px 12px;
+}
+
+.letterSubject {
+	font-family: var(--acc-font-pixel), "Courier New", monospace;
+	font-size: 1.15rem;
+	font-weight: 400;
+	color: #3b2f27;
+	letter-spacing: 0;
+}
+
+.bigNumber {
+	font-size: 1.05rem;
+}
+
+/* Крупная кнопка на бумаге: жёлтая, как основная кнопка программы. */
+.level .bigButton {
+	align-self: flex-start;
+	min-height: 38px;
+	padding: 6px 16px;
+	font-family: var(--acc-font-pixel), "Courier New", monospace;
+	font-size: 1.05rem;
+	font-weight: 400;
+	color: #1b1512;
+	background: #f7d23e;
+	border: 3px solid #1b1512;
+	border-radius: 0;
+	box-shadow: 0 4px 0 #1b1512;
+}
+
+.level .bigButton:hover:not(:disabled) {
+	background: #ffe066;
+}
+
+.level .bigButton:active:not(:disabled) {
+	box-shadow: 0 1px 0 #1b1512;
+	transform: translateY(3px);
+}
