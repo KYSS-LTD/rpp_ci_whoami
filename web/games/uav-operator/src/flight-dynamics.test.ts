@@ -1,6 +1,6 @@
 import { Object3D, PerspectiveCamera, Quaternion, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
-import { create_ChaseCamera } from "./flight-dynamics.js";
+import { create_ChaseCamera, create_TouchdownCamera } from "./flight-dynamics.js";
 import { create_Acro, fpvKit } from "./fpv.js";
 
 describe("камера сопровождения", () => {
@@ -29,6 +29,37 @@ describe("камера сопровождения", () => {
 			expect(localPosition().distanceTo(initialPosition)).toBeCloseTo(0, 8);
 			expect(localRotation().angleTo(initialRotation)).toBeLessThan(1e-6);
 		}
+	});
+});
+
+describe("камера при посадке", () => {
+	it.each([30, 60])("плавно меняет позицию и наклон при %i кадрах в секунду", (fps) => {
+		const camera = new PerspectiveCamera();
+		camera.position.set(0, 2, 1);
+		camera.rotateZ(.7);
+		const beforeLanding = camera.quaternion.clone();
+		const touchdown = create_TouchdownCamera(camera);
+		const restingPosition = new Vector3(0, 1, 2);
+		const restingRotation = new Quaternion();
+		const frame = (delta: number) => {
+			camera.position.copy(restingPosition);
+			camera.quaternion.copy(restingRotation);
+			return touchdown.settle(delta);
+		};
+		touchdown.start();
+		expect(frame(0)).toBe(false);
+		expect(camera.position.toArray()).toEqual([0, 2, 1]);
+		expect(camera.quaternion.angleTo(beforeLanding)).toBeCloseTo(0);
+		for (let index = 0; index < Math.ceil(.35 * fps) - 1; index++) {
+			const distance = camera.position.distanceTo(restingPosition);
+			const angle = camera.quaternion.angleTo(restingRotation);
+			expect(frame(1 / fps)).toBe(false);
+			expect(camera.position.distanceTo(restingPosition)).toBeLessThan(distance);
+			expect(camera.quaternion.angleTo(restingRotation)).toBeLessThan(angle);
+		}
+		expect(frame(1 / fps)).toBe(true);
+		expect(camera.position.toArray()).toEqual(restingPosition.toArray());
+		expect(camera.quaternion.angleTo(restingRotation)).toBeCloseTo(0);
 	});
 });
 

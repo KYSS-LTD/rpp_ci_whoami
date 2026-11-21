@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { base as coastBase, flight_Ground, limits as coastLimits, on_Pad, padRadius as coastPadRadius, sectors as beachSectors, shore } from './coast.js';
 import { retryPenalty } from './difficulty.js';
 import { create_FleetModel, fleet } from './fleet.js';
-import { create_ChaseCamera, create_Damage, signal_AtEdge } from './flight-dynamics.js';
+import { create_ChaseCamera, create_Damage, create_TouchdownCamera, signal_AtEdge } from './flight-dynamics.js';
 import { bind_DamageDisplay } from './flight-damage-display.js';
 import { bind_Preferences, flightPreferences, preference_Markup } from './flight-preferences.js';
 import { create_Acro, fpvKit } from './fpv.js';
@@ -91,6 +91,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	const chaseDistance = chase ? Math.max(1.4, kit.length * 5.5) : 0;
 	const updateChase = chase ? create_ChaseCamera(fieldDrone.drone, droneCenter, chaseDistance) : null;
 	const camera = new THREE.PerspectiveCamera(flightPreferences.fov, 1, .07, 620);
+	const touchdownCamera = create_TouchdownCamera(camera);
 	const profile = practice ? { ...settings.flight, mode: practice.mode, drain: .7 } : settings.flight;
 	const { scanRadius } = profile;
 	const stabilized = profile.mode === 'assisted';
@@ -230,6 +231,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	let signalLost = false;
 	let landing = false;
 	let landed = false;
+	let landingNoticePending = false;
 	let paused = false;
 	let errors = 0;
 	let feedback = 0;
@@ -245,9 +247,12 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	let completionTimer;
 	let completion = null;
 
+	function record_Completion() {
+		if (completionNotice) completion = { score: score_Flight(), duration: raceFinish ?? flightSeconds };
+	}
+
 	function announce_Completion(message) {
 		if (!completionNotice) return show_CompletePrompt(message);
-		completion = { score: score_Flight(), duration: raceFinish ?? flightSeconds };
 		completionNotice.textContent = `${message} ${text.free.flightExitHint}`;
 		vibrate_Device([30, 60, 30]);
 		completionTimer = setTimeout(() => { completionNotice.textContent = ''; }, 3000);
@@ -318,7 +323,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	}
 
 	function perform_Action() {
-		if (resetting || stage_OverlayOpen()) return;
+		if (resetting || stage_OverlayOpen() || landingNoticePending) return;
 		if (raceFinish !== null || landed) {
 			if (!freeMode) queueMicrotask(() => { if (!signal.aborted) query('#complete-submit').click(); });
 			return;
@@ -497,6 +502,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			raceFinish = Math.max(.01, flightSeconds - raceStart);
 			flightControls.hidden = true;
 		}
+		record_Completion();
 		announce_Completion(race ? text.free.raceDone : text.free.fieldDone);
 	}
 
@@ -512,6 +518,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	}
 
 	function register_Touchdown(safePad) {
+		touchdownCamera.start();
 		const landingWasActive = landing;
 		landing = false;
 		if (safePad) logAction('returned');
@@ -522,7 +529,8 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		if (landed || !beach || !safePad || !hasLifted || scanned.size !== sectors.length) return;
 		landed = true;
 		button.hidden = true;
-		announce_Completion(freeMode ? text.free.beachDone : copy.completeNotice);
+		record_Completion();
+		landingNoticePending = true;
 	}
 
 	const raceScore = () => raceFinish === null ? Math.round(nextGate / sectors.length * 65)
@@ -595,6 +603,11 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 				camera.lookAt(x - backX * 20, y - 3.6, z - backZ * 20);
 				if (!grounded && !reduceMotion.matches) camera.rotateZ(-(motion.vx * backZ - motion.vz * backX) * .009);
 			}
+			const cameraSettled = touchdownCamera.settle(delta);
+			if (cameraSettled && landingNoticePending) {
+				landingNoticePending = false;
+				announce_Completion(freeMode ? text.free.beachDone : copy.completeNotice);
+			}
 			const course = Math.round((360 - THREE.MathUtils.radToDeg(heading) % 360) % 360) % 360;
 			videoLoss = signal_AtEdge(x, z, limits);
 			if (videoLoss >= 1 && !signalLost) lose_Signal();
@@ -637,7 +650,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 				updateDamageDisplay(damage);
 				batteryText.dataset.low = battery <= 22;
 				stateText.textContent = signalLost ? copy.osdFail : damage.disabled ? copy.disabled : !armed ? copy.osdSafe : battery <= 22 ? copy.osdLow
-					: on_Ground() ? (hasLifted ? copy.osdLanded : copy.osdArmed) : '';
+					: grounded && cameraSettled ? (hasLifted ? copy.osdLanded : copy.osdArmed) : '';
 				disarmButton.hidden = !armed || signalLost || !on_Ground();
 				landButton.hidden = !stabilized || !powered || landing || landed || on_Ground();
 				if (!signalLost && (damage.disabled || battery === 0)) set_Action(copy.retry);
