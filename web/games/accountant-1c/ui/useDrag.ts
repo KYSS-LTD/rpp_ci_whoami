@@ -47,7 +47,7 @@ interface DragSession {
 	startX: number;
 	startY: number;
 	element: HTMLElement;
-	isDragging: boolean;
+	originalStyle: { transform: string; zIndex: string } | null;
 }
 
 export interface DragHandleProps {
@@ -73,10 +73,11 @@ export function useDrag(options: UseDragOptions) {
 		optionsRef.current = options;
 	});
 
-	function resetElement(element: HTMLElement) {
-		element.style.transform = "";
-		element.style.zIndex = "";
-		element.style.pointerEvents = "";
+	function resetElement({ element, originalStyle }: DragSession) {
+		if (originalStyle) {
+			element.style.transform = originalStyle.transform;
+			element.style.zIndex = originalStyle.zIndex;
+		}
 	}
 
 	function endSession() {
@@ -99,7 +100,7 @@ export function useDrag(options: UseDragOptions) {
 					startX: event.clientX,
 					startY: event.clientY,
 					element,
-					isDragging: false,
+					originalStyle: null,
 				};
 				// Новое нажатие: гасить больше нечего, даже если click после прошлого перетаскивания не пришёл.
 				suppressClickRef.current = false;
@@ -119,11 +120,11 @@ export function useDrag(options: UseDragOptions) {
 				const dx = event.clientX - session.startX;
 				const dy = event.clientY - session.startY;
 				const threshold = optionsRef.current.threshold ?? defaultThreshold;
-				if (!session.isDragging && Math.hypot(dx, dy) < threshold) {
-					return;
-				}
-				if (!session.isDragging) {
-					session.isDragging = true;
+				if (!session.originalStyle) {
+					if (Math.hypot(dx, dy) < threshold) {
+						return;
+					}
+					session.originalStyle = { transform: session.element.style.transform, zIndex: session.element.style.zIndex };
 					setDraggingId(session.itemId);
 				}
 				session.element.style.transform = `translate(${dx}px, ${dy}px)`;
@@ -134,7 +135,7 @@ export function useDrag(options: UseDragOptions) {
 				if (!session || session.pointerId !== event.pointerId) {
 					return;
 				}
-				if (!session.isDragging) {
+				if (!session.originalStyle) {
 					// Короткое нажатие без сдвига: дальше сработает обычный click.
 					endSession();
 					return;
@@ -143,7 +144,7 @@ export function useDrag(options: UseDragOptions) {
 				const rect = session.element.getBoundingClientRect();
 				const resolveTarget = optionsRef.current.resolveTarget ?? resolveDropTargetAtPoint;
 				const targetId = resolveTarget(event.clientX, event.clientY, session.element);
-				resetElement(session.element);
+				resetElement(session);
 				// click приходит в той же задаче, что и pointerup. Если элемент уже убран из разметки, click не придёт,
 				// поэтому флаг снимается после текущей задачи и не съедает следующее нажатие.
 				suppressClickRef.current = true;
@@ -156,7 +157,7 @@ export function useDrag(options: UseDragOptions) {
 			onPointerCancel() {
 				const session = sessionRef.current;
 				if (session) {
-					resetElement(session.element);
+					resetElement(session);
 				}
 				endSession();
 			},

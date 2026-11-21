@@ -4,6 +4,8 @@
 // Строку выписки сопоставляют со строкой учёта: перетащить на неё, выбрать её и затем пару, или клавиатурой.
 // То, что не сходится, отмечают на бумаге кнопкой «Расхождение», причину выбирают в программе.
 import { useState } from "react";
+import { miniGameTutorials } from "../data/tutorials";
+import { useTutorial } from "../hooks/useTutorial";
 import { type BankReconciliationData, type DiscrepancyReason, type StatementRow } from "../data/levels";
 import { fillTemplate } from "../logic/feedback";
 import { formatRubles } from "../logic/money";
@@ -38,17 +40,18 @@ interface StatementDeskProps {
 	matches: Record<string, string>;
 	marks: ReconciliationMarks;
 	isFinished: boolean;
+	tutorialTarget?: string;
 	onMatch: (bankId: string, ledgerId: string) => boolean;
 	onToggleMark: (rowId: string) => void;
 }
 
 // Стол сверки: два листа. Внутри рабочего места, потому что выбор строки и цели общий для обоих листов.
-function StatementDesk({ bankRows, ledgerRows, matches, marks, isFinished, onMatch, onToggleMark }: StatementDeskProps) {
+function StatementDesk({ bankRows, ledgerRows, matches, marks, isFinished, tutorialTarget, onMatch, onToggleMark }: StatementDeskProps) {
 	const matchedLedgerIds = Object.values(matches);
 	const isMatched = (row: StatementRow) => (row.side === "bank" ? matches[row.id] !== undefined : matchedLedgerIds.includes(row.id));
 	const isMarked = (rowId: string) => marks[rowId] !== undefined;
 	const openLedgerIds = ledgerRows.filter((row) => !isMatched(row) && !isMarked(row.id)).map((row) => row.id);
-	const { selectedItemId, getItemProps, getTargetProps, cancelSelection } = usePickAndDrop({ targetIds: openLedgerIds, onPlace: onMatch });
+	const { selectedItemId, getItemProps, getTargetProps, cancelSelection } = usePickAndDrop({ targetIds: openLedgerIds, tutorialTarget, onPlace: onMatch });
 
 	function renderFlag(row: StatementRow) {
 		if (isMatched(row)) {
@@ -60,6 +63,7 @@ function StatementDesk({ bankRows, ledgerRows, matches, marks, isFinished, onMat
 			<button
 				type="button"
 				className={styles.flagButton}
+				data-tutorial-id={`flag-${row.id}`}
 				aria-pressed={marked}
 				aria-label={`${marked ? texts.unmark : texts.markDiscrepancy}: ${rowText}`}
 				disabled={isFinished}
@@ -124,7 +128,7 @@ function StatementDesk({ bankRows, ledgerRows, matches, marks, isFinished, onMat
 	);
 }
 
-export function BankReconciliation({ data, random, onComplete, onMistake, onNotice }: MiniGameProps<BankReconciliationData>) {
+export function BankReconciliation({ data, random, tutorialEnabled = false, onComplete, onMistake, onNotice }: MiniGameProps<BankReconciliationData>) {
 	const [rowOrder] = useState(() => ({
 		bank: shuffle(
 			data.rows.filter((row) => row.side === "bank"),
@@ -140,8 +144,21 @@ export function BankReconciliation({ data, random, onComplete, onMistake, onNoti
 	const [marks, setMarks] = useState<ReconciliationMarks>({});
 	const [isFinished, setIsFinished] = useState(false);
 
+	const matchedLedgerIds = Object.values(matches);
+	const openPair = data.matchingPairs.find(([bankId, ledgerId]) =>
+		matches[bankId] === undefined && !matchedLedgerIds.includes(ledgerId) && marks[bankId] === undefined && marks[ledgerId] === undefined,
+	);
+	const practiceDiscrepancy = data.discrepancies
+		.flatMap(({ rowIds, reason }) => rowIds.map((rowId) => ({ rowId, reason, marked: marks[rowId] !== undefined })))
+		.find(({ rowId, reason }) => matches[rowId] === undefined && !matchedLedgerIds.includes(rowId) && marks[rowId] !== reason);
+	const tutorial = useTutorial(tutorialEnabled, miniGameTutorials.bankReconciliation(openPair, practiceDiscrepancy));
+	const tutorialTarget = tutorial.current?.action === "match" ? tutorial.current.targets[1].slice("target-".length) : undefined;
+
 	function handleMatch(bankId: string, ledgerId: string): boolean {
 		const isValidPair = data.matchingPairs.some(([pairBankId, pairLedgerId]) => pairBankId === bankId && pairLedgerId === ledgerId);
+		if (!tutorial.accept("match", bankId === openPair?.[0] && ledgerId === openPair?.[1] && isValidPair)) {
+			return false;
+		}
 		if (!isValidPair || matches[bankId] !== undefined || Object.values(matches).includes(ledgerId)) {
 			onMistake({ explanationId: "reconciliation.badMatch" });
 			return false;
@@ -152,6 +169,9 @@ export function BankReconciliation({ data, random, onComplete, onMistake, onNoti
 	}
 
 	function toggleMark(rowId: string) {
+		if (!tutorial.accept("flag", rowId === practiceDiscrepancy?.rowId && marks[rowId] === undefined)) {
+			return;
+		}
 		setMarks((previous) => {
 			const next = { ...previous };
 			if (next[rowId] !== undefined) {
@@ -164,6 +184,9 @@ export function BankReconciliation({ data, random, onComplete, onMistake, onNoti
 	}
 
 	function setReason(rowId: string, reason: DiscrepancyReason | null) {
+		if (!tutorial.accept("reason", rowId === practiceDiscrepancy?.rowId && reason === practiceDiscrepancy.reason)) {
+			return;
+		}
 		setMarks((previous) => ({ ...previous, [rowId]: reason }));
 	}
 
@@ -216,6 +239,7 @@ export function BankReconciliation({ data, random, onComplete, onMistake, onNoti
 								<td>
 									<select
 										aria-label={`${texts.reasonLabel}: ${rowText}`}
+										data-tutorial-id={`reason-${rowId}`}
 										value={marks[rowId] ?? ""}
 										disabled={isFinished}
 										onChange={(event) => setReason(rowId, event.target.value === "" ? null : (event.target.value as DiscrepancyReason))}
@@ -239,6 +263,7 @@ export function BankReconciliation({ data, random, onComplete, onMistake, onNoti
 
 	return (
 		<Workplace
+			tutorial={tutorial}
 			booth={{ character: "inspector", name: accountantTexts.boothCharacters.inspector, speech: accountantTexts.boothSpeech.bankReconciliation }}
 			monitorSection="bank"
 			monitorTitle={texts.tab}
@@ -251,6 +276,7 @@ export function BankReconciliation({ data, random, onComplete, onMistake, onNoti
 					matches={matches}
 					marks={marks}
 					isFinished={isFinished}
+					tutorialTarget={tutorialTarget}
 					onMatch={handleMatch}
 					onToggleMark={toggleMark}
 				/>

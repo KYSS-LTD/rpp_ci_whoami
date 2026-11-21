@@ -1,0 +1,105 @@
+.overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	pointer-events: none;
+}
+
+.shade {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+}
+
+.ring,
+.arrow {
+	fill: none;
+	stroke: #ffdc57;
+	stroke-width: 3px;
+	filter: drop-shadow(0 0 2px #b3261e);
+}
+
+.ring {
+	animation: ringPulse 1.4s alternate infinite;
+}
+
+.arrow {
+	stroke-dasharray: 8 6;
+	animation: dash 1s linear infinite;
+}
+
+@keyframes ringPulse {
+	to { stroke: #ff715b; }
+}
+
+@keyframes dash {
+	to { stroke-dashoffset: -28; }
+}
+
+.note {
+	position: absolute;
+	width: min(340px, calc(100% - 24px));
+	max-height: calc(100dvh - 24px);
+	overflow: auto;
+	padding: 12px;
+	color: #37251c;
+	background: #fff4cc;
+	border: 2px solid #a33129;
+	box-shadow: 4px 5px #351911;
+	font: 0.86rem/1.4 var(--acc-font-paper, monospace);
+	pointer-events: auto;
+}
+
+.noteHeader,
+.buttons {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.noteHeader {
+	font-family: var(--acc-font-pixel, monospace);
+}
+
+.noteHeader span {
+	margin-left: auto;
+}
+
+.portrait {
+	width: 30px;
+	height: 34px;
+	flex: 0 0 auto;
+}
+
+.note p {
+	margin: 8px 0;
+}
+
+.retry {
+	color: #941f1a;
+}
+
+.buttons {
+	flex-wrap: wrap;
+}
+
+.buttons button {
+	padding: 4px 8px;
+	min-height: 32px;
+	color: #37251c;
+	background: #ffdf70;
+	border: 1px solid #9a4a24;
+	border-radius: 0;
+}
+
+.buttons button:hover:not(:disabled) {
+	color: #fff4cc;
+	background: #a33129;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ring,
+	.arrow {
+		animation: none;
+	}
+}

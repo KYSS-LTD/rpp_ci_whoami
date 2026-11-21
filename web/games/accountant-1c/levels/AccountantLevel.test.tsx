@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { requiredLevelIds, type LevelId } from "@/core/contract/types";
 import { accountantManifest } from "../manifest";
+import { tutorialTexts } from "../texts/tutorial";
 import { accountantTexts } from "../texts";
 import { MonthClose } from "../ui/parts";
 import { AccountantLevel } from "./AccountantLevel";
@@ -62,6 +63,12 @@ function clickButton(name: string) {
 	fireEvent.click(screen.getByRole("button", { name }));
 }
 
+function startLevel() {
+	clickButton(accountantTexts.newspaper.openLetter);
+	clickButton(accountantTexts.newspaper.start);
+	clickButton(tutorialTexts.skip);
+}
+
 afterEach(() => {
 	cleanup();
 	setFakeMiniGame(7);
@@ -79,8 +86,14 @@ describe("сценарий уровня", () => {
 		renderLevel(levelId);
 		const [kindA, kindB] = expectedOrder[levelId];
 		expect(screen.getByText(accountantTexts.newspaper[levelId].headline)).toBeTruthy();
+		expect(screen.queryByRole("heading", { name: accountantTexts.intros[levelId].subject })).toBeNull();
+		clickButton(accountantTexts.newspaper.openLetter);
 		expect(screen.getByRole("heading", { name: accountantTexts.intros[levelId].subject })).toBeTruthy();
 		clickButton(accountantTexts.newspaper.start);
+		expect(screen.getByText(tutorialTexts.steps.overviewWindow)).toBeTruthy();
+		clickButton(tutorialTexts.next);
+		expect(screen.getByText(tutorialTexts.steps.overviewDesk)).toBeTruthy();
+		clickButton(tutorialTexts.next);
 		expect(screen.getByText(`fake-${kindA}`)).toBeTruthy();
 		clickButton("fake-complete");
 		expect(screen.getByRole("heading", { name: accountantTexts.summaryScene.title })).toBeTruthy();
@@ -93,11 +106,11 @@ describe("сценарий уровня", () => {
 
 	it("подсказка доступна только на medium", () => {
 		renderLevel("medium");
-		clickButton(accountantTexts.newspaper.start);
+		startLevel();
 		expect(screen.getByText("hints-true")).toBeTruthy();
 		cleanup();
 		renderLevel("easy");
-		clickButton(accountantTexts.newspaper.start);
+		startLevel();
 		expect(screen.getByText("hints-false")).toBeTruthy();
 	});
 });
@@ -106,7 +119,7 @@ describe("отправка результата", () => {
 	it("«Сдать отчёт» отправляет completed: true с суммой очков один раз", () => {
 		setFakeMiniGame(8);
 		const onFinish = renderLevel("easy");
-		clickButton(accountantTexts.newspaper.start);
+		startLevel();
 		clickButton("fake-complete");
 		clickButton(accountantTexts.buttons.next);
 		clickButton("fake-complete");
@@ -124,7 +137,7 @@ describe("отправка результата", () => {
 
 	it("medium: 9 + 7 и подсказка в первой мини-игре дают 15, итоги дня показывают задания и подсказки", () => {
 		const onFinish = renderLevel("medium");
-		clickButton(accountantTexts.newspaper.start);
+		startLevel();
 		setFakeMiniGame(9, 1);
 		clickButton("fake-complete");
 		clickButton(accountantTexts.buttons.next);
@@ -139,7 +152,7 @@ describe("отправка результата", () => {
 
 	it("выход во время второй мини-игры отдаёт completed: false с очками первой", () => {
 		const onFinish = renderLevel("hard");
-		clickButton(accountantTexts.newspaper.start);
+		startLevel();
 		clickButton("fake-complete");
 		clickButton(accountantTexts.buttons.next);
 		clickButton(accountantTexts.window.exitEarly);
@@ -178,7 +191,7 @@ describe("рабочее место уровня", () => {
 
 	it("ошибка печатает замечание главбуха (ответ до шутки), его можно убрать; в «Сообщениях» остаётся строка", () => {
 		renderLevel("medium");
-		clickButton(accountantTexts.newspaper.start);
+		startLevel();
 		clickButton("fake-mistake");
 		const explanation = accountantTexts.explanations["postings.paySupplier"];
 		const slips = screen.getByRole("complementary", { name: accountantTexts.slips.regionLabel });
@@ -194,7 +207,7 @@ describe("рабочее место уровня", () => {
 	it("уведомления директора появляются, закрываются кнопкой и сами", () => {
 		vi.useFakeTimers();
 		renderLevel("easy");
-		clickButton(accountantTexts.newspaper.start);
+		startLevel();
 		expect(screen.getByText(accountantTexts.notifications.easy.start)).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.window.closeNotification }));
 		expect(screen.queryByText(accountantTexts.notifications.easy.start)).toBeNull();
@@ -211,7 +224,7 @@ describe("рабочее место уровня", () => {
 		setFakeMiniGame(9);
 		renderLevel("easy");
 		expect(screen.getByTestId("ficus").dataset.state).toBe("growing");
-		clickButton(accountantTexts.newspaper.start);
+		startLevel();
 		clickButton("fake-complete");
 		expect(screen.getByTestId("ficus").dataset.state).toBe("blooming");
 		setFakeMiniGame(0);

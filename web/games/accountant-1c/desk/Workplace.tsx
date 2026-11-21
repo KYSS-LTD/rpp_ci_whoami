@@ -4,6 +4,9 @@
 // Сверху полоса дня (день, часы, фикус, очки, «Уйти домой пораньше»), под ней окошко в коридор с персонажем
 // и монитор с программой, ниже во всю ширину стол с бумагами, калькулятором, справочником и замечаниями.
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { TutorialOverlay } from "../components/TutorialOverlay";
+import type { TutorialController } from "../hooks/useTutorial";
+import { tutorialTexts } from "../texts/tutorial";
 import { fillTemplate } from "../logic/feedback";
 import { getFicusState } from "../logic/mood";
 import { accountantTexts } from "../texts";
@@ -95,17 +98,19 @@ interface WorkplaceProps {
 	rulebookTab?: RulebookTabId;
 	// Высота стола в пикселях на широком экране.
 	deskHeight?: number;
+	tutorial?: TutorialController;
 }
 
-export function Workplace({ booth, monitorSection, monitorTitle, monitor, desk, rulebookTab, deskHeight = 500 }: WorkplaceProps) {
+export function Workplace({ booth, monitorSection, monitorTitle, monitor, desk, rulebookTab, deskHeight = 500, tutorial }: WorkplaceProps) {
 	const chrome = useLevelChrome();
+	const rootRef = useRef<HTMLElement>(null);
 	const deskRef = useRef<HTMLDivElement>(null);
 	const ficusState = getFicusState(chrome.share);
 	const texts = accountantTexts.workplace;
 
 	return (
 		<AmountTargetProvider>
-			<section className={`${styles.workplace} ${fontVariables}`} aria-label={texts.deskLabel}>
+			<section ref={rootRef} className={`${styles.workplace} ${fontVariables}`} aria-label={texts.deskLabel}>
 				<header className={styles.dayBar}>
 					<p className={styles.dayLabel}>
 						{fillTemplate(texts.dayLabel, { day: String(chrome.dayNumber) })}
@@ -118,13 +123,16 @@ export function Workplace({ booth, monitorSection, monitorTitle, monitor, desk, 
 					<p className={styles.dayScore}>
 						{texts.scoreLabel}: <strong>{chrome.scoreText}</strong>
 					</p>
+					{tutorial?.enabled ? (
+						<button type="button" className={styles.tutorialHelp} data-tutorial-help aria-label={tutorialTexts.replay} onClick={tutorial.replay}>?</button>
+					) : null}
 					<button type="button" className={styles.exitButton} onClick={chrome.onExitEarly} disabled={chrome.isExitDisabled}>
 						{accountantTexts.window.exitEarly}
 					</button>
 				</header>
 
 				<div className={styles.upper}>
-					<section className={styles.booth} aria-label={texts.boothLabel}>
+					<section className={styles.booth} data-tutorial-id="booth" aria-label={texts.boothLabel}>
 						<div className={styles.boothWindow}>
 							<PixelCharacter
 								key={`${booth.character}-${booth.variant ?? 0}-${booth.name}`}
@@ -147,6 +155,7 @@ export function Workplace({ booth, monitorSection, monitorTitle, monitor, desk, 
 						formTitle={monitorTitle}
 						messages={chrome.messages}
 						notifications={chrome.notifications}
+						hideNotifications={!!tutorial?.current}
 						onCloseNotification={chrome.closeNotification}
 					>
 						{monitor}
@@ -154,13 +163,14 @@ export function Workplace({ booth, monitorSection, monitorTitle, monitor, desk, 
 				</div>
 
 				<DeskLayoutProvider deskRef={deskRef}>
-					<div className={styles.desk} ref={deskRef} style={{ "--desk-height": `${deskHeight}px` } as React.CSSProperties}>
+					<div className={styles.desk} data-tutorial-id="desk" ref={deskRef} style={{ "--desk-height": `${deskHeight}px` } as React.CSSProperties}>
 						{desk}
 						{rulebookTab ? <Rulebook defaultPosition={{ x: 850, y: 374 }} initialTab={rulebookTab} /> : null}
 						<Calculator defaultPosition={{ x: 830, y: 16 }} />
 						<SlipStack />
 					</div>
 				</DeskLayoutProvider>
+				{tutorial?.current ? <TutorialOverlay rootRef={rootRef} tutorial={tutorial} step={tutorial.current} /> : null}
 			</section>
 		</AmountTargetProvider>
 	);

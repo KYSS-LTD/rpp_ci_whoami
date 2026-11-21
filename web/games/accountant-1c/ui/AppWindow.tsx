@@ -29,6 +29,7 @@ interface AppWindowProps {
 	formTitle: string | null;
 	messages: WindowMessage[];
 	notifications: WindowNotification[];
+	hideNotifications?: boolean;
 	onCloseNotification: (id: number) => void;
 	children: ReactNode;
 }
@@ -57,13 +58,13 @@ function NotificationToast({ notification, onClose }: { notification: WindowNoti
 	);
 }
 
-export function AppWindow({ activeSection, formTitle, messages, notifications, onCloseNotification, children }: AppWindowProps) {
+export function AppWindow({ activeSection, formTitle, messages, notifications, hideNotifications, onCloseNotification, children }: AppWindowProps) {
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
 	const [isMessagesOpen, setIsMessagesOpen] = useState(false);
 
 	return (
 		<div className={styles.monitor}>
-			<div className={styles.window} data-testid="accounting-window">
+			<div className={styles.window} data-testid="accounting-window" data-tutorial-id="monitor">
 				<header className={styles.titleBar}>
 					<span className={styles.appMark} aria-hidden="true" />
 					<p className={styles.appTitle}>{windowTexts.appTitle}</p>
@@ -119,7 +120,7 @@ export function AppWindow({ activeSection, formTitle, messages, notifications, o
 					</div>
 				</div>
 
-				<ul className={styles.notifications} aria-label={windowTexts.notificationsLabel} aria-live="polite">
+				<ul className={styles.notifications} hidden={hideNotifications} aria-label={windowTexts.notificationsLabel} aria-live="polite">
 					{notifications.map((notification) => (
 						<NotificationToast key={notification.id} notification={notification} onClose={onCloseNotification} />
 					))}

@@ -4,6 +4,8 @@
 // от блока, пишет сумму (можно посчитать на калькуляторе), проводит и отдаёт ордер в окошко со штампом «Проведено».
 // В конце смены приходит инкассатор: излишек сверх лимита сдаётся в банк.
 import { useState } from "react";
+import { miniGameTutorials } from "../data/tutorials";
+import { useTutorial } from "../hooks/useTutorial";
 import { type CashDeskData, type CashDocumentType } from "../data/levels";
 import { formatRubles, parseAmountInput } from "../logic/money";
 import { cashSurplusPoints, calculateCashSurplus, scoreCashDesk, type CashVisitorAnswer } from "../logic/scoring";
@@ -27,7 +29,7 @@ interface HandedOrder {
 	amount: number;
 }
 
-export function CashDesk({ data, onComplete, onMistake, onNotice, onProgress }: MiniGameProps<CashDeskData>) {
+export function CashDesk({ data, tutorialEnabled = false, onComplete, onMistake, onNotice, onProgress }: MiniGameProps<CashDeskData>) {
 	const [visitorIndex, setVisitorIndex] = useState(0);
 	// Бланк, оторванный от блока, или null, пока бланка на столе нет.
 	const [documentType, setDocumentType] = useState<CashDocumentType | null>(null);
@@ -43,6 +45,7 @@ export function CashDesk({ data, onComplete, onMistake, onNotice, onProgress }: 
 	const [balance, setBalance] = useState(data.openingBalance);
 
 	const visitor = data.visitors[visitorIndex] ?? null;
+	const tutorial = useTutorial(tutorialEnabled, miniGameTutorials.cashDesk(visitor, visitor !== null && visitor.documentType === documentType));
 	const isSurplusStage = visitor === null;
 
 	function reportProgress(nextAnswers: Record<string, CashVisitorAnswer>, surplus: number | null, surplusDone: boolean) {
@@ -75,6 +78,9 @@ export function CashDesk({ data, onComplete, onMistake, onNotice, onProgress }: 
 		const amount = parseAmountInput(amountInput);
 		if (amount === null) {
 			setIsAmountInvalid(true);
+			return;
+		}
+		if (!tutorial.accept("cashHand", documentType === visitor.documentType && amount === visitor.amount)) {
 			return;
 		}
 		setIsAmountInvalid(false);
@@ -154,6 +160,7 @@ export function CashDesk({ data, onComplete, onMistake, onNotice, onProgress }: 
 
 	return (
 		<Workplace
+			tutorial={tutorial}
 			booth={{ ...booth, counter: handedCounter }}
 			monitorSection="cash"
 			monitorTitle={texts.tab}
@@ -216,7 +223,11 @@ export function CashDesk({ data, onComplete, onMistake, onNotice, onProgress }: 
 										aria-checked={documentType === type}
 										className={styles.pad}
 										data-type={type}
+										data-tutorial-id={`pad-${type}`}
 										onClick={() => {
+											if (!tutorial.accept("cashPick", type === visitor.documentType)) {
+												return;
+											}
 											setDocumentType(type);
 											setIsAmountInvalid(false);
 										}}
@@ -256,6 +267,7 @@ export function CashDesk({ data, onComplete, onMistake, onNotice, onProgress }: 
 										label={texts.amountLabel}
 										value={amountInput}
 										placeholder={texts.amountPlaceholder}
+										data-tutorial-id="cash-amount"
 										aria-invalid={isAmountInvalid}
 										onValueChange={setAmountInput}
 									/>
@@ -265,7 +277,7 @@ export function CashDesk({ data, onComplete, onMistake, onNotice, onProgress }: 
 										{texts.amountInvalid}
 									</p>
 								) : null}
-								<button type="submit" className={styles.paperButton} disabled={amountInput.trim() === ""}>
+								<button type="submit" data-tutorial-id="cash-hand" className={styles.paperButton} disabled={amountInput.trim() === ""}>
 									{paperTexts.handOver}
 								</button>
 							</form>

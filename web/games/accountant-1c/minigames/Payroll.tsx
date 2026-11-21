@@ -3,6 +3,8 @@
 // Мини-игра "Расчёт зарплаты с НДФЛ" (medium). Число детей видно только в заявлениях на вычет на столе:
 // у кого заявления нет, вычета нет. Ведомость заполняется в программе, весы на столе выравниваются при верных полях.
 import { useState } from "react";
+import { miniGameTutorials, type TutorialStep } from "../data/tutorials";
+import { useTutorial } from "../hooks/useTutorial";
 import { type PayrollData } from "../data/levels";
 import { fillTemplate } from "../logic/feedback";
 import { formatRubles, parseAmountInput } from "../logic/money";
@@ -43,10 +45,11 @@ function parsePayrollInputs(inputs: PayrollInputs): Record<string, PayrollAnswer
 
 const tilts = [-2.5, 1.5, -1];
 
-export function Payroll({ data, hintsEnabled, onComplete, onMistake, onNotice, onProgress }: MiniGameProps<PayrollData>) {
+export function Payroll({ data, tutorialEnabled = false, hintsEnabled, onComplete, onMistake, onNotice, onProgress }: MiniGameProps<PayrollData>) {
 	const [inputs, setInputs] = useState<PayrollInputs>(() =>
 		Object.fromEntries(data.employees.map((employee) => [employee.id, { deduction: "", ndfl: "" }])),
 	);
+	const [draft, setDraft] = useState<{ step: TutorialStep; value: string }>();
 	const [hintedIds, setHintedIds] = useState<string[]>([]);
 	const [isFinished, setIsFinished] = useState(false);
 
@@ -55,9 +58,31 @@ export function Payroll({ data, hintsEnabled, onComplete, onMistake, onNotice, o
 	const tiltDeg = calculateScalesTilt(checks.correct, checks.total);
 	const isBalanced = checks.correct === checks.total;
 	const applicants = data.employees.filter((employee) => applicationTexts.employees[employee.id] !== undefined);
+	const employee = applicants[0] ?? data.employees[0];
+	const tutorial = useTutorial(tutorialEnabled, miniGameTutorials.payroll(employee?.id, applicants.length > 0));
+
+	function fieldValue(employeeId: string, field: "deduction" | "ndfl") {
+		const id = `pay-${field === "ndfl" ? "tax" : field}-${employeeId}`;
+		return draft && draft.step === tutorial.current && tutorial.current.targets.includes(id) ? draft.value : inputs[employeeId][field];
+	}
 
 	function handleChange(employeeId: string, field: "deduction" | "ndfl", value: string) {
 		// Калькулятор вызывает этот обработчик через свежую ссылку (AmountInput), поэтому inputs здесь актуальны.
+		if (tutorial.current) {
+			const action = field === "ndfl" ? "tax" : "deduction";
+			if (tutorial.current.action !== action || employeeId !== employee?.id) {
+				return;
+			}
+			const expected = expectedPayrollRow(employee.salary, employee.childrenCount);
+			if (parseAmountInput(value) !== expected[field]) {
+				setDraft({ step: tutorial.current, value });
+				return;
+			}
+			if (!tutorial.accept(action, true)) {
+				return;
+			}
+			setDraft(undefined);
+		}
 		const nextInputs = { ...inputs, [employeeId]: { ...inputs[employeeId], [field]: value } };
 		setInputs(nextInputs);
 		const nextAnswers = parsePayrollInputs(nextInputs);
@@ -122,14 +147,15 @@ export function Payroll({ data, hintsEnabled, onComplete, onMistake, onNotice, o
 							const name = accountantTexts.employees[employee.id];
 							const ndfl = answers[employee.id]?.ndfl ?? null;
 							return (
-								<tr key={employee.id}>
+								<tr key={employee.id} data-tutorial-id={`pay-row-${employee.id}`}>
 									<th scope="row">{name}</th>
 									<td className={styles.amountCell}>{formatRubles(employee.salary)}</td>
 									<td>
 										<AmountInput
 											className={styles.cellInput}
 											label={`${texts.deductionColumn}: ${name}`}
-											value={inputs[employee.id].deduction}
+											value={fieldValue(employee.id, "deduction")}
+											data-tutorial-id={`pay-deduction-${employee.id}`}
 											disabled={isFinished}
 											onValueChange={(value) => handleChange(employee.id, "deduction", value)}
 										/>
@@ -138,7 +164,8 @@ export function Payroll({ data, hintsEnabled, onComplete, onMistake, onNotice, o
 										<AmountInput
 											className={styles.cellInput}
 											label={`${texts.ndflColumn}: ${name}`}
-											value={inputs[employee.id].ndfl}
+											value={fieldValue(employee.id, "ndfl")}
+											data-tutorial-id={`pay-tax-${employee.id}`}
 											disabled={isFinished}
 											onValueChange={(value) => handleChange(employee.id, "ndfl", value)}
 										/>
@@ -220,6 +247,7 @@ export function Payroll({ data, hintsEnabled, onComplete, onMistake, onNotice, o
 
 	return (
 		<Workplace
+			tutorial={tutorial}
 			booth={{ character: "chief", name: accountantTexts.boothCharacters.chief, speech: accountantTexts.boothSpeech.payroll }}
 			monitorSection="payroll"
 			monitorTitle={texts.tab}
