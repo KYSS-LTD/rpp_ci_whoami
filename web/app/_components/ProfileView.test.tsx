@@ -1,4 +1,4 @@
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { platformStorage, storageKeys } from "@/core/storage";
 import { ProfileView } from "./ProfileView";
@@ -74,5 +74,17 @@ describe("личная страница анализа", () => {
 		render(<ProfileView />);
 		expect(fetchSpy).not.toHaveBeenCalled();
 		vi.unstubAllGlobals();
+	});
+
+	it("показывает результат упражнения и пересчитывает процент после смены оценки", () => {
+		platformStorage.write(storageKeys.practiceResults, [
+			{ gameId: "demo", activity: "race", difficulty: null, score: 86, completed: true, durationSec: 28 },
+		]);
+		const { container } = render(<ProfileView />);
+		expect(screen.getByText("Гонка")).toBeTruthy();
+		expect(container.querySelector("ol li")?.textContent).toContain("43%");
+		fireEvent.change(screen.getByRole("combobox", { name: "Оценка игры Демо" }), { target: { value: "5" } });
+		expect(container.querySelector("ol li")?.textContent).toContain("86%");
+		expect(platformStorage.read(storageKeys.gameRatings, {})).toEqual({ demo: 5 });
 	});
 });

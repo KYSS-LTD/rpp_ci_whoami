@@ -264,10 +264,17 @@ try {
 		resume_Screen();
 	});
 	bridge.onStart(({ levelId }) => {
-		if (freeMode) return show_FreeMenu();
-		difficulty = normalize_Difficulty(levelId);
-		if (!difficulty) return bridge.reportError(text.unavailable);
-		show_Stage(0);
+		try {
+			if (freeMode) return show_FreeMenu();
+			difficulty = normalize_Difficulty(levelId);
+			if (!difficulty) return bridge.reportError(text.unavailable);
+			show_Stage(0);
+		} catch (error) {
+			stop_Mode();
+			screen.innerHTML = `<p class="boot-status" role="alert">${text.unavailable}</p>`;
+			bridge.reportError(text.unavailable);
+			debug_Message('Ошибка запуска уровня', error);
+		}
 	});
 	// В режиме отладки состояние игры доступно из консоли: window.aerolab.mode, window.aerolab.coast.
 	if (debugEnabled) window.aerolab = { get mode() { return mode; }, get coast() { return coast; }, renderer, run, show_Stage };

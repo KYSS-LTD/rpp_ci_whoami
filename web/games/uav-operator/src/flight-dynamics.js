@@ -1,4 +1,26 @@
-import { MathUtils } from 'three';
+import { MathUtils, Vector3 } from 'three';
+
+export function create_ChaseCamera(drone, center, distance) {
+	const target = new Vector3();
+	const nose = new Vector3();
+	const horizon = new Vector3(0, 1, 0);
+	const elevation = Math.atan(.25);
+	const minPitch = -.42;
+	const maxPitch = .42;
+	return (camera, heading, grounded, groundAt) => {
+		drone.localToWorld(target.copy(center));
+		nose.set(0, 0, -1).applyQuaternion(drone.quaternion);
+		const pitch = grounded ? 0 : Math.asin(MathUtils.clamp(nose.y, -1, 1));
+		// Камера остаётся за носом даже при пикировании, горизонт не вращается вместе с дроном.
+		const angle = MathUtils.clamp(pitch - elevation, minPitch - elevation, maxPitch - elevation);
+		const horizontal = distance * Math.cos(angle);
+		camera.up.copy(horizon);
+		camera.position.set(target.x + Math.sin(heading) * horizontal,
+			target.y - Math.sin(angle) * distance, target.z + Math.cos(heading) * horizontal);
+		camera.position.y = Math.max(camera.position.y, groundAt(camera.position.x, camera.position.z) + .12);
+		camera.lookAt(target);
+	};
+}
 
 export function signal_AtEdge(x, z, bounds) {
 	const clearance = Math.min(x - bounds.minX, bounds.maxX - x, z - bounds.minZ, bounds.maxZ - z);

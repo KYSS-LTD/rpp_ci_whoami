@@ -78,4 +78,15 @@ describe("расчет баллов профессий", () => {
 		const values = scores?.map((item) => item.score) ?? [];
 		expect(values).toEqual([...values].sort((first, second) => second - first));
 	});
+
+	it("учитывает лучшую завершённую гонку один раз и реагирует на оценку игры", () => {
+		const race = { gameId: "a", activity: "race" as const, difficulty: null, score: 92, completed: true, durationSec: 29 };
+		const practices = [{ ...race, score: 100, completed: false }, { ...race, score: 31 }, race];
+		expect(computeProfessionScores([gameA], [], {}, practices)?.[0].score).toBeCloseTo(.46);
+		expect(computeProfessionScores([gameA], [], { a: 5 }, practices)?.[0].score).toBeCloseTo(.92);
+	});
+
+	it("показывает пустой анализ, когда игра из старой истории больше не доступна", () => {
+		expect(computeProfessionScores([gameA], [attempt("removed", "easy", 10)], {})).toBeNull();
+	});
 });

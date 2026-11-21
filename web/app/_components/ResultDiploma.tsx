@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import type { LevelResult } from "@/core/contract/types";
+import type { LevelResult, PracticeActivity } from "@/core/contract/types";
 import { ratingForPercent } from "@/core/diplomas";
 import { scorePercent } from "@/core/achievements/rules";
 import { readPlayerName } from "@/core/progress";
@@ -10,11 +10,12 @@ import styles from "./LevelRunner.module.css";
 
 const copy = diplomasTexts.result;
 
-export function ResultDiploma({ result, gameTitle, levelTitle, difficulty }: {
+export function ResultDiploma({ result, gameTitle, levelTitle, difficulty, activity }: {
 	result: LevelResult;
 	gameTitle: string;
 	levelTitle: string;
 	difficulty: string;
+	activity?: PracticeActivity;
 }) {
 	const [name, setName] = useState(() => readPlayerName().slice(0, 120));
 	const [link, setLink] = useState("");
@@ -22,7 +23,7 @@ export function ResultDiploma({ result, gameTitle, levelTitle, difficulty }: {
 	const [error, setError] = useState("");
 	const [issuedAt] = useState(() => new Date().toISOString());
 	const generation = useRef<AbortController | null>(null);
-	const filename = `diplom-${result.gameId}.pdf`;
+	const filename = `diplom-${result.gameId}${activity ? `-${activity}` : ""}.pdf`;
 	const rating = ratingForPercent(scorePercent(result));
 
 	useEffect(() => () => generation.current?.abort(), []);

@@ -133,8 +133,21 @@ describe("iframe-уровень: выход, ошибка и таймаут", ()
 		expect(screen.getByRole("status").textContent).toContain(commonTexts.levelLoading);
 	});
 
-	it("без ready за время ожидания показывается запасной экран", () => {
+	it("после первого таймаута повторяет загрузку и принимает ready от нового фрейма", () => {
+		const { frame, frameWindow } = renderLevel();
+		act(() => { vi.advanceTimersByTime(10_000); });
+		const retriedFrame = screen.getByTitle("Город будущего") as HTMLIFrameElement;
+		expect(retriedFrame).not.toBe(frame);
+		expect(retriedFrame.getAttribute("src")).toContain("&retry=1");
+		sendFromGame(frameWindow, "ready");
+		expect(screen.getByRole("status").textContent).toContain(commonTexts.levelRetrying);
+		sendFromGame(retriedFrame.contentWindow as Window, "ready");
+		expect(screen.queryByRole("status")).toBeNull();
+	});
+
+	it("после второго таймаута показывает запасной экран", () => {
 		renderLevel();
+		act(() => { vi.advanceTimersByTime(10_000); });
 		act(() => {
 			vi.advanceTimersByTime(9_999);
 		});

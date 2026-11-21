@@ -10,7 +10,7 @@ export const gamesTexts = {
 	playLevel: "Играть",
 	ratingTitle: "Оцените игру от 1 до 5",
 	ratingSaved: "Оценка сохранена",
-	ratingUnavailable: "Оценить можно после прохождения хотя бы одного уровня",
+	ratingUnavailable: "Оценить можно после завершения уровня или упражнения",
 	// Фильтр ленты по формату игры.
 	filterLabel: "Формат игры",
 	filterAll: "Все",

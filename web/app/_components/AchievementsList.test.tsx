@@ -21,6 +21,7 @@ describe("страница ачивок", () => {
 		expect(awardedItem?.textContent).toContain("Получено");
 		expect(lockedItems.length).toBeGreaterThan(0);
 		expect(lockedItems[0].textContent).toContain("Закрыто");
-		expect(screen.queryByText("Гроза сложности")).toBeNull();
+		expect(screen.getByText("Гроза сложности")).toBeTruthy();
+		expect(container.querySelectorAll('img[src^="/achievement-icons/"]')).toHaveLength(6);
 	});
 });

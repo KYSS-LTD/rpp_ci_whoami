@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { base as coastBase, flight_Ground, limits as coastLimits, on_Pad, padRadius as coastPadRadius, sectors as beachSectors, shore } from './coast.js';
 import { retryPenalty } from './difficulty.js';
 import { create_FleetModel, fleet } from './fleet.js';
-import { create_Damage, signal_AtEdge } from './flight-dynamics.js';
+import { create_ChaseCamera, create_Damage, signal_AtEdge } from './flight-dynamics.js';
 import { bind_DamageDisplay } from './flight-damage-display.js';
 import { bind_Preferences, flightPreferences, preference_Markup } from './flight-preferences.js';
 import { create_Acro, fpvKit } from './fpv.js';
@@ -87,9 +87,9 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	const fieldDrone = droneKey ? create_FleetModel(scene, droneKey) : world.fieldDrone;
 	if (droneKey && beach) coast.fieldDrone.drone.visible = false;
 	const chase = practice?.camera === 'chase';
-	const chaseTarget = new THREE.Vector3();
 	const droneCenter = chase ? fieldDrone.drone.worldToLocal(new THREE.Box3().setFromObject(fieldDrone.drone).getCenter(new THREE.Vector3())) : null;
 	const chaseDistance = chase ? Math.max(1.4, kit.length * 5.5) : 0;
+	const updateChase = chase ? create_ChaseCamera(fieldDrone.drone, droneCenter, chaseDistance) : null;
 	const camera = new THREE.PerspectiveCamera(flightPreferences.fov, 1, .07, 620);
 	const profile = practice ? { ...settings.flight, mode: practice.mode, drain: .7 } : settings.flight;
 	const { scanRadius } = profile;
@@ -246,7 +246,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	const throttleStick = bind_Joystick(query('#stick-view'), signal);
 	const leftIndicator = query('#indicator-left i');
 	const rightIndicator = query('#indicator-right i');
-	bind_Preferences(signal, fov => { camera.fov = fov; camera.updateProjectionMatrix(); });
+	bind_Preferences(signal, fov => { camera.fov = fov; camera.updateProjectionMatrix(); }, chase ? 'chase' : 'fpv');
 	const flightInputs = bind_FlightInputs(attitudeStick, throttleStick, {
 		action: perform_Action, toggleMap: toggle_Map, restart: request_Restart,
 		menu: () => { if (!resetting) toggle_StageMenu(); },
@@ -359,7 +359,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		if (beach && distance(base) > padRadius) return show_Message(copy.badLand, 'warn');
 		if (motion.height > profile.landHeight) return show_Message(copy.lower, 'warn');
 		landing = true;
-		show_Message(copy.landing, 'success');
+		show_Message(beach ? copy.landing : copy.descending, 'success');
 	}
 
 	const on_Ground = () => motion.height <= groundHeight + .001;
@@ -400,11 +400,11 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		if (!stabilized) {
 			impact = acro.update(delta, motion, axes, Number(filter.value), groundAt, damage, powered);
 			if (powered) battery = acro.power(delta * profile.drain, acro.throttle);
-			upright = 1 - 2 * (acro.attitude.x ** 2 + acro.attitude.z ** 2);
+			upright = impact > 0 ? acro.impactUpright : 1 - 2 * (acro.attitude.x ** 2 + acro.attitude.z ** 2);
 		} else {
 			const maxSpeed = kit.maxSpeed ?? 15;
 			const stick = Math.max(1, Math.hypot(axes.x, axes.z));
-			motion.heading -= axes.yaw * delta * 1.48 * (kit.agility ?? 1);
+			if (!wasOnGround) motion.heading -= axes.yaw * delta * 1.48 * (kit.agility ?? 1);
 			const sine = Math.sin(motion.heading);
 			const cosine = Math.cos(motion.heading);
 			const blend = 1 - Math.exp(-(kit.motorResponse ?? 14) * .48 * delta);
@@ -500,9 +500,10 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	}
 
 	function register_Touchdown(safePad) {
+		const landingWasActive = landing;
 		landing = false;
 		if (safePad) logAction('returned');
-		if (!damage.disabled && battery > 0 && feedback <= 0) {
+		if (!damage.disabled && battery > 0 && (landingWasActive || feedback <= 0)) {
 			sound.play('land');
 			show_Message(safePad ? copy.padRest : copy.touchdown, 'success');
 		}
@@ -557,24 +558,26 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			const backZ = Math.cos(heading);
 			fieldDrone.drone.visible = chase;
 			fieldDrone.drone.position.set(x, y - .66, z);
-			if (stabilized) fieldDrone.drone.rotation.set(armed ? -Math.hypot(motion.vx, motion.vz) * .013 : 0, heading, damage.rollBias * .3);
+			const grounded = on_Ground();
+			if (stabilized) {
+				const forwardSpeed = -(motion.vx * backX + motion.vz * backZ);
+				const sideSpeed = motion.vx * backZ - motion.vz * backX;
+				fieldDrone.drone.rotation.set(grounded ? 0 : -forwardSpeed * .013, heading,
+					grounded ? 0 : -sideSpeed * .013 + damage.rollBias * .3, 'YXZ');
+			}
 			else fieldDrone.drone.quaternion.copy(acro.attitude);
 			if (fieldDrone.body) fieldDrone.body.rotation.z = (1 - damage.hull) * .32;
 			if (chase) {
-				fieldDrone.drone.localToWorld(chaseTarget.copy(droneCenter));
-				camera.position.copy(chaseTarget).addScaledVector(camera.up, chaseDistance * .42);
-				camera.position.x += backX * chaseDistance;
-				camera.position.z += backZ * chaseDistance;
-				camera.lookAt(chaseTarget);
+				updateChase(camera, heading, grounded, groundAt);
 			} else if (!stabilized) {
 				camera.position.set(x, y + .20, z);
 				camera.quaternion.copy(acro.attitude);
 				camera.rotateX(THREE.MathUtils.degToRad(kit.cameraTilt));
-				if (!reduceMotion.matches && armed && damage.thrust < .99) camera.rotateX(Math.sin(time * 97) * (1 - damage.thrust) * .028);
+				if (!grounded && !reduceMotion.matches && armed && damage.thrust < .99) camera.rotateX(Math.sin(time * 97) * (1 - damage.thrust) * .028);
 			} else {
 				camera.position.set(x, y + .20, z);
 				camera.lookAt(x - backX * 20, y - 3.6, z - backZ * 20);
-				if (!reduceMotion.matches) camera.rotateZ(-(motion.vx * backZ - motion.vz * backX) * .009);
+				if (!grounded && !reduceMotion.matches) camera.rotateZ(-(motion.vx * backZ - motion.vz * backX) * .009);
 			}
 			const course = Math.round((360 - THREE.MathUtils.radToDeg(heading) % 360) % 360) % 360;
 			videoLoss = signal_AtEdge(x, z, limits);
