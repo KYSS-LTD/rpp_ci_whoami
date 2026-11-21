@@ -1,5 +1,5 @@
 import fontkit from "@pdf-lib/fontkit";
-import { PDFDocument, rgb } from "pdf-lib";
+import { BlendMode, PDFDocument, rgb } from "pdf-lib";
 import type { LevelResult } from "../contract/types";
 import { issueDiploma } from "./index";
 import { diplomasTexts } from "@/texts/diplomas";
@@ -62,10 +62,10 @@ export async function createDiplomaPdf(
 	page.drawRectangle({ x: 34, y: 34, width: width - 68, height: height - 68, color: rgb(1, 1, 1), borderColor: line, borderWidth: 1 });
 	page.drawRectangle({ x: 34, y: 468, width: width - 68, height: 93, color: deep });
 	page.drawRectangle({ x: 34, y: 465, width: width - 68, height: 3, color: color(0xf0c419) });
-	page.drawCircle({ x: 90, y: 515, size: 26, color: color(0x102e21), borderColor: color(0x6ba185), borderWidth: 1 });
-	page.drawImage(logo, { x: 72, y: 497, ...logo.scaleToFit(36, 36) });
+	page.drawImage(logo, { x: 66, y: 491, ...logo.scaleToFit(48, 48) });
 	page.drawText(commonTexts.siteName, { x: 129, y: 510, size: 16, font, color: rgb(1, 1, 1) });
-	page.drawImage(flag, { x: 657, y: 486, ...flag.scaleToFit(112, 60) });
+	// Screen сохраняет зелёный фон под чёрными пикселями флага и оставляет белую надпись.
+	page.drawImage(flag, { x: 657, y: 486, ...flag.scaleToFit(112, 60), blendMode: BlendMode.Screen });
 
 	centered(copy.heading, 395, 48, 670, width / 2, green);
 	centered(copy.intro, 358, 15, 670, width / 2, muted);

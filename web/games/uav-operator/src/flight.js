@@ -87,8 +87,9 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	const fieldDrone = droneKey ? create_FleetModel(scene, droneKey) : world.fieldDrone;
 	if (droneKey && beach) coast.fieldDrone.drone.visible = false;
 	const chase = practice?.camera === 'chase';
-	const chaseOffset = new THREE.Vector3();
-	const chaseLook = new THREE.Vector3();
+	const chaseTarget = new THREE.Vector3();
+	const droneCenter = chase ? fieldDrone.drone.worldToLocal(new THREE.Box3().setFromObject(fieldDrone.drone).getCenter(new THREE.Vector3())) : null;
+	const chaseDistance = chase ? Math.max(1.4, kit.length * 5.5) : 0;
 	const camera = new THREE.PerspectiveCamera(flightPreferences.fov, 1, .07, 620);
 	const profile = practice ? { ...settings.flight, mode: practice.mode, drain: .7 } : settings.flight;
 	const { scanRadius } = profile;
@@ -554,12 +555,17 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			const y = groundAt(x, z) + height;
 			const backX = Math.sin(heading);
 			const backZ = Math.cos(heading);
+			fieldDrone.drone.visible = chase;
+			fieldDrone.drone.position.set(x, y - .66, z);
+			if (stabilized) fieldDrone.drone.rotation.set(armed ? -Math.hypot(motion.vx, motion.vz) * .013 : 0, heading, damage.rollBias * .3);
+			else fieldDrone.drone.quaternion.copy(acro.attitude);
+			if (fieldDrone.body) fieldDrone.body.rotation.z = (1 - damage.hull) * .32;
 			if (chase) {
-				const distanceBehind = Math.max(1.4, kit.length * 5.5);
-				chaseOffset.set(x + backX * distanceBehind, y + .74, z + backZ * distanceBehind);
-				if (delta === 0) camera.position.copy(chaseOffset);
-				else camera.position.lerp(chaseOffset, 1 - Math.exp(-10 * delta));
-				camera.lookAt(chaseLook.set(x - backX * 1.0, y - .1, z - backZ * 1.0));
+				fieldDrone.drone.localToWorld(chaseTarget.copy(droneCenter));
+				camera.position.copy(chaseTarget).addScaledVector(camera.up, chaseDistance * .42);
+				camera.position.x += backX * chaseDistance;
+				camera.position.z += backZ * chaseDistance;
+				camera.lookAt(chaseTarget);
 			} else if (!stabilized) {
 				camera.position.set(x, y + .20, z);
 				camera.quaternion.copy(acro.attitude);
@@ -577,11 +583,6 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			sound.flight({ running: powered, throttle: stabilized ? .48 + Math.hypot(motion.vx, motion.vz) * .014 : acro.throttle,
 				speed: Math.hypot(motion.vx, motion.vz), signalLost, paused: !moving });
 			camera.updateMatrixWorld();
-			fieldDrone.drone.visible = chase;
-			fieldDrone.drone.position.set(x, y - .66, z);
-			if (stabilized) fieldDrone.drone.rotation.set(armed ? -Math.hypot(motion.vx, motion.vz) * .013 : 0, heading, damage.rollBias * .3);
-			else fieldDrone.drone.quaternion.copy(acro.attitude);
-			if (fieldDrone.body) fieldDrone.body.rotation.z = (1 - damage.hull) * .32;
 			fieldDrone.propellers.forEach((propeller, index) => {
 				propeller.visible = damage.propellers[index] > .04;
 				if (powered) propeller.rotation.y += delta * 27 * damage.propellers[index] * (index % 2 ? 1 : -1);

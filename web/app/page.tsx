@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { landingTexts } from "@/texts/landing";
-import { uavTexts } from "@/games/uav-operator/texts";
 import styles from "./page.module.css";
 
 // Кадры для коллажа на первом экране: превью игр из библиотеки. Только для вида, поэтому alt пустой.
@@ -18,9 +17,6 @@ export default function LandingPage() {
 					<div className={styles.actions}>
 						<Link href="/games" className={`button-primary ${styles.cta}`}>
 							{landingTexts.gamesButton}
-						</Link>
-						<Link href="/games/uav-operator/free" className="button-secondary">
-							<span aria-hidden="true">✣</span> {uavTexts.title} · {uavTexts.free}
 						</Link>
 						<p className={styles.privacy}>{landingTexts.privacyNote}</p>
 					</div>

@@ -1,6 +1,6 @@
 <p align="center"><img src="logo.png" alt="" width="108"></p>
 
-# Портал профессий
+# KyssProf
 
 Профориентация через мини-игры. За одну смену на кухне, один день в бухгалтерии или один вылет дрона можно попробовать задачи профессии и понять, хочется ли заниматься ими дальше.
 
@@ -87,8 +87,13 @@ npm run build
 
 ## Команда KYSS
 
-<img src="kyss_flag.png" width="240" alt="Логотип команды KYSS">
+<p align="center"><img src="kyss_flag.png" width="240" alt="Флаг команды KYSS"></p>
 
 | [Syharik3316](https://github.com/Syharik3316) | [danyayok](https://github.com/danyayok) | [ynovka](https://github.com/ynovka) |
-| --- | --- | --- |
+| :---: | :---: | :---: |
+| [<img src="https://avatars.githubusercontent.com/u/156796237?s=128&v=4" width="72" height="72" alt="Аватар Syharik3316">](https://github.com/Syharik3316) | [<img src="https://avatars.githubusercontent.com/u/147042315?s=128&v=4" width="72" height="72" alt="Аватар danyayok">](https://github.com/danyayok) | [<img src="https://avatars.githubusercontent.com/u/31537599?s=128&v=4" width="72" height="72" alt="Аватар ynovka">](https://github.com/ynovka) |
 | Тренажёр БПЛА и интеграция с порталом | Платформа и бухгалтерская игра | Игра «Повар» |
+
+## Лицензия
+
+Код KyssProf распространяется по [Apache License 2.0](LICENSE). Для сторонних материалов действуют их собственные лицензии.

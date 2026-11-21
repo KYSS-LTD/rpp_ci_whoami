@@ -1,8 +1,7 @@
 // Общие тексты интерфейса. Весь отображаемый текст хранится здесь, а не в компонентах.
 
 export const commonTexts = {
-	siteName: "Портал профессий",
-	documentTitle: "Портал профессий",
+	siteName: "KyssProf",
 	documentDescription: "Мини-игры, которые помогают понять, какие профессии вам подходят",
 	navHome: "Главная",
 	navGames: "Игры",

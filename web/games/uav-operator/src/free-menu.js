@@ -5,7 +5,7 @@ import { bind_Click, glyphs, query } from './ui.js';
 
 const copy = text.free;
 const difficulties = ['easy', 'normal', 'hard'];
-export const freeOptions = { map: 'beach', drone: 'mini', mode: 'assisted', camera: 'fpv' };
+export const freeOptions = { map: 'beach', drone: 'mini', mode: 'acro', camera: 'fpv' };
 
 export function mount_FreeMenu({ mount, signal, screen, select, start, exit }) {
 	const block = screen === 'assembly' || screen === 'survey';
