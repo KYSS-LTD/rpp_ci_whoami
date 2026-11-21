@@ -1,28 +1,44 @@
+import { defaultDifficulty, difficultyIds } from './difficulty.js';
 import { text } from './text.js';
 
-const storageKey = 'aerolab:uav-operator:v1';
-const debug = import.meta.env.VITE_DEBUG === 'true';
+const storageKey = 'aerolab:uav-operator:v2';
+const legacyKey = 'aerolab:uav-operator:v1';
+const soundKey = 'aerolab:uav-operator:sound';
+export const debugEnabled = import.meta.env.VITE_DEBUG === 'true';
 
 export function debug_Message(message, error) {
-	if (debug) console.debug(`[aerolab] ${message}`, error || '');
+	if (debugEnabled) console.debug(`[aerolab] ${message}`, error || '');
+}
+
+// Проверяет сохранённый прогресс одного уровня сложности: очки этапов и рекорд.
+function read_Run(value) {
+	const run = { scores: [], best: 0 };
+	if (!value || !Array.isArray(value.scores)) return run;
+	for (const score of value.scores.slice(0, text.stages.length)) {
+		if (!Number.isInteger(score) || score < 0 || score > 100) break;
+		run.scores.push(score);
+	}
+	run.best = Number.isInteger(value.best) && value.best >= 0 && value.best <= 300 ? value.best : 0;
+	return run;
 }
 
 export function read_Progress() {
-	const initial = { scores: [], best: 0 };
+	const progress = { difficulty: defaultDifficulty, runs: {} };
+	for (const id of difficultyIds) progress.runs[id] = read_Run(null);
 	try {
 		const value = JSON.parse(localStorage.getItem(storageKey));
-		if (!value || !Array.isArray(value.scores)) return initial;
-		const scores = [];
-		for (const score of value.scores.slice(0, text.stages.length)) {
-			if (!Number.isInteger(score) || score < 0 || score > 100) break;
-			scores.push(score);
+		if (value && typeof value === 'object') {
+			if (difficultyIds.includes(value.difficulty)) progress.difficulty = value.difficulty;
+			for (const id of difficultyIds) progress.runs[id] = read_Run(value.runs?.[id]);
+			return progress;
 		}
-		const best = Number.isInteger(value.best) && value.best >= 0 && value.best <= 300 ? value.best : 0;
-		return { scores, best };
+		// Прогресс первой версии игры относится к обычной сложности.
+		const legacy = JSON.parse(localStorage.getItem(legacyKey));
+		if (legacy) progress.runs.normal = read_Run(legacy);
 	} catch (error) {
 		debug_Message('Ошибка чтения прогресса', error);
-		return initial;
 	}
+	return progress;
 }
 
 export function save_Progress(progress) {
@@ -33,7 +49,23 @@ export function save_Progress(progress) {
 	}
 }
 
-export function publish_Result(scores, score) {
+export function read_SoundEnabled() {
+	try {
+		return localStorage.getItem(soundKey) !== 'off';
+	} catch {
+		return true;
+	}
+}
+
+export function save_SoundEnabled(enabled) {
+	try {
+		localStorage.setItem(soundKey, enabled ? 'on' : 'off');
+	} catch (error) {
+		debug_Message('Ошибка сохранения настройки звука', error);
+	}
+}
+
+export function publish_Result(scores, score, difficulty) {
 	const origin = import.meta.env.VITE_PORTAL_ORIGIN;
 	if (!origin || window.parent === window) return;
 	try {
@@ -42,7 +74,7 @@ export function publish_Result(scores, score) {
 			throw new Error('VITE_PORTAL_ORIGIN должен содержать только origin портала');
 		}
 		window.parent.postMessage({
-			type: 'whoami:game-completed', version: 1, gameId: 'uav-operator', score, maxScore: 300,
+			type: 'whoami:game-completed', version: 1, gameId: 'uav-operator', score, maxScore: 300, difficulty,
 			stages: text.stages.map((stage, index) => ({ id: stage.id, score: scores[index], maxScore: 100 })),
 		}, url.origin);
 	} catch (error) {

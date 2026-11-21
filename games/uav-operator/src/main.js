@@ -3,9 +3,10 @@ import '@fontsource/ibm-plex-mono/500.css';
 import './style.css';
 import { start_Assembly } from './assembly.js';
 import { create_Coast } from './coast.js';
+import { difficultyIds, difficultySettings, read_UrlDifficulty } from './difficulty.js';
 import { start_Flight } from './flight.js';
 import { dispose_Scene } from './models.js';
-import { debug_Message, publish_Result, read_Progress, save_Progress } from './progress.js';
+import { debugEnabled, debug_Message, publish_Result, read_Progress, save_Progress } from './progress.js';
 import { create_Home, create_Renderer, resize_Frame } from './scenes.js';
 import { start_Survey } from './survey.js';
 import { text } from './text.js';
@@ -13,10 +14,13 @@ import { bind_Click, bind_Stage, glyphs, query } from './ui.js';
 
 const app = query('#app');
 const progress = read_Progress();
+progress.difficulty = read_UrlDifficulty() ?? progress.difficulty;
 const modes = [start_Assembly, start_Flight, start_Survey];
 const canvas = document.createElement('canvas');
 canvas.setAttribute('aria-hidden', 'true');
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+// Счётчики попыток живут, пока этап не сдан: выход в меню и повторный вход их не обнуляют.
+const stageSessions = new Map();
 let renderer;
 let coast;
 let mode;
@@ -38,16 +42,23 @@ app.innerHTML = `<header class="site-header"><div class="topbar">
 const screen = query('#screen');
 const best = query('#best');
 const back = query('#back');
-const observation = new ResizeObserver(() => { dirty = true; schedule_Frame(); });
+const observation = new ResizeObserver(() => request_Frame());
 const viewportObservation = new IntersectionObserver(([entry]) => {
 	if (entry.target !== canvas.parentElement) return;
 	sceneVisible = entry.isIntersecting;
 	lastFrame = null;
-	if (sceneVisible) {
-		dirty = true;
-		schedule_Frame();
-	}
+	if (sceneVisible) request_Frame();
 });
+
+function current_Run() {
+	return progress.runs[progress.difficulty];
+}
+
+function stage_Session(index) {
+	const key = `${progress.difficulty}:${index}`;
+	if (!stageSessions.has(key)) stageSessions.set(key, { attempts: 0 });
+	return stageSessions.get(key);
+}
 
 function render_Loop(time) {
 	frame = 0;
@@ -69,6 +80,12 @@ function render_Loop(time) {
 
 function schedule_Frame() {
 	if (!frame && mode && sceneVisible && !document.hidden && !graphicsLost) frame = requestAnimationFrame(render_Loop);
+}
+
+// Режимы вызывают эту функцию, когда статичная сцена изменилась и её нужно перерисовать.
+function request_Frame() {
+	dirty = true;
+	schedule_Frame();
 }
 
 function stop_Mode() {
@@ -100,20 +117,52 @@ function open_Screen(nextPage) {
 	app.classList.toggle('playing', page.kind === 'stage');
 	controller = new AbortController();
 	back.hidden = page.kind === 'home';
-	best.hidden = !progress.best || page.kind !== 'home';
-	best.textContent = `${text.best} · ${progress.best}`;
+	update_Best();
 	dirty = true;
 	window.scrollTo(0, 0);
 	return controller.signal;
+}
+
+function update_Best() {
+	const run = current_Run();
+	best.hidden = !run.best || page.kind !== 'home';
+	best.textContent = `${text.best} · ${text.difficulty[progress.difficulty].title} · ${run.best}`;
 }
 
 function focus_Heading() {
 	query('h1')?.focus({ preventScroll: true });
 }
 
+function difficulty_Markup() {
+	return `<fieldset class="difficulty-picker"><legend class="micro">${text.difficultyLabel}</legend>
+		<div class="difficulty-options">${difficultyIds.map(id => `<label class="difficulty-option difficulty-${id}">
+			<input type="radio" name="difficulty" value="${id}" ${id === progress.difficulty ? 'checked' : ''}>
+			<span><b>${text.difficulty[id].title}</b><small>${text.difficulty[id].short}</small></span>
+		</label>`).join('')}</div>
+		<p class="difficulty-note" id="difficulty-note" aria-live="polite">${text.difficulty[progress.difficulty].detail}</p>
+	</fieldset>`;
+}
+
+function missions_Markup() {
+	const scores = current_Run().scores;
+	const next = Math.min(scores.length, 2);
+	return text.stages.map((stage, index) => {
+		const score = scores[index];
+		return `<button type="button" class="mission-card card-${stage.id}" id="mission-${stage.id}" ${index > next ? 'disabled' : ''}>
+			<span class="card-top"><span class="mission-icon" aria-hidden="true">${glyphs[stage.id]}</span><span class="micro">${score === undefined ? `0${index + 1} / ${stage.location}` : `${text.done} · ${score}/100`}</span></span>
+			<strong>${stage.title}</strong><span class="card-summary">${stage.summary}</span>
+			<span class="card-level">${text.difficulty[progress.difficulty].stages[stage.id]}</span>
+		</button>`;
+	}).join('');
+}
+
+function start_Label() {
+	const count = current_Run().scores.length;
+	return count === 3 ? text.finish : count ? text.continue : text.start;
+}
+
 function show_Home(focus = true) {
 	const signal = open_Screen({ kind: 'home' });
-	const next = Math.min(progress.scores.length, 2);
 	mount(`<div class="home-content">
 		<section class="hero">
 			<div class="canvas-slot" id="canvas-slot"></div><div class="hero-shade"></div>
@@ -121,55 +170,69 @@ function show_Home(focus = true) {
 				<p class="hero-tag"><span></span>${text.tag}</p>
 				<h1 tabindex="-1">${text.headline[0]}<br><em>${text.headline[1]}</em></h1>
 				<p class="hero-intro">${text.intro}</p>
-				<button class="button button-primary hero-action" id="start" type="button"><i aria-hidden="true">▶</i>${progress.scores.length === 3 ? text.finish : progress.scores.length ? text.continue : text.start}</button>
+				${difficulty_Markup()}
+				<button class="button button-primary hero-action" id="start" type="button"><i aria-hidden="true">▶</i><span id="start-label">${start_Label()}</span></button>
 			</div>
 			<div class="hero-coordinate"><span>${text.regionCode}</span><strong>${text.region}</strong></div>
 		</section>
-		<section class="program"><div class="program-heading"><h2>${text.program}</h2><span class="micro">${text.totalMissions}</span></div>
-			<div class="mission-cards" aria-label="${text.missionList}">${text.stages.map((stage, index) => {
-				const score = progress.scores[index];
-				return `<button type="button" class="mission-card card-${stage.id}" id="mission-${stage.id}" ${index > next ? 'disabled' : ''}>
-					<span class="card-top"><span class="mission-icon" aria-hidden="true">${glyphs[stage.id]}</span><span class="micro">${score === undefined ? `0${index + 1} / ${stage.location}` : `${text.done} · ${score}/100`}</span></span>
-					<strong>${stage.title}</strong><span class="card-summary">${stage.summary}</span>
-				</button>`;
-			}).join('')}</div>
+		<section class="program"><div class="program-heading"><h2>${text.program}</h2><span class="micro" id="program-level">${text.totalMissions} · ${text.difficulty[progress.difficulty].title}</span></div>
+			<div class="mission-cards" id="mission-cards" aria-label="${text.missionList}">${missions_Markup()}</div>
 		</section>
 		<footer class="home-footer"><span>${text.fieldNote}</span><span>${text.brand} / ${text.regionCode}</span></footer>
 	</div>`);
 	mode = create_Home(coast);
-	bind_Click('#start', () => progress.scores.length === 3 ? show_Result() : show_Stage(next), signal);
-	text.stages.forEach((stage, index) => bind_Click(`#mission-${stage.id}`, () => show_Stage(index), signal));
+	const bind_Missions = () => text.stages.forEach((stage, index) => bind_Click(`#mission-${stage.id}`, () => show_Stage(index), signal));
+	bind_Click('#start', () => {
+		const run = current_Run();
+		if (run.scores.length === 3) show_Result();
+		else show_Stage(Math.min(run.scores.length, 2));
+	}, signal);
+	query('.difficulty-options').addEventListener('change', event => {
+		if (!difficultyIds.includes(event.target.value)) return;
+		progress.difficulty = event.target.value;
+		save_Progress(progress);
+		query('#difficulty-note').textContent = text.difficulty[progress.difficulty].detail;
+		query('#program-level').textContent = `${text.totalMissions} · ${text.difficulty[progress.difficulty].title}`;
+		query('#start-label').textContent = start_Label();
+		query('#mission-cards').innerHTML = missions_Markup();
+		bind_Missions();
+		update_Best();
+	}, { signal });
+	bind_Missions();
 	if (focus) focus_Heading();
 	schedule_Frame();
 }
 
 function show_Stage(index) {
 	const signal = open_Screen({ kind: 'stage', index });
-	mode = modes[index]({ mount, coast, renderer, signal });
-	bind_Stage({ signal, restart: () => show_Stage(index), exit: open_Home, focusScene: mode.focus,
-		submit: () => save_Stage(index, mode.score()),
+	const difficulty = progress.difficulty;
+	mode = modes[index]({ mount, coast, renderer, signal, difficulty, settings: difficultySettings[difficulty], session: stage_Session(index), invalidate: request_Frame });
+	bind_Stage({ signal, restart: () => mode.restart ? mode.restart() : show_Stage(index), exit: open_Home, focusScene: mode.focus,
+		submit: () => save_Stage(index, mode.score(), mode.summary?.()),
 	});
 	schedule_Frame();
 }
 
-function save_Stage(index, score) {
-	progress.scores[index] = score;
-	if (progress.scores.length === 3) {
-		const total = progress.scores.reduce((sum, entry) => sum + entry, 0);
-		progress.best = Math.max(progress.best, total);
-		if (index === 2) publish_Result(progress.scores, total);
+function save_Stage(index, score, summary) {
+	const run = current_Run();
+	run.scores[index] = score;
+	stageSessions.delete(`${progress.difficulty}:${index}`);
+	if (run.scores.length === 3) {
+		const total = run.scores.reduce((sum, entry) => sum + entry, 0);
+		run.best = Math.max(run.best, total);
+		if (index === 2) publish_Result(run.scores, total, progress.difficulty);
 	}
 	save_Progress(progress);
-	show_Debrief(index, score);
+	show_Debrief(index, score, summary);
 }
 
-function show_Debrief(index, score) {
-	const signal = open_Screen({ kind: 'debrief', index, score });
+function show_Debrief(index, score, summary = '') {
+	const signal = open_Screen({ kind: 'debrief', index, score, summary });
 	const current = text.stages[index];
 	mount(`<section class="result-card">
 		<div class="result-icon" aria-hidden="true">${glyphs[current.id]}</div>
-		<p class="micro">${text.complete}</p><h1 tabindex="-1">${current.title}</h1>
-		<div class="score-big">${score}<span> / 100</span></div><p class="result-lesson">${current.lesson}</p>
+		<p class="micro">${text.complete} · ${text.difficulty[progress.difficulty].title}</p><h1 tabindex="-1">${current.title}</h1>
+		<div class="score-big">${score}<span> / 100</span></div>${summary ? `<p class="result-summary">${summary}</p>` : ''}<p class="result-lesson">${current.lesson}</p>
 		<div class="result-actions">
 			<button type="button" class="button button-primary" id="next">${index === 2 ? text.finish : text.next}</button>
 			<button type="button" class="button button-quiet" id="again">${text.repeat}</button>
@@ -182,16 +245,17 @@ function show_Debrief(index, score) {
 
 function show_Result() {
 	const signal = open_Screen({ kind: 'result' });
-	const score = progress.scores.reduce((sum, entry) => sum + entry, 0);
+	const run = current_Run();
+	const score = run.scores.reduce((sum, entry) => sum + entry, 0);
 	mount(`<section class="result-card"><div class="result-icon" aria-hidden="true">✦</div>
-		<p class="micro">${text.resultLabel}</p><h1 tabindex="-1">${text.allComplete}</h1>
+		<p class="micro">${text.resultLabel} · ${text.difficulty[progress.difficulty].title}</p><h1 tabindex="-1">${text.allComplete}</h1>
 		<div class="score-big">${score}<span> / 300</span></div><p class="result-lesson">${text.resultIntro}</p>
-		<ul class="score-list">${text.stages.map((stage, index) => `<li><span>${stage.skill}</span><strong>${progress.scores[index]} / 100</strong></li>`).join('')}</ul>
+		<ul class="score-list">${text.stages.map((stage, index) => `<li><span>${stage.skill}</span><strong>${run.scores[index]} / 100</strong></li>`).join('')}</ul>
 		<div class="result-actions"><button type="button" class="button button-primary" id="menu">${text.menu}</button><button type="button" class="button button-quiet" id="again">${text.repeat}</button></div>
 	</section>`);
 	bind_Click('#menu', () => show_Home(), signal);
 	bind_Click('#again', () => {
-		progress.scores = [];
+		run.scores = [];
 		save_Progress(progress);
 		show_Stage(0);
 	}, signal);
@@ -209,16 +273,13 @@ document.addEventListener('visibilitychange', () => {
 		cancelAnimationFrame(frame);
 		frame = 0;
 		lastFrame = null;
-	} else {
-		dirty = true;
-		schedule_Frame();
-	}
+	} else request_Frame();
 });
-reducedMotion.addEventListener('change', () => { dirty = true; schedule_Frame(); });
+reducedMotion.addEventListener('change', request_Frame);
 
 function resume_Screen() {
 	if (page.kind === 'stage') show_Stage(page.index);
-	else if (page.kind === 'debrief') show_Debrief(page.index, page.score);
+	else if (page.kind === 'debrief') show_Debrief(page.index, page.score, page.summary);
 	else if (page.kind === 'result') show_Result();
 	else show_Home(false);
 }
@@ -240,6 +301,8 @@ try {
 		resume_Screen();
 	});
 	show_Home(false);
+	// В режиме отладки состояние игры доступно из консоли: window.aerolab.mode, window.aerolab.coast.
+	if (debugEnabled) window.aerolab = { get mode() { return mode; }, coast, renderer, progress, show_Stage };
 } catch (error) {
 	screen.innerHTML = `<p class="boot-status" role="alert">${text.unavailable}</p>`;
 	debug_Message('Ошибка инициализации WebGL', error);

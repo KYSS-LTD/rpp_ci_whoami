@@ -114,45 +114,117 @@ export function create_Drone(parent) {
 	return { drone, propellers };
 }
 
+// Точки разъёма на каждом модуле (в локальных координатах модели). От них идут кабели к полётному контроллеру.
+export const componentPlugs = {
+	camera: [0, .14, .23], gps: [.27, .06, 0], speed: [-.29, .06, 0],
+	receiver: [.24, .06, 0], transmitter: [-.27, .06, 0], battery: [0, .12, -.34],
+};
+
+// Модули строятся основанием на y = 0, лицевая сторона смотрит в -z (к носу дрона).
+// Размеры подобраны так, чтобы каждый модуль помещался в свой отсек корпуса под крышкой.
 export function create_Component(parent, type) {
 	const part = group(parent);
 	switch (type) {
 		case 'camera': {
-			box(part, palette.blue, .83, .33, .65);
-			box(part, palette.ink, .65, .24, .66, 0, .07, -.04);
-			const lens = cylinder(part, palette.glass, .19, .21, .12, 0, .04, .33);
+			// Камера в рамке с боковыми пластинами, объектив смотрит в окно носовой стенки.
+			box(part, palette.blue, .42, .38, .36, 0, .21, .02);
+			box(part, palette.ink, .36, .3, .04, 0, .22, -.17);
+			for (const side of [-1, 1]) box(part, palette.dark, .04, .3, .4, side * .25, .15, .02);
+			box(part, palette.dark, .54, .04, .4, 0, .02, .02);
+			const lens = cylinder(part, palette.ink, .12, .135, .14, 0, .22, -.24);
 			lens.rotation.x = Math.PI / 2;
+			const glass = cylinder(part, palette.glass, .085, .085, .02, 0, .22, -.315);
+			glass.rotation.x = Math.PI / 2;
+			box(part, 0xe8e2c8, .1, .06, .05, 0, .14, .21);
 			break;
 		}
 		case 'gps':
-			box(part, palette.mint, .87, .10, .76);
-			box(part, palette.shell, .63, .12, .58, 0, .1);
-			cylinder(part, palette.metal, .13, .13, .025, 0, .17, 0);
+			// Модуль GPS с керамической антенной на верхней стороне.
+			box(part, palette.mint, .5, .09, .5, 0, .045);
+			box(part, 0x1d2a26, .46, .02, .46, 0, .1);
+			box(part, palette.shell, .3, .05, .3, 0, .135);
+			cylinder(part, palette.metal, .05, .05, .03, 0, .175, 0);
+			box(part, 0xe8e2c8, .06, .05, .1, .23, .06, 0);
 			break;
 		case 'speed':
-			box(part, 0x243e35, .82, .10, .66);
-			for (let index = -1; index <= 1; index++) box(part, 0x20242a, .16, .09, .45, index * .23, .084);
-			for (const side of [-1, 1]) for (let index = -2; index <= 2; index++) box(part, 0xc7a465, .065, .02, .085, index * .132, .06, side * .281);
+			// Регулятор 4-в-1: силовые ключи, конденсатор и контакты моторов.
+			box(part, 0x243e35, .54, .05, .54, 0, .025);
+			for (let row = -1; row <= 1; row += 2) for (let column = -1; column <= 1; column++) box(part, 0x20242a, .1, .05, .08, column * .14, .075, row * .12);
+			for (const x of [-.24, .24]) for (const z of [-.24, .24]) box(part, 0xc7a465, .06, .015, .06, x, .055, z);
+			const capacitor = cylinder(part, 0x2b3f6a, .06, .06, .26, .02, .11, .2);
+			capacitor.rotation.z = Math.PI / 2;
+			box(part, 0xe8e2c8, .05, .05, .1, -.25, .06, 0);
 			break;
 		case 'receiver': {
-			box(part, 0x254348, .67, .10, .42);
-			box(part, 0x171c22, .28, .09, .26, -.07, .08);
-			box(part, 0xb9af9b, .14, .065, .12, .22, .08);
-			box(part, 0x292e34, .31, .035, .035, 0, .04, -.32).rotation.y = .84;
-			box(part, 0x292e34, .43, .032, .032, .21, .04, -.42);
+			// Приёмник с двумя антеннами, которые выводятся к боковой стенке корпуса.
+			box(part, 0x254348, .42, .05, .3, 0, .025);
+			box(part, 0x171c22, .16, .05, .14, -.06, .07);
+			box(part, 0xb9af9b, .08, .04, .08, .1, .065, .06);
+			box(part, 0x292e34, .26, .02, .02, -.31, .04, -.06).rotation.y = .3;
+			box(part, 0x292e34, .26, .02, .02, -.31, .04, .07).rotation.y = -.3;
+			box(part, 0xe8e2c8, .05, .05, .09, .21, .06, 0);
 			break;
 		}
 		case 'transmitter':
-			box(part, 0x263733, .78, .095, .56);
-			for (let index = -3; index <= 3; index++) box(part, 0x343b40, .047, .12, .39, index * .085, .095);
-			cylinder(part, 0xb69e72, .068, .068, .12, .29, .08, .19);
-			box(part, palette.dark, .5, .05, .05, .53, .07, .19);
+			// Видеопередатчик с радиатором и разъёмом антенны у правой стенки.
+			box(part, 0x263733, .48, .05, .4, 0, .025);
+			for (let index = -3; index <= 3; index++) box(part, 0x343b40, .035, .1, .3, index * .06, .1);
+			const connector = cylinder(part, 0xb69e72, .045, .045, .14, .3, .06, .1);
+			connector.rotation.z = Math.PI / 2;
+			box(part, 0xe8e2c8, .05, .05, .09, -.23, .06, 0);
 			break;
 		case 'battery':
-			box(part, palette.dark, .96, .33, .68);
-			box(part, 0x797f74, .53, .34, .683, -.03);
-			box(part, palette.coral, .19, .12, .18, .55, .04);
+			// Аккумулятор 6S в плёнке с ремешком и силовым разъёмом XT60.
+			box(part, palette.dark, 1.24, .34, .58, 0, .17);
+			box(part, 0x797f74, .62, .345, .585, -.08, .17);
+			box(part, palette.lime, .1, .35, .6, .42, .17);
+			box(part, palette.coral, .16, .1, .1, 0, .12, -.33);
 			break;
 	}
 	return part;
+}
+
+// Отвёртка: жало в начале координат, рукоятка вдоль +y. Материалы свои, чтобы подсветка не задевала другие детали.
+export function create_Screwdriver(parent) {
+	const tool = group(parent);
+	const handle = new THREE.MeshStandardMaterial({ color: palette.coral, roughness: .55 });
+	const grip = new THREE.MeshStandardMaterial({ color: 0x2a2f33, roughness: .9 });
+	const steel = new THREE.MeshStandardMaterial({ color: 0xb7bfbd, roughness: .3, metalness: .7 });
+	const add = (geometry, surface, y) => {
+		const piece = new THREE.Mesh(geometry, surface);
+		piece.position.y = y;
+		piece.castShadow = true;
+		tool.add(piece);
+		return piece;
+	};
+	add(new THREE.CylinderGeometry(.012, .028, .06, 8), steel, .03);
+	add(new THREE.CylinderGeometry(.028, .028, .86, 10), steel, .49);
+	add(new THREE.CylinderGeometry(.06, .045, .1, 12), steel, .95);
+	add(new THREE.CylinderGeometry(.1, .085, .72, 10), handle, 1.36);
+	for (let index = 0; index < 3; index++) add(new THREE.CylinderGeometry(.104, .104, .07, 10), grip, 1.14 + index * .18);
+	add(new THREE.SphereGeometry(.1, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), handle, 1.72);
+	return { tool, surfaces: [handle, grip] };
+}
+
+// Винт крышки: основание шляпки в начале координат, стержень уходит вниз.
+export function create_Screw(parent) {
+	const screw = group(parent);
+	const head = new THREE.MeshStandardMaterial({ color: 0xc5ccc8, roughness: .35, metalness: .65 });
+	const add = (geometry, surface, y) => {
+		const piece = new THREE.Mesh(geometry, surface);
+		piece.position.y = y;
+		piece.castShadow = true;
+		screw.add(piece);
+		return piece;
+	};
+	add(new THREE.CylinderGeometry(.085, .085, .05, 14), head, .025);
+	add(new THREE.CylinderGeometry(.032, .028, .34, 8), head, -.17);
+	const slot = material(palette.ink);
+	for (const angle of [0, Math.PI / 2]) {
+		const cross = new THREE.Mesh(new THREE.BoxGeometry(.12, .012, .024), slot);
+		cross.position.y = .052;
+		cross.rotation.y = angle;
+		screw.add(cross);
+	}
+	return { screw, surfaces: [head] };
 }
