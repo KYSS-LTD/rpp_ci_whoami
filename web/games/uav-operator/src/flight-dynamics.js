@@ -11,6 +11,31 @@ export function create_ChaseCamera(drone, center, distance) {
 	};
 }
 
+export function create_TouchdownCamera(camera) {
+	const duration = .35;
+	const position = new Vector3();
+	const rotation = new Quaternion();
+	let remaining = 0;
+	return {
+		start() {
+			position.copy(camera.position);
+			rotation.copy(camera.quaternion);
+			remaining = duration;
+		},
+		settle(delta) {
+			remaining -= delta;
+			if (remaining <= Number.EPSILON) {
+				remaining = 0;
+				return true;
+			}
+			const weight = MathUtils.smoothstep(remaining, 0, duration);
+			camera.position.lerp(position, weight);
+			camera.quaternion.slerp(rotation, weight);
+			return false;
+		},
+	};
+}
+
 export function signal_AtEdge(x, z, bounds) {
 	const clearance = Math.min(x - bounds.minX, bounds.maxX - x, z - bounds.minZ, bounds.maxZ - z);
 	return 1 - MathUtils.smoothstep(clearance, -19, 12);
