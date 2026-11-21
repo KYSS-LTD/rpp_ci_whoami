@@ -2,6 +2,24 @@ import * as THREE from 'three';
 import { box, cylinder, group, ring, palette, create_Drone } from './models.js';
 
 export const base = { x: -15, z: 37, label: 'H' };
+export const padRadius = 4.4;
+const stationSite = { x: -25, z: 42 };
+const terraceHeight = 3.2;
+const padThickness = .16;
+
+function site_Distance(x, z) {
+	// Запас в один шаг сетки удерживает края фундамента на плоских треугольниках.
+	return Math.min(Math.hypot(x - base.x, z - base.z) - padRadius,
+		Math.max(Math.abs(x - stationSite.x) - 4, Math.abs(z - stationSite.z) - 3.2));
+}
+
+export function on_Pad(x, z) {
+	return Math.hypot(x - base.x, z - base.z) <= padRadius;
+}
+
+export function flight_Ground(x, z) {
+	return on_Pad(x, z) ? terraceHeight + padThickness : Math.max(0, terrain_Height(x, z));
+}
 export const sectors = [
 	{ x: 4, z: 76, label: 'A' }, { x: -4, z: -27, label: 'B' }, { x: 2, z: -139, label: 'C' },
 ];
@@ -20,7 +38,8 @@ export function shore(z) {
 
 export function terrain_Height(x, z) {
 	const inland = shore(z) - x;
-	return Math.min(10, inland * .045 + Math.max(0, inland - 23) * .105) + THREE.MathUtils.smoothstep(inland, 22, 40) * (2.5 + Math.sin(x * .13 + z * .08) * 2.2 + Math.cos(z * .15) * 1.4);
+	const natural = Math.min(10, inland * .045 + Math.max(0, inland - 23) * .105) + THREE.MathUtils.smoothstep(inland, 22, 40) * (2.5 + Math.sin(x * .13 + z * .08) * 2.2 + Math.cos(z * .15) * 1.4);
+	return THREE.MathUtils.lerp(terraceHeight, natural, THREE.MathUtils.smoothstep(site_Distance(x, z), 4, 12));
 }
 
 export function beach_Texture(repeatX, repeatY) {
@@ -205,7 +224,7 @@ function create_Vegetation(scene) {
 		const margin = 18 + Math.cos(z * .071) * 7 + Math.sin(z * .031) * 5;
 		const x = shore(z) - margin - random() ** 1.28 * 138;
 		const launchPath = x > base.x - 2 && Math.abs(z - base.z + (x - base.x) * .55) < 7;
-		if (x < -157 || launchPath || Math.hypot(x - base.x, z - base.z) < 8 || Math.hypot(x + 25, z - 42) < 7.4 ||
+		if (x < -157 || launchPath || Math.hypot(x - base.x, z - base.z) < 8 || site_Distance(x, z) < 5 ||
 			sectors.some(point => Math.hypot(x - point.x, z - point.z) < 9)) continue;
 		const key = cellId(x, z);
 		if (!cells.has(key)) cells.set(key, []);
@@ -262,8 +281,11 @@ function create_Vegetation(scene) {
 	}
 	const rocks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0x9d9b87, flatShading: true }), 66);
 	for (let index = 0; index < rocks.count; index++) {
-		const z = random() * 166 - 86;
-		const x = shore(z) - random() * 38;
+		let x, z;
+		do {
+			z = random() * 166 - 86;
+			x = shore(z) - random() * 38;
+		} while (site_Distance(x, z) < 2);
 		const radius = .18 + random() * .96;
 		stock.rotation.set(.3, random() * Math.PI, .24);
 		stock.position.set(x, terrain_Height(x, z) + .03, z);
@@ -309,7 +331,7 @@ function create_Lighthouse(scene) {
 }
 
 function create_Station(scene) {
-	const station = group(scene, -25, terrain_Height(-25, 42), 42);
+	const station = group(scene, stationSite.x, terraceHeight, stationSite.z);
 	box(station, 0xd7b189, 7.8, .54, 6.2, 0, .2, 0);
 	box(station, 0xf2d9a6, 6.6, 2.65, 4.8, 0, 1.6);
 	const roof = box(station, 0x426a64, 7.36, .27, 5.6, 0, 3, 0);
@@ -331,10 +353,10 @@ function create_Station(scene) {
 		bow.rotation.y = Math.PI;
 		box(boat, 0x397e84, 1.1, .61, 1.14, 0, .56, .42);
 	}
-	const landing = group(scene, base.x, terrain_Height(base.x, base.z) + .52, base.z);
-	cylinder(landing, 0x728274, 3.40, 3.59, 1.22, 0, -.56, 0, 32);
-	cylinder(landing, 0x39494a, 3.35, 3.52, .16, 0, 0, 0, 32);
-	ring(landing, 0xb5baae, 2.97, .035, 0, .085, 0);
+	const landing = group(scene, base.x, terraceHeight + padThickness - .08, base.z);
+	cylinder(landing, 0x728274, padRadius, padRadius + .19, 1.22, 0, -.56, 0, 32);
+	cylinder(landing, 0x39494a, padRadius, padRadius + .12, .16, 0, 0, 0, 32);
+	ring(landing, 0xb5baae, padRadius - .33, .035, 0, .085, 0);
 	for (const side of [-1, 1]) box(landing, palette.shell, .22, .035, 1.73, side * .53, .107, 0);
 	box(landing, palette.shell, 1.04, .035, .22, 0, .107, 0);
 }

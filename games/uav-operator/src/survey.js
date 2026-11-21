@@ -26,7 +26,7 @@ function best_Match(selection, items) {
 	return items.map(item => ({ item, quality: match_Quality(selection, item) })).sort((first, second) => second.quality - first.quality)[0] ?? { item: null, quality: 0 };
 }
 
-export function start_Survey({ mount, signal, settings, invalidate }) {
+export function start_Survey({ mount, signal, settings, invalidate, sound }) {
 	const { photos: layoutIds, kinds, decoys: withDecoys } = settings.survey;
 	const copy = text.survey;
 	const totalTargets = layoutIds.reduce((sum, id) => sum + count_Targets(id, kinds), 0);
@@ -117,6 +117,9 @@ export function start_Survey({ mount, signal, settings, invalidate }) {
 		view.camera = photo.camera;
 		dispose_Scene(previous);
 		found = new Set();
+		active = null;
+		keyboard = { x: .5, y: .5 };
+		cursor.hidden = true;
 		for (const label of overlay.querySelectorAll('.photo-box.accepted')) label.remove();
 		hint.hidden = true;
 		nextPrompt.hidden = true;
@@ -230,6 +233,7 @@ export function start_Survey({ mount, signal, settings, invalidate }) {
 		found.add(best.item);
 		foundTotal++;
 		accuracy += best.quality;
+		sound.play('mark');
 		vibrate_Device(15);
 		const label = document.createElement('div');
 		label.className = 'photo-box accepted';

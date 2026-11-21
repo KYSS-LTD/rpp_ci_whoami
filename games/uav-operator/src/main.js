@@ -1,9 +1,10 @@
 import '@fontsource-variable/manrope';
 import '@fontsource/ibm-plex-mono/500.css';
 import './style.css';
+import { create_Sound } from './audio.js';
 import { start_Assembly } from './assembly.js';
 import { create_Coast } from './coast.js';
-import { difficultyIds, difficultySettings, read_UrlDifficulty } from './difficulty.js';
+import { difficultyIds, difficultySettings, read_UrlDifficulty, retryPenalty } from './difficulty.js';
 import { start_Flight } from './flight.js';
 import { dispose_Scene } from './models.js';
 import { debugEnabled, debug_Message, publish_Result, read_Progress, save_Progress } from './progress.js';
@@ -14,13 +15,15 @@ import { bind_Click, bind_Stage, glyphs, query } from './ui.js';
 
 const app = query('#app');
 const progress = read_Progress();
-progress.difficulty = read_UrlDifficulty() ?? progress.difficulty;
+const urlDifficulty = read_UrlDifficulty();
+if (urlDifficulty) {
+	progress.difficulty = urlDifficulty;
+	progress.chosen = true;
+}
 const modes = [start_Assembly, start_Flight, start_Survey];
 const canvas = document.createElement('canvas');
 canvas.setAttribute('aria-hidden', 'true');
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-// Счётчики попыток живут, пока этап не сдан: выход в меню и повторный вход их не обнуляют.
-const stageSessions = new Map();
 let renderer;
 let coast;
 let mode;
@@ -52,12 +55,6 @@ const viewportObservation = new IntersectionObserver(([entry]) => {
 
 function current_Run() {
 	return progress.runs[progress.difficulty];
-}
-
-function stage_Session(index) {
-	const key = `${progress.difficulty}:${index}`;
-	if (!stageSessions.has(key)) stageSessions.set(key, { attempts: 0 });
-	return stageSessions.get(key);
 }
 
 function render_Loop(time) {
@@ -136,10 +133,10 @@ function focus_Heading() {
 function difficulty_Markup() {
 	return `<fieldset class="difficulty-picker"><legend class="micro">${text.difficultyLabel}</legend>
 		<div class="difficulty-options">${difficultyIds.map(id => `<label class="difficulty-option difficulty-${id}">
-			<input type="radio" name="difficulty" value="${id}" ${id === progress.difficulty ? 'checked' : ''}>
+			<input type="radio" name="difficulty" value="${id}" ${progress.chosen && id === progress.difficulty ? 'checked' : ''}>
 			<span><b>${text.difficulty[id].title}</b><small>${text.difficulty[id].short}</small></span>
 		</label>`).join('')}</div>
-		<p class="difficulty-note" id="difficulty-note" aria-live="polite">${text.difficulty[progress.difficulty].detail}</p>
+		<p class="difficulty-note" id="difficulty-note" ${progress.chosen ? '' : 'hidden'} aria-live="polite">${text.difficulty[progress.difficulty].detail}</p>
 	</fieldset>`;
 }
 
@@ -148,10 +145,10 @@ function missions_Markup() {
 	const next = Math.min(scores.length, 2);
 	return text.stages.map((stage, index) => {
 		const score = scores[index];
-		return `<button type="button" class="mission-card card-${stage.id}" id="mission-${stage.id}" ${index > next ? 'disabled' : ''}>
+		return `<button type="button" class="mission-card card-${stage.id}" id="mission-${stage.id}" ${!progress.chosen || index > next ? 'disabled' : ''}>
 			<span class="card-top"><span class="mission-icon" aria-hidden="true">${glyphs[stage.id]}</span><span class="micro">${score === undefined ? `0${index + 1} / ${stage.location}` : `${text.done} · ${score}/100`}</span></span>
 			<strong>${stage.title}</strong><span class="card-summary">${stage.summary}</span>
-			<span class="card-level">${text.difficulty[progress.difficulty].stages[stage.id]}</span>
+			${progress.chosen ? `<span class="card-level">${text.difficulty[progress.difficulty].stages[stage.id]}</span>` : ''}
 		</button>`;
 	}).join('');
 }
@@ -171,11 +168,11 @@ function show_Home(focus = true) {
 				<h1 tabindex="-1">${text.headline[0]}<br><em>${text.headline[1]}</em></h1>
 				<p class="hero-intro">${text.intro}</p>
 				${difficulty_Markup()}
-				<button class="button button-primary hero-action" id="start" type="button"><i aria-hidden="true">▶</i><span id="start-label">${start_Label()}</span></button>
+				<button class="button button-primary hero-action" id="start" ${progress.chosen ? '' : 'disabled'} type="button"><i aria-hidden="true">▶</i><span id="start-label">${start_Label()}</span></button>
 			</div>
 			<div class="hero-coordinate"><span>${text.regionCode}</span><strong>${text.region}</strong></div>
 		</section>
-		<section class="program"><div class="program-heading"><h2>${text.program}</h2><span class="micro" id="program-level">${text.totalMissions} · ${text.difficulty[progress.difficulty].title}</span></div>
+		<section class="program"><div class="program-heading"><h2>${text.program}</h2><span class="micro" id="program-level">${text.totalMissions}${progress.chosen ? ` · ${text.difficulty[progress.difficulty].title}` : ''}</span></div>
 			<div class="mission-cards" id="mission-cards" aria-label="${text.missionList}">${missions_Markup()}</div>
 		</section>
 		<footer class="home-footer"><span>${text.fieldNote}</span><span>${text.brand} / ${text.regionCode}</span></footer>
@@ -190,6 +187,9 @@ function show_Home(focus = true) {
 	query('.difficulty-options').addEventListener('change', event => {
 		if (!difficultyIds.includes(event.target.value)) return;
 		progress.difficulty = event.target.value;
+		progress.chosen = true;
+		query('#start').disabled = false;
+		query('#difficulty-note').hidden = false;
 		save_Progress(progress);
 		query('#difficulty-note').textContent = text.difficulty[progress.difficulty].detail;
 		query('#program-level').textContent = `${text.totalMissions} · ${text.difficulty[progress.difficulty].title}`;
@@ -203,11 +203,24 @@ function show_Home(focus = true) {
 	schedule_Frame();
 }
 
-function show_Stage(index) {
+function show_Stage(index, showTutorial = true) {
 	const signal = open_Screen({ kind: 'stage', index });
 	const difficulty = progress.difficulty;
-	mode = modes[index]({ mount, coast, renderer, signal, difficulty, settings: difficultySettings[difficulty], session: stage_Session(index), invalidate: request_Frame });
-	bind_Stage({ signal, restart: () => mode.restart ? mode.restart() : show_Stage(index), exit: open_Home, focusScene: mode.focus,
+	const sound = create_Sound(signal);
+	const run = current_Run();
+	const restart = () => show_Stage(index, false);
+	mode = modes[index]({ mount, coast, renderer, signal, difficulty, settings: difficultySettings[difficulty], sound, restart, invalidate: request_Frame,
+		attempts: run.attempts, onLaunch() {
+			run.attempts++;
+			if (run.attempts > 1 && run.scores.length >= 2) run.scores[1] = Math.max(0, run.scores[1] - retryPenalty);
+			save_Progress(progress);
+			return run.attempts;
+		},
+	});
+	const mute = query('#mute');
+	mute.setAttribute('aria-pressed', String(sound.muted));
+	bind_Click('#mute', () => mute.setAttribute('aria-pressed', String(sound.toggle())), signal);
+	bind_Stage({ signal, restart, showTutorial, exit: open_Home, focusScene: mode.focus,
 		submit: () => save_Stage(index, mode.score(), mode.summary?.()),
 	});
 	schedule_Frame();
@@ -216,11 +229,10 @@ function show_Stage(index) {
 function save_Stage(index, score, summary) {
 	const run = current_Run();
 	run.scores[index] = score;
-	stageSessions.delete(`${progress.difficulty}:${index}`);
 	if (run.scores.length === 3) {
 		const total = run.scores.reduce((sum, entry) => sum + entry, 0);
 		run.best = Math.max(run.best, total);
-		if (index === 2) publish_Result(run.scores, total, progress.difficulty);
+		if (index === 2) publish_Result(run.scores, total, progress.difficulty, run.attempts);
 	}
 	save_Progress(progress);
 	show_Debrief(index, score, summary);
@@ -250,14 +262,15 @@ function show_Result() {
 	mount(`<section class="result-card"><div class="result-icon" aria-hidden="true">✦</div>
 		<p class="micro">${text.resultLabel} · ${text.difficulty[progress.difficulty].title}</p><h1 tabindex="-1">${text.allComplete}</h1>
 		<div class="score-big">${score}<span> / 300</span></div><p class="result-lesson">${text.resultIntro}</p>
-		<ul class="score-list">${text.stages.map((stage, index) => `<li><span>${stage.skill}</span><strong>${run.scores[index]} / 100</strong></li>`).join('')}</ul>
+		<p>${text.flight.attempts} · ${run.attempts}</p><ul class="score-list">${text.stages.map((stage, index) => `<li><span>${stage.skill}</span><strong>${run.scores[index]} / 100</strong></li>`).join('')}</ul>
 		<div class="result-actions"><button type="button" class="button button-primary" id="menu">${text.menu}</button><button type="button" class="button button-quiet" id="again">${text.repeat}</button></div>
 	</section>`);
 	bind_Click('#menu', () => show_Home(), signal);
 	bind_Click('#again', () => {
 		run.scores = [];
+		run.attempts = 0;
 		save_Progress(progress);
-		show_Stage(0);
+		show_Home();
 	}, signal);
 	focus_Heading();
 }

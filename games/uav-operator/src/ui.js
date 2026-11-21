@@ -80,7 +80,7 @@ export function stage_Shell(index, scene, panel, controls = '', tutorial = '', t
 			<div class="overlay-heading"><h2 id="stage-menu-title">${mission.title}</h2><button class="button button-quiet close-overlay" type="button" id="close-menu" aria-label="${text.close}">×</button></div>
 			<button class="button button-primary" id="submit-stage" type="button">${text.submit}</button>
 			${panel}
-			<div class="actions-row"><button class="button button-quiet" id="tutorial-again" type="button">${text.tutorial}</button><button class="button button-quiet" id="restart" type="button">${text.restart}</button><button class="button button-quiet" id="stage-exit" type="button">${text.toHub}</button></div>
+			<div class="actions-row"><button class="button button-quiet" id="mute" type="button">${text.mute}</button><button class="button button-quiet" id="tutorial-again" type="button">${text.tutorial}</button><button class="button button-quiet" id="restart" type="button">${text.restart}</button><button class="button button-quiet" id="stage-exit" type="button">${text.toHub}</button></div>
 		</aside>
 		<dialog class="stage-dialog" id="stage-tutorial" aria-labelledby="tutorial-title">
 			<h2 id="tutorial-title">${mission.title}</h2><p>${mission.guide}</p>${tutorial}
@@ -93,7 +93,7 @@ export function stage_Shell(index, scene, panel, controls = '', tutorial = '', t
 	</section>`;
 }
 
-export function bind_Stage({ signal, restart, exit, submit, focusScene }) {
+export function bind_Stage({ signal, restart, exit, submit, focusScene, showTutorial = true }) {
 	const menu = query('#stage-menu');
 	const menuButton = query('#stage-menu-button');
 	const tutorial = query('#stage-tutorial');
@@ -130,5 +130,6 @@ export function bind_Stage({ signal, restart, exit, submit, focusScene }) {
 		else (focusScene ?? (() => menuButton.focus()))();
 	}, { signal });
 	tutorial.addEventListener('close', () => focusScene?.(), { signal });
-	tutorial.showModal();
+	if (showTutorial) tutorial.showModal();
+	else focusScene?.();
 }

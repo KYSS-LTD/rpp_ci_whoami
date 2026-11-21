@@ -1,19 +1,17 @@
 import * as THREE from 'three';
-import { base, limits, sectors, shore, terrain_Height } from './coast.js';
+import { base, flight_Ground as groundAt, limits, on_Pad, padRadius, sectors, shore } from './coast.js';
+import { retryPenalty } from './difficulty.js';
 import { create_Acro, fpvKit } from './fpv.js';
 import { bind_FlightInputs, bind_Joystick } from './inputs.js';
 import { add_Beacon } from './scenes.js';
 import { palette } from './models.js';
-import { close_StageMenu, query, scene_Frame, set_Status, stage_OverlayOpen, stage_Shell } from './ui.js';
+import { close_StageMenu, query, scene_Frame, set_Status, show_CompletePrompt, stage_OverlayOpen, stage_Shell } from './ui.js';
 import { text } from './text.js';
 import { create_AnalogFeed } from './video.js';
 
-const scanRadius = 6.5;
-const landRadius = 4.4;
 const points = [base, ...sectors];
 const launchHeading = -Math.PI * .34;
 const directionArrows = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
-const groundAt = (x, z) => Math.max(0, terrain_Height(x, z));
 const clampAxis = value => THREE.MathUtils.clamp(value, -1, 1);
 
 function draw_Map(context, x, z, heading, scanned) {
@@ -62,26 +60,33 @@ function draw_Map(context, x, z, heading, scanned) {
 	context.restore();
 }
 
-export function start_Flight({ mount, coast, renderer, signal }) {
+export function start_Flight({ mount, coast, renderer, signal, settings, restart, attempts, onLaunch, sound }) {
 	const copy = text.flight;
 	const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 	const { scene, fieldDrone, seaTime, touchesTree } = coast;
 	const camera = new THREE.PerspectiveCamera(70, 1, .07, 620);
-	const acro = create_Acro();
+	const profile = settings.flight;
+	const { scanRadius } = profile;
+	const stabilized = profile.mode === 'assisted';
+	const trainer = profile.mode === 'angle';
+	const modeLabel = copy.osdModes[profile.mode];
+	const keys = stabilized ? copy.keys : trainer ? copy.angleKeys : copy.acroKeys;
+	const sticks = stabilized ? copy.joysticks : trainer ? copy.angleSticks : copy.acroSticks;
+	const acro = create_Acro(trainer);
 	const video = create_AnalogFeed(renderer);
 	const photoCamera = new THREE.OrthographicCamera(-8, 8, 5, -5, .1, 96);
 	photoCamera.up.set(0, 0, -1);
 	const trackedPosition = new THREE.Vector3();
 	const markerLayer = `<div id="waypoints" aria-hidden="true">${points.map(point => `<span class="world-marker" id="marker-${point.label}">${point.label}</span>`).join('')}</div>`;
 	const sceneMarkup = scene_Frame(`<div class="fpv-osd">
-		<div class="fpv-top"><span>${fpvKit.name.toUpperCase()}<br><span id="osd-mode">ACRO</span></span><span id="course">000°</span><span class="fpv-right" id="navigation-osd"></span></div>
+		<div class="fpv-top"><span>${fpvKit.name.toUpperCase()}<br><span id="osd-mode">${modeLabel}</span><br><span id="attempt-count"></span></span><span id="course">000°</span><span class="fpv-right" id="navigation-osd"></span></div>
 		<div class="fpv-reticle" aria-hidden="true"></div><div class="fpv-message" id="osd-state"></div>
 		<div class="fpv-bottom"><span><span id="battery"></span><br><span id="consumption"></span></span><span class="fpv-center"><span id="altitude">0.0 m</span><br><span id="throttle"></span></span><span class="fpv-right"><time id="airtime">00:00</time><br><span id="speed">0 km/h</span></span></div>
 	</div>${markerLayer}`);
 	const controls = `<div class="flight-controls">
-		<div class="joystick-group"><div class="joystick" id="stick-view" aria-hidden="true"><i></i></div><span id="stick-left-label">${copy.throttleYaw}</span></div>
+		<div class="joystick-group"><div class="joystick" id="stick-view" aria-hidden="true"><i></i></div><span id="stick-left-label">${stabilized ? copy.attitude : copy.throttleYaw}</span></div>
 		<button class="button button-primary" id="flight-action" type="button">${copy.takeoff}</button>
-		<div class="joystick-group"><div class="joystick" id="stick-move" aria-hidden="true"><i></i></div><span id="stick-right-label">${copy.pitchRoll}</span></div>
+		<div class="joystick-group"><div class="joystick" id="stick-move" aria-hidden="true"><i></i></div><span id="stick-right-label">${stabilized ? copy.motion : copy.pitchRoll}</span></div>
 	</div><aside class="flight-map" id="flight-map" aria-labelledby="map-title" hidden>
 		<div class="overlay-heading"><h2 id="map-title">${copy.map}</h2><button class="button button-quiet close-overlay" type="button" id="close-map" aria-label="${text.close}">×</button></div><div class="sector-list">
 		${sectors.map(point => `<span id="sector-${point.label}">${point.label}</span>`).join('')}
@@ -90,13 +95,13 @@ export function start_Flight({ mount, coast, renderer, signal }) {
 	const panel = `<button class="button button-quiet" type="button" id="toggle-map" aria-controls="flight-map" aria-expanded="false">${copy.map}</button>
 		<button class="button button-quiet" type="button" id="flight-land" hidden>${copy.land}</button>
 		<div class="fpv-controls" aria-label="${copy.settings}">
-			<label>${copy.mode}<select id="flight-mode"><option value="acro">ACRO</option><option value="assisted">${copy.assisted}</option></select></label>
-			<label>${copy.filter}<select id="input-filter"><option value="12">12 Hz</option><option value="6" selected>6 Hz</option><option value="3">3 Hz</option></select></label>
+			<p>${copy.mode} · ${copy.modes[profile.mode]}</p>
+			<label>${copy.filter}<select id="input-filter" ${stabilized ? 'disabled' : ''}><option value="12">12 Hz</option><option value="6" selected>6 Hz</option><option value="3">3 Hz</option></select></label>
 			<label>${copy.feed}<select id="camera-effects"><option value="1" selected>${copy.analog}</option><option value="2">${copy.soft}</option><option value="0">${copy.clean}</option></select></label>
 		</div>
 		<figure class="flight-photo" id="flight-photo" hidden><canvas id="photo-preview" width="1440" height="900" aria-label="${copy.capture}"></canvas><figcaption id="photo-caption"></figcaption><button type="button" id="expand-photo" class="button button-quiet">${copy.expand}</button></figure>
-		<p class="keyboard-note" id="flight-keys">${copy.acroKeys}</p><p class="joystick-note" id="flight-sticks">${copy.acroSticks}</p>`;
-	const tutorial = `<p class="keyboard-note">${copy.acroKeys}</p><p class="joystick-note">${copy.acroSticks}</p>`;
+		<p class="keyboard-note" id="flight-keys">${keys}</p><p class="joystick-note" id="flight-sticks">${sticks}</p>`;
+	const tutorial = `<p class="keyboard-note">${keys}</p><p class="joystick-note">${sticks}</p><p>${copy.retryRule}</p>`;
 	mount(stage_Shell(1, sceneMarkup, panel, controls, tutorial));
 	const frame = query('#scene-frame');
 	frame.tabIndex = -1;
@@ -119,23 +124,9 @@ export function start_Flight({ mount, coast, renderer, signal }) {
 		viewer.showModal();
 	}, { signal });
 	const effects = query('#camera-effects');
-	const modeInput = query('#flight-mode');
 	const filter = query('#input-filter');
-	const modeName = query('#osd-mode');
-	const manual = () => modeInput.value === 'acro';
-	modeInput.addEventListener('change', () => {
-		flightInputs.reset();
-		motion.heading = manual() ? launchHeading : 0;
-		acro.reset(motion.heading);
-		filter.disabled = !manual();
-		modeName.textContent = manual() ? 'ACRO' : copy.assistedOsd;
-		button.textContent = manual() ? copy.arm : copy.takeoff;
-		query('#flight-keys').textContent = manual() ? copy.acroKeys : copy.keys;
-		query('#flight-sticks').textContent = manual() ? copy.acroSticks : copy.joysticks;
-		query('#stick-left-label').textContent = manual() ? copy.throttleYaw : copy.attitude;
-		query('#stick-right-label').textContent = manual() ? copy.pitchRoll : copy.motion;
-		set_Status(manual() ? copy.waitingAcro : copy.waiting);
-	}, { signal });
+	const attemptText = query('#attempt-count');
+	attemptText.textContent = `${copy.attempts} · ${attempts}`;
 	const clock = query('#airtime');
 	let flightSeconds = 0;
 	const button = query('#flight-action');
@@ -151,17 +142,18 @@ export function start_Flight({ mount, coast, renderer, signal }) {
 	const stateText = query('#osd-state');
 	const throttleText = query('#throttle');
 	const markers = points.map(point => ({ point,
-		ring: add_Beacon(scene, point, point === base ? palette.mint : palette.lime, point === base ? landRadius : scanRadius),
+		ring: add_Beacon(scene, point, point === base ? palette.mint : palette.lime, point === base ? padRadius : scanRadius),
 		label: query(`#marker-${point.label}`),
 	}));
 	const scanned = new Set();
-	const motion = { x: base.x, z: base.z, height: .72, y: groundAt(base.x, base.z) + .72, heading: launchHeading, vx: 0, vz: 0 };
+	const motion = { x: base.x, z: base.z, height: .72, y: groundAt(base.x, base.z) + .72, heading: stabilized ? 0 : launchHeading, vx: 0, vz: 0 };
 	acro.reset(motion.heading);
 	let battery = 100;
 	let airborne = false;
 	let failed = false;
 	let landing = false;
 	let landed = false;
+	let resting = false;
 	let paused = false;
 	let errors = 0;
 	let feedback = 0;
@@ -169,11 +161,12 @@ export function start_Flight({ mount, coast, renderer, signal }) {
 	let telemetry = 0;
 	let videoLoss = 0;
 	let hasLifted = false;
+	let liftedThisHop = false;
 	const attitudeStick = bind_Joystick(query('#stick-move'), signal);
 	const throttleStick = bind_Joystick(query('#stick-view'), signal);
-	const flightInputs = bind_FlightInputs(attitudeStick, throttleStick, { action: perform_Action, toggleMap: toggle_Map, blocked: stage_OverlayOpen, signal });
-	button.textContent = copy.arm;
-	set_Status(copy.waitingAcro);
+	const flightInputs = bind_FlightInputs(attitudeStick, throttleStick, { action: perform_Action, toggleMap: toggle_Map, restart, blocked: stage_OverlayOpen, signal });
+	button.textContent = stabilized ? copy.takeoff : copy.arm;
+	set_Status(stabilized ? copy.waiting : copy.waitingAcro);
 
 	function distance(point) {
 		return Math.hypot(motion.x - point.x, motion.z - point.z);
@@ -214,16 +207,21 @@ export function start_Flight({ mount, coast, renderer, signal }) {
 	}
 
 	function perform_Action() {
-		if (failed || landing || landed || stage_OverlayOpen()) return;
+		if (stage_OverlayOpen()) return;
+		if (failed) return restart();
+		if (landing || landed) return;
 		if (!airborne) {
 			airborne = true;
-			if (manual()) acro.reset(motion.heading);
+			if (!resting) attempts = onLaunch();
+			resting = false;
+			liftedThisHop = false;
+			attemptText.textContent = `${copy.attempts} · ${attempts}`;
+			if (!stabilized) acro.reset(motion.heading);
 			else {
 				motion.height = 7;
 				hasLifted = true;
 				landButton.hidden = false;
 			}
-			modeInput.disabled = true;
 			button.textContent = copy.photo;
 			focus();
 			return;
@@ -236,21 +234,22 @@ export function start_Flight({ mount, coast, renderer, signal }) {
 			return;
 		}
 		capture_Sector(target);
+		sound.play('shutter');
 		scanned.add(target);
 		query(`#sector-${target.label}`).classList.add('captured');
 		query(`#marker-${target.label}`).hidden = true;
 		flash = .24;
 		show_Message(scanned.size === sectors.length ? copy.comeback : copy.next, 'success');
 		if (scanned.size === sectors.length) {
-			if (manual()) button.hidden = true;
+			if (!stabilized) button.hidden = true;
 			else button.textContent = copy.land;
 		}
 	}
 	function attempt_Landing() {
 		if (failed || landed || landing) return;
-		if (distance(base) > landRadius) return show_Message(copy.badLand, 'warn');
-		if (manual()) return show_Message(copy.manualLand);
-		if (motion.height > 4) return show_Message(copy.lower, 'warn');
+		if (distance(base) > padRadius) return show_Message(copy.badLand, 'warn');
+		if (!stabilized) return show_Message(copy.manualLand);
+		if (motion.height > profile.landHeight) return show_Message(copy.lower, 'warn');
 		landing = true;
 		button.disabled = true;
 		landButton.hidden = true;
@@ -269,26 +268,26 @@ export function start_Flight({ mount, coast, renderer, signal }) {
 		}
 	}, { once: true });
 	viewer.addEventListener('close', flightInputs.reset, { signal });
+	const can_TouchDown = (x, z) => liftedThisHop && on_Pad(x, z);
 	function update_Motion(delta) {
 		if (!airborne || failed) return;
 		const axes = flightInputs.axes();
-		if (manual()) {
+		if (!stabilized) {
 			for (const axis of Object.keys(axes)) axes[axis] = clampAxis(axes[axis]);
-			const impact = acro.update(delta, motion, axes, Number(filter.value), groundAt, limits);
-			battery = acro.power(delta, acro.throttle);
-			hasLifted ||= motion.height > 1.2;
+			const impact = acro.update(delta, motion, axes, Number(filter.value), groundAt, limits, can_TouchDown);
+			battery = acro.power(delta * profile.drain, acro.throttle);
+			liftedThisHop ||= motion.height > .77;
+			hasLifted ||= liftedThisHop;
 			const collision = touchesTree(motion.x, motion.y, motion.z);
-			const touchingDown = hasLifted && motion.height <= .721;
+			const touchingDown = liftedThisHop && motion.height <= .721;
 			const upright = 1 - 2 * (acro.attitude.x ** 2 + acro.attitude.z ** 2);
-			if (collision || impact > 5 || (touchingDown && upright < .72)) fail_Flight(copy.crash);
+			if (touchingDown && on_Pad(motion.x, motion.z)) finish_Flight();
+			else if (collision || impact > 5 || (touchingDown && upright < .72)) fail_Flight(copy.crash);
 			else if (battery === 0) fail_Flight(copy.emergency);
-			else if (touchingDown && distance(base) < 3.25) {
-				finish_Flight();
-			}
 			return;
 		}
 		motion.heading -= THREE.MathUtils.clamp(axes.yaw, -1, 1) * delta * 1.48;
-		motion.height = THREE.MathUtils.clamp(motion.height + axes.y * delta * 8.6, 1.4, 27);
+		motion.height = THREE.MathUtils.clamp(motion.height + axes.y * delta * 8.6, .72, 27);
 		const length = Math.max(1, Math.hypot(axes.x, axes.z));
 		const sine = Math.sin(motion.heading);
 		const cosine = Math.cos(motion.heading);
@@ -297,27 +296,42 @@ export function start_Flight({ mount, coast, renderer, signal }) {
 		motion.vz = THREE.MathUtils.lerp(motion.vz, (-axes.x * sine + axes.z * cosine) * 15 / length, blend);
 		motion.x = THREE.MathUtils.clamp(motion.x + motion.vx * delta, limits.minX, limits.maxX);
 		motion.z = THREE.MathUtils.clamp(motion.z + motion.vz * delta, limits.minZ, limits.maxZ);
-		battery = acro.power(delta, .61 + .09 * Math.hypot(motion.vx, motion.vz) / 15);
-		if (touchesTree(motion.x, groundAt(motion.x, motion.z) + motion.height, motion.z)) fail_Flight(copy.crash);
+		battery = acro.power(delta * profile.drain, .61 + .09 * Math.hypot(motion.vx, motion.vz) / 15);
+		if (motion.height <= .721 && on_Pad(motion.x, motion.z)) finish_Flight();
+		else if (touchesTree(motion.x, groundAt(motion.x, motion.z) + motion.height, motion.z)) fail_Flight(copy.crash);
 		else if (battery === 0) fail_Flight(copy.emergency);
 	}
 	function fail_Flight(message) {
 		failed = true;
 		motion.vx = motion.vz = 0;
-		flightControls.hidden = landButton.hidden = true;
+		flightControls.classList.add('retry-flight');
+		button.hidden = false;
+		landButton.hidden = true;
+		button.textContent = copy.retry;
+		button.disabled = false;
+		sound.play('impact');
 		frame.classList.add('signal-lost');
 		set_Status(message, 'warn');
 	}
 	function finish_Flight() {
 		landing = airborne = false;
-		landed = true;
-		flightControls.hidden = landButton.hidden = true;
+		landed = scanned.size === sectors.length;
+		resting = !landed;
+		motion.height = .72;
+		acro.reset(motion.heading);
+		sound.play('land');
+		flightControls.hidden = landed;
+		landButton.hidden = true;
+		button.disabled = false;
+		button.textContent = stabilized ? copy.takeoff : copy.arm;
 		motion.vx = motion.vz = 0;
-		set_Status(copy.landed, 'success');
+		set_Status(landed ? copy.landed : stabilized ? copy.padRestAssisted : copy.padRest, 'success');
+		if (landed) show_CompletePrompt(copy.completeNotice);
 	}
 
 	return { scene, camera, focus,
-		score: () => Math.max(0, scanned.size * 25 + (hasLifted ? 10 : 0) + (landed ? 15 : 0) - errors * 5 - (failed ? 10 : 0)),
+		score: () => Math.max(0, scanned.size * 25 + (hasLifted ? 10 : 0) + (landed ? 15 : 0) - errors * 5 - (failed ? 10 : 0) - retryPenalty * Math.max(0, attempts - 1)),
+		summary: () => `${copy.attempts} · ${attempts} · ${copy.summarySectors} ${scanned.size} / ${sectors.length}`,
 		render(time) {
 			const effect = Number(effects.value);
 			if (failed) video.render(scene, camera, reduceMotion.matches ? 0 : time, 1, 1, true);
@@ -355,7 +369,7 @@ export function start_Flight({ mount, coast, renderer, signal }) {
 			const backX = Math.sin(heading);
 			const backZ = Math.cos(heading);
 			camera.position.set(x, y + .20, z);
-			if (manual()) {
+			if (!stabilized) {
 				camera.quaternion.copy(acro.attitude);
 				camera.rotateX(THREE.MathUtils.degToRad(fpvKit.cameraTilt));
 				if (!reduceMotion.matches && airborne && !failed && Number(effects.value)) camera.rotateX(Math.sin(time * 97) * acro.throttle * .002);
@@ -364,7 +378,9 @@ export function start_Flight({ mount, coast, renderer, signal }) {
 				if (!reduceMotion.matches) camera.rotateZ(-(motion.vx * backZ - motion.vz * backX) * .009);
 			}
 			const course = Math.round((360 - THREE.MathUtils.radToDeg(heading) % 360) % 360) % 360;
-			videoLoss = THREE.MathUtils.smoothstep(Math.hypot(distance(base), height), 30, 205);
+			videoLoss = THREE.MathUtils.smoothstep(Math.hypot(distance(base), height), ...profile.videoRange);
+			sound.flight({ running: airborne && !failed, throttle: stabilized ? .48 + Math.hypot(motion.vx, motion.vz) * .014 : acro.throttle,
+				speed: Math.hypot(motion.vx, motion.vz), loss: failed ? 1 : videoLoss, paused });
 			camera.updateMatrixWorld();
 			fieldDrone.drone.visible = false;
 			fieldDrone.drone.scale.setScalar(.18);
@@ -373,7 +389,7 @@ export function start_Flight({ mount, coast, renderer, signal }) {
 			if (airborne && !failed) for (const propeller of fieldDrone.propellers) propeller.rotation.y += delta * 19;
 			for (const marker of markers) {
 				const { point, label, ring } = marker;
-				ring.visible = !manual() && !scanned.has(point);
+				ring.visible = profile.markers && !scanned.has(point);
 				label.hidden = !ring.visible;
 				if (label.hidden) continue;
 				trackedPosition.set(point.x, ring.position.y + 1.7, point.z).project(camera);
@@ -397,16 +413,16 @@ export function start_Flight({ mount, coast, renderer, signal }) {
 				speedText.textContent = `${Math.round(Math.hypot(motion.vx, motion.vz) * 3.6)} km/h`;
 				batteryText.textContent = `${acro.voltage.toFixed(1)} V`;
 				usedText.textContent = `${Math.round(acro.used)} mAh`;
-				throttleText.textContent = manual() ? `THR ${Math.round((airborne && !failed ? acro.throttle : 0) * 100)}%` : '';
+				throttleText.textContent = !stabilized ? `THR ${Math.round((airborne && !failed ? acro.throttle : 0) * 100)}%` : '';
 				batteryText.dataset.low = battery <= 22;
-				stateText.textContent = failed ? copy.osdFail : landed ? copy.osdLanded : !airborne ? copy.osdSafe : battery <= 22 ? copy.osdLow : manual() && !hasLifted ? copy.osdArmed : '';
+				stateText.textContent = failed ? copy.osdFail : landed ? copy.osdLanded : !airborne ? copy.osdSafe : battery <= 22 ? copy.osdLow : !stabilized && !hasLifted ? copy.osdArmed : '';
 			}
 			flash = Math.max(0, flash - delta);
 			frame.classList.toggle('photo-flash', flash > 0 && !reduceMotion.matches);
 			feedback -= delta;
 			if (!airborne || failed || landing || feedback > 0) return;
-			if (manual() && !hasLifted) set_Status(copy.liftAcro);
-			else if (scanned.size === sectors.length) set_Status(distance(base) <= landRadius ? (manual() ? copy.manualLand : height <= 4 ? copy.landNow : copy.lower) : copy.comeback);
+			if (!stabilized && !hasLifted) set_Status(copy.liftAcro);
+			else if (scanned.size === sectors.length) set_Status(distance(base) <= padRadius ? (!stabilized ? copy.manualLand : height <= profile.landHeight ? copy.landNow : copy.lower) : copy.comeback);
 			else if (battery <= 22) set_Status(copy.low, 'warn');
 			else if (target_InRange()) set_Status(height >= 3 && height <= 12 ? copy.canScan : copy.near, 'success');
 			else set_Status(copy.searching);
