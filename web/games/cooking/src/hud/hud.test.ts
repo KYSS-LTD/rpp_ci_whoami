@@ -9,7 +9,7 @@ import { controlsTexts, hudTexts } from "../texts";
 import { HUD_EDGE_PADDING_PX } from "./constants";
 import { createHud } from "./index";
 import { createOrdersPanel } from "./orders";
-import { computeHudMetrics, getTouchControlsReservePx, type HudEnvironment } from "./ordersLayout";
+import type { HudEnvironment } from "./ordersLayout";
 import { createResultReporter } from "./reporter";
 
 const level = getLevelConfig("easy");
@@ -542,14 +542,14 @@ describe("раскладка (7.7)", () => {
 		expect(zones.every((zone) => zone.startsWith("top-"))).toBe(true);
 	});
 
-	it("смена режима ввода и размера окна пересчитывает раскладку: на широком экране три стола полным видом, на телефоне компактным", () => {
+	it("смена режима ввода и размера окна переключает карточки столов и сводку по блюдам", () => {
 		setWindowSize(1280, 800);
 		const { root, hud } = setupHud("keyboard");
-		hud.update(createSnapshot({ tables: createSixTables([2, 1, 2]) }), 0);
+		hud.update(createSnapshot({ tables: createSixTables([2]) }), 0);
 		const orders = root.querySelector<HTMLElement>(".hud-orders");
 		expect(orders?.getAttribute("data-density")).toBe("full");
 		setWindowSize(844, 390);
-		expect(orders?.getAttribute("data-density")).toBe("compact");
+		expect(orders?.getAttribute("data-view")).toBe("dishes");
 		expect(root.querySelector(".cooking-hud")?.getAttribute("data-screen")).toBe("low");
 		hud.setInputMode("touch");
 		expect(root.querySelector(".cooking-hud")?.getAttribute("data-input-mode")).toBe("touch");
@@ -587,7 +587,7 @@ function createSixTables(orderCounts: readonly number[]): TableSnapshot[] {
 	});
 }
 
-describe("карточки заказов на телефоне: все столы видны, ничего не обрезается (дефект H1)", () => {
+describe("сводка заказов на телефоне", () => {
 	const phoneSizes: Array<[number, number]> = [
 		[844, 390],
 		[667, 375],
@@ -609,60 +609,43 @@ describe("карточки заказов на телефоне: все стол
 			["два стола на четыре места и четыре на два (hard)", [4, 4, 2, 2, 2, 2]],
 			["шесть столов по четыре заказа", [4, 4, 4, 4, 4, 4]],
 			["шесть столов по два заказа", [2, 2, 2, 2, 2, 2]],
-		])("%s: все шесть карточек в DOM, внутри блока, а блок внутри своей зоны", (_label, orderCounts) => {
+		])("%s: сводка учитывает все ожидающие блюда", (_label, orderCounts) => {
 			const panel = createOrdersPanel({}, () => environment);
 			document.body.append(panel.element);
-			panel.update(createSnapshot({ tables: createSixTables(orderCounts) }), 0);
+			const tables = createSixTables(orderCounts);
+			panel.update(createSnapshot({ tables }), 0);
 
-			// Все шесть карточек есть в DOM, ни одна не скрыта, число строк заказов совпадает со снимком.
-			const cards = Array.from(panel.element.querySelectorAll<HTMLElement>(".hud-card"));
-			expect(cards).toHaveLength(6);
-			expect(cards.every((card) => !card.hidden && card.isConnected)).toBe(true);
-			const shownCounts = cards.map((card) => card.querySelectorAll(".hud-order").length).sort();
-			expect(shownCounts).toEqual([...orderCounts].sort());
-
-			// План: компактный вид, всё помещается.
-			const plan = panel.getPlan();
-			expect(plan).not.toBeNull();
-			expect(plan?.fits).toBe(true);
-			expect(panel.element.getAttribute("data-density")).toBe("compact");
+			const orders = tables.flatMap((table) => table.orders.filter((order) => order.status === "waiting"));
+			expect(panel.getView()).toBe("dishes");
 			expect(panel.element.getAttribute("data-fits")).toBe("true");
-			expect(Number(panel.element.style.getPropertyValue("--hud-orders-rows")) * Number(panel.element.style.getPropertyValue("--hud-orders-columns"))).toBeGreaterThanOrEqual(6);
-
-			// Каждая карточка внутри блока, блок внутри зоны справа от таймера и выше экранных кнопок (проверка по расчётным размерам).
-			const metrics = computeHudMetrics(environment);
-			expect(plan?.placements).toHaveLength(6);
-			for (const placement of plan?.placements ?? []) {
-				expect(placement.xPx + placement.widthPx).toBeLessThanOrEqual((plan?.widthPx ?? 0) + 1e-6);
-				expect(placement.yPx + placement.heightPx).toBeLessThanOrEqual((plan?.heightPx ?? 0) + 1e-6);
+			const tiles = [...panel.element.querySelectorAll<HTMLElement>(".hud-dish")];
+			expect(tiles.map((tile) => tile.dataset.dish).sort()).toEqual([...new Set(orders.map((order) => order.dish))].sort());
+			for (const tile of tiles) {
+				const dish = tile.dataset.dish as DishId;
+				const count = orders.filter((order) => order.dish === dish).length;
+				expect(tile.textContent).toContain(String(count));
+				expect(tile.getAttribute("aria-label")).toBe(hudTexts.orders.dishCountLabel(hudTexts.dishNames[dish], count));
 			}
-			expect(plan?.widthPx ?? Infinity).toBeLessThanOrEqual(metrics.zoneWidthPx + 1e-6);
-			expect((plan?.heightPx ?? Infinity) + environment.paddingTopPx).toBeLessThanOrEqual(height - getTouchControlsReservePx(width, height) + 1e-6);
-			// Блок прижат к правому краю и не заходит в центральный блок с таймером.
-			expect(width - environment.paddingRightPx - (plan?.widthPx ?? 0)).toBeGreaterThanOrEqual(width / 2 + metrics.centerWidthPx / 2 - 1e-6);
 			panel.dispose();
 		});
 	});
 
-	it("HUD целиком: на 844 x 390 шесть столов видны, названия блюд и слово 'Стол' остаются в DOM для вспомогательных технологий", () => {
+	it("в портретной ориентации предлагает повернуть телефон до начала смены", () => {
+		setWindowSize(390, 794);
+		const { root, hud, callbacks } = setupHud("touch");
+		hud.update(createSnapshot({ phase: "ready" }), 0);
+		const dialog = getDialog(root, "orientation");
+		expect(dialog.hasAttribute("open")).toBe(true);
+		expect(callbacks.onStartPressed).not.toHaveBeenCalled();
 		setWindowSize(844, 390);
-		const { root, hud } = setupHud("touch");
-		hud.update(createSnapshot({ tables: createSixTables([4, 4, 2, 2, 2, 2]) }), 0);
-		const orders = root.querySelector<HTMLElement>(".hud-orders");
-		expect(orders?.getAttribute("data-density")).toBe("compact");
-		const cards = root.querySelectorAll(".hud-card");
-		expect(cards).toHaveLength(6);
-		for (const card of Array.from(cards)) {
-			expect(card.querySelector(".hud-card__title")?.textContent).toMatch(/^Стол \d$/);
-			card.querySelectorAll(".hud-order").forEach((row) => {
-				expect(row.querySelector(".hud-order__name")?.textContent?.length).toBeGreaterThan(2);
-				expect(row.querySelector("progress")?.getAttribute("aria-label")).toBeTruthy();
-			});
-		}
+		expect(dialog.hasAttribute("open")).toBe(false);
+		setWindowSize(390, 794);
+		dialog.querySelector("button")?.click();
+		expect(dialog.hasAttribute("open")).toBe(false);
 	});
 
 	it("стиль: блок карточек не скрывает переполнение и не обрезает колонки", async () => {
-		const css = await import("node:fs").then((fs) => fs.readFileSync(`${process.cwd()}/game-src/cooking/src/hud/hud.css`, "utf8"));
+		const css = await import("node:fs").then((fs) => fs.readFileSync(`${process.cwd()}/games/cooking/src/hud/hud.css`, "utf8"));
 		const ordersRule = css.slice(css.indexOf(".hud-orders {"), css.indexOf("}", css.indexOf(".hud-orders {")));
 		expect(ordersRule).not.toMatch(/overflow\s*:\s*(hidden|clip|auto|scroll)/);
 		expect(ordersRule).not.toContain("max-block-size");

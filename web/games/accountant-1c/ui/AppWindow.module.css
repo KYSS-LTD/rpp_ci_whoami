@@ -1,34 +1,6 @@
 /* Монитор с учётной программой (design.md, D5). Палитра окна жёлто-красная и всегда светлая,
    переменные --acc-* заданы на окне и не зависят от темы портала. Логотипа и фирменных иконок нет. */
 
-.monitor {
-	position: relative;
-	display: flex;
-	flex-direction: column;
-	min-width: 0;
-	min-height: 0;
-	padding: 10px 10px 18px;
-	background: linear-gradient(#3a3532, #2a2623);
-	border: 2px solid #15120f;
-	border-radius: 10px;
-	box-shadow:
-		inset 0 0 0 2px #4a4440,
-		0 10px 0 -4px #15120f;
-}
-
-.monitorStand {
-	position: absolute;
-	bottom: 4px;
-	left: 50%;
-	width: 18px;
-	height: 6px;
-	background: #6ad16a;
-	border: 1px solid #1d3d1d;
-	border-radius: 2px;
-	box-shadow: 0 0 6px #6ad16a;
-	transform: translateX(-50%);
-}
-
 .window {
 	/* Палитра программы */
 	--acc-bg: #fffdf6;
@@ -50,20 +22,25 @@
 	--acc-radius: 4px;
 
 	color-scheme: light;
-	position: relative;
+	position: absolute;
+	inset: 0;
+	z-index: 10;
 	display: flex;
 	flex: 1;
 	flex-direction: column;
 	min-height: 0;
 	overflow: hidden;
 	font-family: "Segoe UI", Tahoma, Arial, sans-serif;
-	font-size: 0.86rem;
+	font-size: 0.95rem;
 	line-height: 1.35;
 	color: var(--acc-text);
 	background: var(--acc-bg);
 	border: 1px solid #15120f;
 	border-radius: 3px;
+	transform-origin: top left;
 }
+
+.window[data-open="false"] { visibility: hidden; pointer-events: none; }
 
 .window h2,
 .window h3 {
@@ -138,6 +115,17 @@
 .window .menuToggle {
 	display: none;
 }
+
+.window .closeWindow {
+	min-inline-size: 44px;
+	min-block-size: 44px;
+	color: #fffdf6;
+	background: var(--acc-accent);
+	border-color: #8e0b1f;
+	font-size: 1.25rem;
+}
+
+.window .closeWindow:hover { background: #ac1229; }
 
 /* ---------- Тело программы ---------- */
 
@@ -225,6 +213,7 @@
 	min-height: 0;
 	padding: 8px 12px;
 	overflow: auto;
+	overscroll-behavior: contain;
 }
 
 /* ---------- Сообщения ---------- */
@@ -278,13 +267,12 @@
 
 .notifications {
 	position: absolute;
-	right: 8px;
-	bottom: 8px;
+	inset: 3.75rem 12px auto auto;
 	z-index: 40;
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
-	width: min(300px, calc(100% - 16px));
+	width: min(21rem, 36%);
 	pointer-events: none;
 }
 
@@ -296,28 +284,20 @@
 	display: flex;
 	gap: 8px;
 	align-items: flex-start;
-	padding: 8px;
-	background: #fffbe6;
-	border: 1px solid var(--acc-border);
-	border-left: 4px solid var(--acc-accent);
-	border-radius: 4px;
-	box-shadow: 0 6px 18px rgb(0 0 0 / 0.25);
-	pointer-events: auto;
-	animation: toastIn 0.3s steps(4);
+	padding: 4px;
+	color: #fffdf6;
+	font-family: var(--acc-font-paper, monospace);
+	text-shadow: 0 1px 3px #241a13, 0 0 4px #241a13, 1px 1px #241a13;
+}
+
+.toast:nth-last-child(n + 3) { display: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+	.toast { animation: toastIn 0.25s ease-out; }
 }
 
 @keyframes toastIn {
-	from {
-		opacity: 0;
-		transform: translateY(16px);
-	}
-}
-
-.window .toastAvatar {
-	flex: none;
-	width: 32px;
-	height: 36px;
-	animation: none;
+	from { opacity: 0; transform: translateX(12px); }
 }
 
 .toastBody {
@@ -328,12 +308,16 @@
 .toastAuthor {
 	font-size: 0.72rem;
 	font-weight: 700;
-	color: var(--acc-accent);
+	color: #fff0ad;
 }
 
-.window .toastClose {
-	min-height: 22px;
-	padding: 0 6px;
+.notifications .toastClose {
+	min-inline-size: 44px;
+	min-block-size: 44px;
+	padding: 0;
+	color: inherit;
+	text-shadow: inherit;
+	pointer-events: auto;
 	font-size: 1rem;
 	line-height: 1;
 	background: transparent;
@@ -343,18 +327,15 @@
 /* ---------- Узкий монитор: разделы в меню, сообщения шторкой ---------- */
 
 @media (max-width: 720px) {
-	.monitor {
-		padding: 6px 6px 14px;
-	}
-
 	.window .menuToggle {
 		display: inline-flex;
-		min-height: 24px;
+		min-height: 44px;
 		background: rgb(255 255 255 / 0.5);
 	}
 
 	.body {
 		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: auto minmax(0, 1fr);
 	}
 
 	.sections {
@@ -375,6 +356,12 @@
 	.section[aria-current="page"] {
 		box-shadow: inset 0 -3px 0 var(--acc-accent);
 	}
+
+	.workspace { grid-row: 2; }
+
+	.form button, .form input, .form select, .window .messagesToggle { min-block-size: 44px; }
+
+	.notifications { width: min(16rem, 58%); }
 
 	.form {
 		max-height: none;
@@ -416,10 +403,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.toast {
-		animation: none;
-	}
-
 	.messages .messageList {
 		transition: none;
 	}

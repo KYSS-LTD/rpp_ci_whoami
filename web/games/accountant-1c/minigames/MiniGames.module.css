@@ -741,12 +741,18 @@
 
 /* ---------- Узкие экраны ---------- */
 
-@container (max-width: 760px) {
+@container (max-width: 1120px) {
 	.stampTray {
 		position: relative;
 		left: auto;
 		width: 100%;
-		order: 10;
+		grid-column: 1 / -1;
+	}
+}
+
+@container (max-width: 760px) {
+	.documentCard, .flagButton, .paperButton, .stampFace {
+		min-block-size: 44px;
 	}
 
 	.stampRow {

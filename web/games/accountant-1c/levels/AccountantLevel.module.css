@@ -1,11 +1,17 @@
 /* Уровень: заголовок над рабочим местом, утренняя газета, письмо, перерыв на чай. */
 
 .level {
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
-	margin: 0 auto;
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+	block-size: 100dvh;
+	padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+	background: #2f241e;
 }
+
+.level > div { block-size: 100%; }
+
+:global(html):has(.level) { overflow: hidden; }
 
 /* Название уровня видно на полосе дня, заголовок остаётся для экранных дикторов и не занимает место на экране. */
 .levelTitle {
@@ -27,6 +33,12 @@
 .monitorHeading {
 	font-weight: 700;
 	color: var(--acc-accent);
+}
+
+.finalReport { max-block-size: calc(100% - 24px); overflow: auto; }
+
+@media (max-width: 1120px) {
+	.finalReport { grid-column: 1 / -1; max-block-size: none; overflow: visible; }
 }
 
 .taskList {

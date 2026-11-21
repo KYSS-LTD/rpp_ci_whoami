@@ -64,8 +64,12 @@ h1, h2, p { margin: 0; }
 .dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .5rem; }
 .mission-view dialog:modal { overscroll-behavior: contain; }
 .mission-view dialog::backdrop { background: #070c09b5; overflow: hidden; overscroll-behavior: contain; }
-.stage-status { position: absolute; z-index: 4; inset: calc(var(--edge-top) + 6.8rem) auto auto 50%; transform: translateX(-50%); inline-size: max-content; max-inline-size: min(88%, 42rem); padding: .55rem .85rem; background: #122019ed; border: 1px solid #506855; border-radius: 7px; color: #e4ece2; font: 500 clamp(.74rem, 1.5vw, .88rem)/1.4 var(--mono); text-align: center; opacity: 0; pointer-events: none; }
+.stage-status { position: absolute; z-index: 4; inset: calc(var(--edge-top) + 3.4rem) auto auto var(--edge-left); inline-size: max-content; max-inline-size: min(36%, 28rem); color: #f6f7ef; font: 500 clamp(.68rem, 1.5vw, .88rem)/1.4 var(--mono); text-shadow: 0 1px 3px #101411, 0 0 4px #101411; opacity: 0; pointer-events: none; }
 .stage-status[data-visible="true"] { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+	.stage-status { translate: -.35rem 0; transition: opacity .2s ease, translate .2s ease; }
+	.stage-status[data-visible="true"] { translate: 0 0; }
+}
 .scene-actions { position: absolute; inset: auto var(--edge-right) var(--edge-bottom) var(--edge-left); display: flex; justify-content: center; pointer-events: none; }
 .scene-actions button { pointer-events: auto; }
 .survey-view .scene-frame { background: #151d19; }
@@ -108,14 +112,14 @@ h1, h2, p { margin: 0; }
 .fpv-bottom { bottom: 0; align-items: end; }
 .fpv-right { text-align: end; white-space: pre; }
 .fpv-center { text-align: center; }
-.fpv-message { position: absolute; inset-inline: 0; top: 59%; text-align: center; }
+.fpv-message { position: absolute; inset-inline: auto 0; top: 27%; max-inline-size: 36%; text-align: end; }
 .fpv-reticle { position: absolute; inset: 50% auto auto 50%; width: 1.56rem; height: .55rem; transform: translate(-50%, -50%); }
 .fpv-reticle::before, .fpv-reticle::after { content: ''; position: absolute; top: 50%; height: 1px; width: .51rem; background: currentColor; box-shadow: 0 1px #18201c; }
 .fpv-reticle::before { left: 0; }
 .fpv-reticle::after { right: 0; }
 #battery[data-low="true"], #osd-state { color: #fff0b2; }
 .signal-lost .fpv-reticle, .signal-lost #waypoints { display: none; }
-.signal-lost #osd-state { inset: 50% auto auto 50%; transform: translate(-50%, -50%); background: #132019ed; border: 1px solid #9caa94; padding: .6rem .85rem; font-size: clamp(.9rem, 2.8vw, 1.6rem); white-space: nowrap; }
+[data-camera="chase"] .fpv-reticle { display: none; }
 .fpv-controls { display: grid; gap: .45rem; }
 .fpv-controls label { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.03fr); gap: .32rem; align-items: center; color: var(--muted); font: 500 .75rem var(--mono); }
 .fpv-controls select { font: inherit; min-inline-size: 0; min-block-size: 2.15rem; color: var(--paper); padding-inline: .35rem; background: #17231e; border: 1px solid #4d6356; border-radius: 4px; }
@@ -136,7 +140,7 @@ h1, h2, p { margin: 0; }
 #flight-action { grid-column: 2; grid-row: 1; pointer-events: auto; }
 .joystick-group { display: grid; grid-row: 1; justify-items: center; gap: .24rem; text-align: center; color: #f1f4eb; text-shadow: 1px 1px #121812; font-size: .72rem; }
 .joystick-group:first-child { grid-column: 1; justify-self: start; }
-.joystick-group:last-child { grid-column: 3; justify-self: end; }
+.joystick-group:has(#stick-move) { grid-column: 3; justify-self: end; }
 .joystick { display: grid; place-items: center; inline-size: clamp(66px, 14vw, 91px); aspect-ratio: 1; border: 1px solid #526952; border-radius: 50%; background: radial-gradient(circle, #334638 0 7%, #28392d 8% 36%, #354b3a 37% 38%, #233127 39% 68%, #344c37 69% 71%, #25352a 72%); touch-action: none; -webkit-user-select: none; user-select: none; cursor: grab; }
 .joystick:active { cursor: grabbing; }
 .joystick i { display: block; inline-size: 41%; aspect-ratio: 1; border-radius: 50%; background: #829f65; border: 1px solid #b5d592; box-shadow: 0 3px 8px #0b150f9c; pointer-events: none; }
@@ -201,19 +205,19 @@ h1, h2, p { margin: 0; }
 .difficulty-option small, .difficulty-note, .card-level { font-size: .75rem; color: #c3cfc0; }
 .difficulty-note { margin-top: .5rem; }
 .assembly-step, .photo-badge, .complete-prompt, .next-photo { position: absolute; z-index: 3; margin: 0; padding: .55rem .85rem; border: 1px solid #536850; border-radius: 8px; background: #152019f2; color: var(--paper); font: 500 .83rem/1.4 var(--mono); }
-.assembly-step { bottom: var(--edge-bottom); left: 50%; transform: translateX(-50%); width: max-content; max-width: 92%; pointer-events: none; text-align: center; }
+.assembly-step { bottom: var(--edge-bottom); left: var(--edge-left); width: max-content; max-width: 50%; padding: 0; border: 0; background: transparent; text-shadow: 0 1px 3px #101411, 0 0 4px #101411; pointer-events: none; }
 .photo-badge { top: var(--edge-top); left: var(--edge-left); pointer-events: none; }
 .complete-prompt, .next-photo { bottom: var(--edge-bottom); left: 50%; transform: translateX(-50%); width: max-content; max-width: 94%; display: flex; gap: .7rem; align-items: center; }
 .complete-prompt { z-index: 5; }
-.flight-complete-notice { pointer-events: none; text-align: center; }
+.flight-complete-notice { left: var(--edge-left); max-inline-size: min(36%, 28rem); transform: none; padding: 0; border: 0; background: transparent; text-shadow: 0 1px 3px #101411, 0 0 4px #101411; pointer-events: none; }
 .flight-complete-notice:empty { opacity: 0; }
 .photo-legend .object-tire { background: radial-gradient(circle, transparent 27%, #839085 29%, #46534c 53%, #909c91 65%, transparent 67%); }
 .flight-controls.retry-flight { display: grid; }
 .retry-flight .joystick-group { visibility: hidden; }
 #mute[aria-pressed="true"] { color: var(--accent); border-color: currentColor; }
 
-.camera-boot { position: absolute; inset: 0; z-index: 3; display: grid; align-items: start; justify-items: center; padding-top: 23vh; pointer-events: none; overflow: hidden; }
-.camera-boot span { position: relative; padding: .3em .65em; background: #112119db; color: #d3f7db; font: 500 clamp(.9rem, 2.3vw, 1.65rem)/1.25 var(--mono); letter-spacing: .12em; text-shadow: -1px 0 #52aab4, 1px 0 #c88eaa; }
+.camera-boot { position: absolute; inset: 0; z-index: 3; display: grid; align-items: start; justify-items: start; padding: 52dvh var(--edge-left) 0; pointer-events: none; overflow: hidden; }
+.camera-boot span { position: relative; color: #f6f7ef; font: 500 clamp(.74rem, 1.65vw, 1.1rem)/1.25 var(--mono); text-shadow: 0 1px 3px #101411, 0 0 4px #101411; }
 @media (prefers-reduced-motion: no-preference) {
 	.camera-boot::before { content: ''; position: absolute; inset: 0; background: linear-gradient(#10201dd9, #13202133 64%, #b8dcc473 98%, transparent); animation: camera-sync .65s ease-out both; }
 	.camera-boot span { animation: camera-lock 1.45s ease-out both; }
@@ -291,11 +295,7 @@ h1, h2, p { margin: 0; }
 .flight-view .osd-button:is(:hover, [aria-expanded="true"]) span { background: #23382e; border-color: currentColor; }
 .flight-view #flight-action span { color: #efffbd; border-color: #e0efab; }
 .flight-view.flight-resetting :is(.stage-menu-button, .flight-controls-mini, .flight-controls, .complete-prompt) { visibility: hidden; }
-.flight-view .stage-status {
-	inset-block-start: calc(var(--edge-top) + 6.8rem);
-	padding: .3rem .55rem; border: 0; border-inline-start: 2px solid currentColor; border-radius: 0;
-	background: #0e1814d9; color: #e5f4e6; text-align: start;
-}
+.flight-view .stage-status { inset-block-start: calc(var(--edge-top) + 8.3rem); }
 .flight-view .stage-status[data-state="warn"] { color: #ffbf85; }
 .flight-view .stage-status[data-state="success"] { color: #e7ffba; }
 #stage-status-prefix { margin-inline-end: .6em; padding-inline-end: .55em; border-inline-end: 1px solid currentColor; }
@@ -319,6 +319,8 @@ h1, h2, p { margin: 0; }
 .flight-fov input:focus-visible { outline: 2px solid #d8ff69; outline-offset: 2px; }
 .flight-menu-toggle { display: flex !important; gap: .5rem; align-items: center; min-height: 44px; }
 .flight-menu-toggle input { width: 1.15rem; height: 1.15rem; flex: none; accent-color: var(--accent); }
+.fpv-controls .camera-tilt-help { display: block; }
+.flight-menu-toggle.touch-setting, .touch-flight-zone { display: none !important; }
 .flight-bindings summary { cursor: pointer; min-height: 44px; padding-block: .65rem; }
 .flight-bindings select { min-height: 44px; }
 .flight-bindings .button { margin-top: .5rem; }
@@ -330,14 +332,23 @@ h1, h2, p { margin: 0; }
 	.stage-dialog .lesson-video { max-block-size: 27dvh; }
 }
 @media (any-pointer: coarse) {
-	.flight-controls .joystick-group { visibility: visible; }
-	.flight-controls .joystick { pointer-events: auto; }
-	.flight-controls.retry-flight .joystick-group { visibility: hidden; }
-	.fpv-osd { inset-block-end: calc(var(--edge-bottom) + clamp(5.25rem, 16vw, 7.25rem)); }
-	.flight-view:has(.flight-controls:not([hidden])) .complete-prompt { bottom: calc(var(--edge-bottom) + 6rem); }
+	.flight-menu-toggle.touch-setting { display: flex !important; }
+	.flight-controls { inset-block-start: 44%; align-items: end; }
+	.flight-controls[data-sticks="visible"]:not(.retry-flight) .joystick-group { visibility: visible; }
+	.flight-controls[data-sticks="visible"] .joystick { pointer-events: auto; }
+	.flight-controls[data-sticks="floating"]:not(.retry-flight) .touch-flight-zone { display: block !important; }
+	.touch-flight-zone { position: absolute; inset-block: 0; inline-size: 44%; touch-action: none; pointer-events: auto; }
+	#touch-left { inset-inline-start: 0; }
+	#touch-right { inset-inline-end: 0; }
+	.touch-flight-zone[data-active]::after {
+		content: ''; position: absolute; inset: var(--touch-y) auto auto var(--touch-x); translate: -50% -50%;
+		inline-size: 1.1rem; aspect-ratio: 1; border: 1px solid #e0efe7a6; border-radius: 50%;
+	}
+	.fpv-osd { inset-block-end: calc(var(--edge-bottom) + 3rem); }
+	.flight-view:has(.flight-controls[data-sticks="visible"]) .fpv-osd { inset-block-end: calc(var(--edge-bottom) + clamp(5.25rem, 16vw, 7.25rem)); }
 }
 @media (max-height: 440px) {
-	.flight-view .stage-status { inset-block-start: calc(var(--edge-top) + 5.55rem); }
+	.flight-view .stage-status { inset-block-start: calc(var(--edge-top) + 7rem); }
 	#damage-osd { inline-size: 5.2rem; }
 }
 .stick-indicators {

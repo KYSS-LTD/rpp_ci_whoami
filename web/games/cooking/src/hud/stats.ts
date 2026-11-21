@@ -10,6 +10,7 @@ import { createElement, formatTimer, setAttribute, setCssVariable, setFlag, setT
 export interface StatsBar {
 	// Центральная зона: таймер, "X из N", очки, баннер, подсказка.
 	readonly centerElement: HTMLElement;
+	readonly noticesElement: HTMLElement;
 	// Правая зона: очередь на улице (кнопку паузы добавляет сам HUD).
 	readonly queueElement: HTMLElement;
 	update(snapshot: GameSnapshot): void;
@@ -38,7 +39,9 @@ export function createStatsBar(level: LevelConfig): StatsBar {
 	// Баннер и подсказка: живые области, текст появляется и исчезает, пустая область скрыта стилем (:empty).
 	const banner = createElement("p", { className: "hud-banner", attributes: { role: "status" } });
 	const hint = createElement("p", { className: "hud-hint", attributes: { role: "status" } });
-	centerElement.append(timer, counters, banner, hint);
+	const noticesElement = createElement("div", { className: "hud-notices" });
+	noticesElement.append(banner, hint);
+	centerElement.append(timer, counters);
 
 	// Очередь.
 	const queueElement = createElement("section", { className: "hud-queue" });
@@ -49,6 +52,7 @@ export function createStatsBar(level: LevelConfig): StatsBar {
 
 	return {
 		centerElement,
+		noticesElement,
 		queueElement,
 		update(snapshot) {
 			setText(timer, formatTimer(snapshot.timeLeftSec));
@@ -82,6 +86,7 @@ export function createStatsBar(level: LevelConfig): StatsBar {
 		},
 		dispose() {
 			centerElement.remove();
+			noticesElement.remove();
 			queueElement.remove();
 		},
 	};

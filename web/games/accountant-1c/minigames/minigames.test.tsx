@@ -44,6 +44,16 @@ function byAttribute(attribute: string, value: string): HTMLElement {
 
 const target = (id: string) => byAttribute("data-tutorial-id", id);
 const acknowledge = () => fireEvent.click(screen.getByRole("button", { name: tutorialTexts.next }));
+function openProgram() {
+	if (screen.getByTestId("accounting-window").dataset.open === "false") {
+		fireEvent.click(screen.getByRole("button", { name: accountantTexts.window.open }));
+	}
+}
+
+function minimizeProgram() {
+	fireEvent.click(screen.getByRole("button", { name: accountantTexts.window.minimize }));
+}
+
 const enter = (element: HTMLElement, value: string) => fireEvent.change(element, { target: { value } });
 
 const documentButton = (documentId: string) => byAttribute("data-item-id", documentId);
@@ -63,6 +73,7 @@ describe("разбор первичных документов на столе",
 		fireEvent.click(stamp("purchases"));
 		expect(journalZone("supplierUpd")).toBe("purchases");
 		expect(document.querySelector('[data-item-id="supplierUpd"]')).toBeNull();
+		openProgram();
 		const journal = screen.getByTestId("accounting-window");
 		expect(within(journal).getByRole("img", { name: accountantTexts.sortingSections.purchases })).toBeTruthy();
 	});
@@ -98,6 +109,7 @@ describe("разбор первичных документов на столе",
 			fireEvent.click(documentButton(document.id));
 			fireEvent.click(stamp(document.sectionId));
 		}
+		openProgram();
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.postAndClose }));
 		expect(handlers.onComplete).toHaveBeenCalledWith({ score: 9, hintsUsed: 0, mistakes: ["sorting.pizzaFlyer"] });
 	});
@@ -117,7 +129,7 @@ describe("перетаскивание на Pointer Events", () => {
 		const onDrop = vi.fn();
 		render(<DragProbe onDrop={onDrop} resolveTarget={() => "bank"} />);
 		const handle = screen.getByRole("button", { name: "drag-me" });
-		expect(handle.style.touchAction).toBe("none");
+		expect(handle.style.touchAction).toBe("var(--acc-drag-touch-action, none)");
 		fireEvent.pointerDown(handle, { pointerId: 1, button: 0, pointerType: "mouse", clientX: 10, clientY: 10 });
 		fireEvent.pointerMove(handle, { pointerId: 1, pointerType: "mouse", clientX: 60, clientY: 40 });
 		expect(handle.style.transform).toBe("translate(50px, 30px)");
@@ -173,6 +185,7 @@ describe("перетаскивание на Pointer Events", () => {
 			fireEvent.keyDown(documentButton(document.id), { key: "Enter" });
 			fireEvent.click(stamp(document.sectionId));
 		}
+		openProgram();
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.postAndClose }));
 		expect(handlers.onComplete).toHaveBeenCalledWith({ score: 10, hintsUsed: 0, mistakes: [] });
 	});
@@ -338,6 +351,7 @@ describe("касса у окошка", () => {
 		expect(screen.getByRole("img", { name: accountantTexts.boothCharacters.collector })).toBeTruthy();
 		fireEvent.change(screen.getByLabelText(accountantTexts.miniGames.cashDesk.surplusLabel, { selector: "input" }), { target: { value: "7 500" } });
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.post }));
+		openProgram();
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.postAndClose }));
 		expect(handlers.onComplete).toHaveBeenCalledWith({ score: 9, hintsUsed: 0, mistakes: ["cash.document.employeeOrlov"] });
 	});
@@ -354,6 +368,7 @@ describe("касса у окошка", () => {
 		serveVisitor("incomeOrder", "9300");
 		fireEvent.change(screen.getByLabelText(accountantTexts.miniGames.cashDesk.surplusLabel, { selector: "input" }), { target: { value: "27500" } });
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.post }));
+		openProgram();
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.postAndClose }));
 		expect(handlers.onComplete).toHaveBeenCalledWith(expect.objectContaining({ score: 8, mistakes: ["cash.surplus"] }));
 	});
@@ -361,6 +376,7 @@ describe("касса у окошка", () => {
 
 describe("проводки Дт/Кт", () => {
 	function postCurrent(debit: string, credit: string, amount: string) {
+		openProgram();
 		fireEvent.change(screen.getByLabelText(accountantTexts.miniGames.postings.debitLabel), { target: { value: debit } });
 		fireEvent.change(screen.getByLabelText(accountantTexts.miniGames.postings.creditLabel), { target: { value: credit } });
 		fireEvent.change(screen.getByLabelText(accountantTexts.miniGames.postings.amountLabel, { selector: "input" }), { target: { value: amount } });
@@ -382,17 +398,25 @@ describe("проводки Дт/Кт", () => {
 		for (const remaining of mediumOperations.operations.slice(1)) {
 			postCurrent(remaining.debit, remaining.credit, String(remaining.amount));
 		}
+		openProgram();
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.postAndClose }));
 		expect(handlers.onComplete).toHaveBeenCalledWith({ score: 10, hintsUsed: 0, mistakes: [] });
 	});
 
 	it("форма принимает счета из данных уровня, первичка лежит на столе", () => {
 		render(<Postings data={mediumOperations} hintsEnabled {...createHandlers()} />);
+		openProgram();
 		const debitSelect = screen.getByLabelText(accountantTexts.miniGames.postings.debitLabel) as HTMLSelectElement;
 		const values = Array.from(debitSelect.options)
 			.map((option) => option.value)
 			.filter(Boolean);
 		expect(values).toEqual(mediumOperations.accounts);
+		enter(debitSelect, "60");
+		minimizeProgram();
+		expect(document.activeElement).toBe(screen.getByRole("button", { name: accountantTexts.window.open }));
+		openProgram();
+		expect(debitSelect.value).toBe("60");
+		minimizeProgram();
 		for (const operation of mediumOperations.operations) {
 			expect(screen.getByText(accountantTexts.operationPapers[operation.id].title)).toBeTruthy();
 		}
@@ -409,8 +433,10 @@ describe("проводки Дт/Кт", () => {
 		expect(reply.text.indexOf("Дт 60 Кт 51")).toBeLessThan(reply.text.indexOf(reply.reason));
 		expect(reply.text.indexOf(reply.reason)).toBeLessThan(reply.text.indexOf(reply.joke));
 		expect(document.querySelectorAll('[data-posted="true"]').length).toBe(1);
+		minimizeProgram();
 		const primary = byAttribute("data-paper", "primary-paySupplier");
 		expect(within(primary).getByRole("img", { name: accountantTexts.stamps.posted })).toBeTruthy();
+		openProgram();
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.movements }));
 		const movements = screen.getByRole("region", { name: accountantTexts.miniGames.postings.movementsTitle });
 		expect(within(movements).getByText(/Дт 51/)).toBeTruthy();
@@ -419,11 +445,13 @@ describe("проводки Дт/Кт", () => {
 	it("подсказка отмечается и считается в итоге, все проводки верны", () => {
 		const handlers = createHandlers();
 		render(<Postings data={mediumOperations} hintsEnabled {...handlers} />);
+		openProgram();
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.hint }));
 		expect(screen.getByText("Подсказка: Дт 60 Кт 51.")).toBeTruthy();
 		for (const operation of mediumOperations.operations) {
 			postCurrent(operation.debit, operation.credit, String(operation.amount));
 		}
+		openProgram();
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.postAndClose }));
 		expect(handlers.onComplete).toHaveBeenCalledWith({ score: 10, hintsUsed: 1, mistakes: [] });
 	});
@@ -431,6 +459,7 @@ describe("проводки Дт/Кт", () => {
 
 describe("зарплата с НДФЛ", () => {
 	function fillRow(employeeId: string, deduction: string, ndfl: string) {
+		openProgram();
 		const name = accountantTexts.employees[employeeId];
 		const texts = accountantTexts.miniGames.payroll;
 		fireEvent.change(screen.getByLabelText(`${texts.deductionColumn}: ${name}`), { target: { value: deduction } });
@@ -445,6 +474,7 @@ describe("зарплата с НДФЛ", () => {
 		expect(handlers.onProgress).not.toHaveBeenCalled();
 		enter(target("pay-deduction-petrov"), "1400");
 		expect(screen.getByText(tutorialTexts.steps.payTax)).toBeTruthy();
+		openProgram();
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.hint }));
 		enter(target("pay-tax-petrov"), "6578");
 		expect(handlers.onProgress).toHaveBeenLastCalledWith({ earned: 2.5, possible: 2.5 });
@@ -482,6 +512,7 @@ describe("зарплата с НДФЛ", () => {
 		fillRow("sidorova", "10 200", "3679");
 		fillRow("kuznetsov", "0", "7976");
 		expect(Number(screen.getByTestId("payroll-scales").dataset.tilt)).toBe(calculateScalesTilt(6, 8));
+		openProgram();
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.postAndClose }));
 		expect(handlers.onComplete).toHaveBeenCalledWith({ score: 8, hintsUsed: 0, mistakes: ["payroll.deduction", "payroll.ndfl"] });
 		expect(handlers.onMistake).toHaveBeenCalledWith({
@@ -508,7 +539,9 @@ describe("сверка с выпиской на двух листах", () => {
 		const rowText = accountantTexts.statementRows[rowId];
 		fireEvent.click(screen.getAllByRole("button", { name: `${texts.markDiscrepancy}: ${rowText}` })[0]);
 		if (reason) {
+			openProgram();
 			fireEvent.change(screen.getAllByLabelText(`${texts.reasonLabel}: ${rowText}`)[0], { target: { value: reason } });
+			minimizeProgram();
 		}
 	}
 
@@ -529,6 +562,7 @@ describe("сверка с выпиской на двух листах", () => {
 		markRow("bankFee", "bankFee");
 		markRow("ledgerPower", "inTransit");
 		markRow("ledgerNdfl", null);
+		openProgram();
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.postAndClose }));
 		expect(handlers.onComplete).toHaveBeenCalledWith(expect.objectContaining({ score: 4 }));
 		expect(handlers.onMistake).toHaveBeenCalledWith({
@@ -541,6 +575,7 @@ describe("сверка с выпиской на двух листах", () => {
 		const handlers = createHandlers();
 		render(<BankReconciliation data={hardStatement} hintsEnabled={false} random={createSeededRandom(5)} {...handlers} />);
 		markRow("ledgerVector", "bankFee");
+		openProgram();
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.postAndClose }));
 		expect(handlers.onComplete).toHaveBeenCalledWith(expect.objectContaining({ score: 0 }));
 	});
@@ -591,6 +626,7 @@ describe("бухгалтерский баланс", () => {
 		}
 		fireEvent.change(screen.getByLabelText(accountantTexts.miniGames.balanceSheet.computedLabel, { selector: "input" }), { target: { value: "95 000" } });
 		expect(Number(screen.getByTestId("balance-scales").dataset.tilt)).toBe(0);
+		openProgram();
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.postAndClose }));
 		expect(handlers.onComplete).toHaveBeenCalledWith({ score: 9, hintsUsed: 0, mistakes: ["balance.item"] });
 	});
@@ -603,6 +639,7 @@ describe("бухгалтерский баланс", () => {
 		}
 		fireEvent.change(screen.getByLabelText(accountantTexts.miniGames.balanceSheet.computedLabel, { selector: "input" }), { target: { value: "315000" } });
 		expect(calculateBalanceTilt(315000, 535000)).toBeLessThan(0);
+		openProgram();
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.postAndClose }));
 		expect(handlers.onComplete).toHaveBeenCalledWith({ score: 8, hintsUsed: 0, mistakes: ["balance.computed"] });
 	});

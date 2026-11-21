@@ -66,7 +66,7 @@ function draw_Map(context, x, z, heading, scanned, { limits, points, beach }) {
 	context.restore();
 }
 
-export function start_Flight({ mount, coast, renderer, signal, settings, restart, attempts, onLaunch, sound, restarting, logAction, practice, resetMessage, freeMode }) {
+export function start_Flight({ mount, coast, renderer, signal, settings, restart, attempts, onLaunch, sound, restarting, logAction, practice, resetMessage, freeMode, storyCamera, onCameraChange }) {
 	const copy = text.flight;
 	const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 	const beach = !practice || practice.map === 'beach';
@@ -86,10 +86,11 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	const kit = droneKey ? fleet[droneKey] : fpvKit;
 	const fieldDrone = droneKey ? create_FleetModel(scene, droneKey) : world.fieldDrone;
 	if (droneKey && beach) coast.fieldDrone.drone.visible = false;
-	const chase = practice?.camera === 'chase';
-	const droneCenter = chase ? fieldDrone.drone.worldToLocal(new THREE.Box3().setFromObject(fieldDrone.drone).getCenter(new THREE.Vector3())) : null;
-	const chaseDistance = chase ? Math.max(1.4, kit.length * 5.5) : 0;
-	const updateChase = chase ? create_ChaseCamera(fieldDrone.drone, droneCenter, chaseDistance) : null;
+	let chase = (practice?.camera ?? storyCamera) === 'chase';
+	let cameraChanged = true;
+	const droneCenter = fieldDrone.drone.worldToLocal(new THREE.Box3().setFromObject(fieldDrone.drone).getCenter(new THREE.Vector3()));
+	const chaseDistance = Math.max(1.4, (kit.length ?? .32) * 5.5);
+	const updateChase = create_ChaseCamera(fieldDrone.drone, droneCenter, chaseDistance, touchesTree, groundAt);
 	const camera = new THREE.PerspectiveCamera(flightPreferences.fov, 1, .07, 620);
 	const touchdownCamera = create_TouchdownCamera(camera);
 	const profile = practice ? { ...settings.flight, mode: practice.mode, drain: .7 } : settings.flight;
@@ -121,6 +122,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		<div class="joystick-group"><div class="joystick" id="stick-view" aria-hidden="true"><i></i></div><span id="stick-left-label">${stabilized ? copy.attitude : copy.throttleYaw}</span></div>
 		<button class="button osd-button" id="flight-action" type="button"><span aria-hidden="true"></span></button>
 		<div class="joystick-group"><div class="joystick" id="stick-move" aria-hidden="true"><i></i></div><span id="stick-right-label">${stabilized ? copy.motion : copy.pitchRoll}</span></div>
+		<div class="touch-flight-zone" id="touch-left" aria-hidden="true"></div><div class="touch-flight-zone" id="touch-right" aria-hidden="true"></div>
 	</div><aside class="flight-map" id="flight-map" aria-labelledby="map-title" hidden>
 		<div class="overlay-heading"><h2 id="map-title">${mapLabel}</h2><button class="button button-quiet close-overlay" type="button" id="close-map" aria-label="${text.close}">×</button></div><div class="sector-list">
 		${sectors.map(point => `<span id="sector-${point.label}">${point.label}</span>`).join('')}
@@ -131,13 +133,14 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		<button class="button button-quiet" type="button" id="flight-disarm" hidden>${copy.disarm}</button>
 		<div class="fpv-controls" aria-label="${copy.settings}">
 			<p>${copy.mode} · ${copy.modes[profile.mode]}</p>
+			<label>${copy.camera}<select id="flight-camera"><option value="fpv">${text.free.cameras.fpv}</option><option value="chase">${text.free.cameras.chase}</option></select></label>
 			<label>${copy.filter}<select id="input-filter" ${stabilized ? 'disabled' : ''}><option value="12">12 Hz</option><option value="6" selected>6 Hz</option><option value="3">3 Hz</option></select></label>
 			<label>${copy.feed}<select id="camera-effects"><option value="1" selected>${copy.analog}</option><option value="2">${copy.soft}</option><option value="0">${copy.clean}</option></select></label>
 			${preference_Markup()}
 		</div>
 		<figure class="flight-photo" id="flight-photo" hidden><canvas id="photo-preview" width="1440" height="900" aria-label="${copy.capture}"></canvas><figcaption id="photo-caption"></figcaption><button type="button" id="expand-photo" class="button button-quiet">${copy.expand}</button></figure>
-		<p class="keyboard-note" id="current-flight-keys"></p><p class="joystick-note">${sticks}</p><p class="keyboard-note">${copy.gamepad}</p>`;
-	const tutorial = `<p class="keyboard-note">${keys}</p><p class="joystick-note">${sticks}</p><p class="keyboard-note">${copy.gamepad}</p>`;
+		<p class="keyboard-note" id="current-flight-keys"></p><p class="joystick-note">${copy.touchFlight} ${sticks}</p><p class="keyboard-note">${copy.gamepad}</p>`;
+	const tutorial = `<p class="keyboard-note">${keys}</p><p class="joystick-note">${copy.touchFlight} ${sticks}</p><p class="keyboard-note">${copy.gamepad}</p>`;
 	const stageOverride = practice ? { freeMode, title: text.free.maps[practice.map].title, exit: text.free.back, guide: beach ? null : text.free.maps[practice.map].detail } : {};
 	mount(stage_Shell(1, sceneMarkup, panel, controls, tutorial, '', stageOverride));
 	bind_Click('#close-photo', () => query('#full-photo').close(), signal);
@@ -259,13 +262,30 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	}
 	signal.addEventListener('abort', () => clearTimeout(completionTimer), { once: true });
 	const previous = { x: motion.x, y: motion.y, z: motion.z };
-	const attitudeStick = bind_Joystick(query('#stick-move'), signal);
-	const throttleStick = bind_Joystick(query('#stick-view'), signal);
+	const attitudeStick = bind_Joystick(query('#stick-move'), query('#touch-right'), signal);
+	const throttleStick = bind_Joystick(query('#stick-view'), query('#touch-left'), signal);
 	const leftIndicator = query('#indicator-left i');
 	const rightIndicator = query('#indicator-right i');
-	bind_Preferences(signal, fov => { camera.fov = fov; camera.updateProjectionMatrix(); }, chase ? 'chase' : 'fpv');
+	const cameraSelect = query('#flight-camera');
+	cameraSelect.value = chase ? 'chase' : 'fpv';
+	const preferences = bind_Preferences(signal, fov => { camera.fov = fov; camera.updateProjectionMatrix(); }, cameraSelect.value,
+		`${droneKey ?? 'story'}:${stabilized ? 'assisted' : 'fixed'}`, stabilized ? -10 : kit.cameraTilt, showSticks => {
+			flightControls.dataset.sticks = showSticks ? 'visible' : 'floating';
+			attitudeStick.reset();
+			throttleStick.reset();
+		});
+	function select_Camera(mode) {
+		chase = mode === 'chase';
+		cameraChanged = true;
+		cameraSelect.value = mode;
+		frame.dataset.camera = mode;
+		preferences.selectCamera(mode);
+		onCameraChange(mode);
+	}
+	frame.dataset.camera = cameraSelect.value;
+	cameraSelect.addEventListener('change', () => select_Camera(cameraSelect.value), { signal });
 	const flightInputs = bind_FlightInputs(attitudeStick, throttleStick, {
-		action: perform_Action, toggleMap: toggle_Map, restart: request_Restart,
+		action: perform_Action, toggleMap: toggle_Map, restart: request_Restart, toggleCamera: () => select_Camera(chase ? 'fpv' : 'chase'),
 		menu: () => { if (!resetting) toggle_StageMenu(); },
 		bindings: flightPreferences.bindings, blocked: () => resetting || stage_OverlayOpen(), signal,
 		showAxes(axes) {
@@ -591,18 +611,21 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			}
 			else fieldDrone.drone.quaternion.copy(acro.attitude);
 			if (fieldDrone.body) fieldDrone.body.rotation.z = (1 - damage.hull) * .32;
+			const tilt = preferences.getTilt();
 			if (chase) {
-				updateChase(camera);
+				updateChase(camera, heading, tilt, Math.min(.07, elapsed), cameraChanged || reduceMotion.matches);
 			} else if (!stabilized) {
 				camera.position.set(x, y + .20, z);
 				camera.quaternion.copy(acro.attitude);
-				camera.rotateX(THREE.MathUtils.degToRad(kit.cameraTilt));
+				camera.rotateX(THREE.MathUtils.degToRad(tilt));
 				if (!grounded && !reduceMotion.matches && armed && damage.thrust < .99) camera.rotateX(Math.sin(time * 97) * (1 - damage.thrust) * .028);
 			} else {
 				camera.position.set(x, y + .20, z);
-				camera.lookAt(x - backX * 20, y - 3.6, z - backZ * 20);
+				camera.lookAt(x - backX * 20, y + .20, z - backZ * 20);
+				camera.rotateX(THREE.MathUtils.degToRad(tilt));
 				if (!grounded && !reduceMotion.matches) camera.rotateZ(-(motion.vx * backZ - motion.vz * backX) * .009);
 			}
+			cameraChanged = false;
 			const cameraSettled = touchdownCamera.settle(delta);
 			if (cameraSettled && landingNoticePending) {
 				landingNoticePending = false;

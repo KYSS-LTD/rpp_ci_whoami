@@ -53,6 +53,10 @@ function findInside(container: HTMLElement | null, attribute: string, value: str
 	return root?.querySelector<HTMLElement>(`[${attribute}="${value}"]`) ?? null;
 }
 
+function scrollOnTouch(): boolean {
+	return window.matchMedia?.("(pointer: coarse)").matches === true;
+}
+
 export function usePickAndDrop({ targetIds, tutorialTarget, onPlace, resolveTarget, onFreeDrop, getMovingElement }: UsePickAndDropOptions) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -86,7 +90,7 @@ export function usePickAndDrop({ targetIds, tutorialTarget, onPlace, resolveTarg
 	});
 
 	// Кладёт элемент в цель. Отказ проигрывает возврат (после перетаскивания) или тряску (после выбора нажатием).
-	function place(itemId: string, targetId: string, dragged: { offset: Offset; rect: DOMRect } | null, fromKeyboard: boolean): boolean {
+	function place(itemId: string, targetId: string, dragged: { offset: Offset; rect: DOMRect } | null, moveFocus: boolean): boolean {
 		const handleElement = findInside(containerRef.current, "data-item-id", itemId);
 		// Анимируется то, что двигается при перетаскивании: вся бумага, а не только кнопка на ней.
 		const itemElement = handleElement && getMovingElement ? getMovingElement(handleElement) : handleElement;
@@ -96,12 +100,12 @@ export function usePickAndDrop({ targetIds, tutorialTarget, onPlace, resolveTarg
 		setActiveTargetId(null);
 		if (accepted) {
 			pendingFlightRef.current = { itemId, rect };
-			if (fromKeyboard) {
+			if (moveFocus) {
 				pendingFocusRef.current = { kind: "nextItem" };
 			}
 		} else {
 			playReject(itemElement, dragged?.offset ?? null);
-			if (fromKeyboard) {
+			if (moveFocus) {
 				pendingFocusRef.current = { kind: "item", itemId };
 			}
 		}
@@ -128,7 +132,7 @@ export function usePickAndDrop({ targetIds, tutorialTarget, onPlace, resolveTarg
 		},
 	});
 
-	function selectItem(itemId: string, fromKeyboard: boolean) {
+	function selectItem(itemId: string, moveFocus: boolean) {
 		if (selectedItemId === itemId) {
 			setSelectedItemId(null);
 			setActiveTargetId(null);
@@ -137,7 +141,7 @@ export function usePickAndDrop({ targetIds, tutorialTarget, onPlace, resolveTarg
 		setSelectedItemId(itemId);
 		const firstTargetId = tutorialTarget ?? targetIds[0] ?? null;
 		setActiveTargetId(firstTargetId);
-		if (fromKeyboard && firstTargetId) {
+		if (moveFocus && firstTargetId) {
 			pendingFocusRef.current = { kind: "target", targetId: firstTargetId };
 		}
 	}
@@ -160,7 +164,7 @@ export function usePickAndDrop({ targetIds, tutorialTarget, onPlace, resolveTarg
 			"data-tutorial-id": `item-${itemId}`,
 			onClick(event) {
 				// detail = 0 у нажатия без мыши (например, экранным диктором): тогда фокус тоже переходит на цели.
-				selectItem(itemId, event.detail === 0);
+				selectItem(itemId, event.detail === 0 || scrollOnTouch());
 			},
 			// Enter и пробел обрабатываются сами, а действие кнопки по умолчанию отменяется, чтобы выбор не сработал дважды.
 			onKeyDown(event) {
@@ -204,7 +208,7 @@ export function usePickAndDrop({ targetIds, tutorialTarget, onPlace, resolveTarg
 			...(isActive ? { "data-active": "true" as const } : {}),
 			onClick() {
 				if (selectedItemId) {
-					place(selectedItemId, targetId, null, false);
+					place(selectedItemId, targetId, null, scrollOnTouch());
 				}
 			},
 			onKeyDown(event) {

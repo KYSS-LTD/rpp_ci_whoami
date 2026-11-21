@@ -21,6 +21,7 @@ const bridge = window.PortalBridge;
 let difficulty;
 const freeMode = new URLSearchParams(location.search).get('mode') === 'free';
 let practiceStarted = 0;
+let storyCamera = 'fpv';
 const run = { scores: [], attempts: 0, records: [null, null, null] };
 const modes = [start_Assembly, start_Flight, start_Survey];
 const canvas = document.createElement('canvas');
@@ -127,7 +128,11 @@ function show_Stage(index, showTutorial = true, resetMessage = '') {
 		record.events[key]++;
 	};
 	mode = modes[index]({ mount, coast, renderer, signal, difficulty, settings: difficultySettings[difficulty], sound, logAction, restart, restarting: !showTutorial, invalidate: request_Frame,
-		freeMode, practice: freeMode && index === 1 ? { ...freeOptions } : null, resetMessage,
+		freeMode, practice: freeMode && index === 1 ? { ...freeOptions } : null, resetMessage, storyCamera,
+		onCameraChange(camera) {
+			if (freeMode) freeOptions.camera = camera;
+			else storyCamera = camera;
+		},
 		attempts: run.attempts, onLaunch() {
 			run.attempts++;
 			if (run.attempts > 1 && run.scores.length >= 2) run.scores[1] = Math.max(0, run.scores[1] - retryPenalty);

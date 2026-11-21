@@ -1,5 +1,5 @@
 // Перетаскивание на Pointer Events (design.md, D6): работает мышью, пером и касанием без библиотек.
-// touch-action: none ставится только на перетаскиваемые элементы, чтобы остальная страница прокручивалась.
+// На сенсорном экране вертикальный жест прокручивает стол. Бумаги также можно выбирать нажатием.
 
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from "react";
 import type { Offset } from "./motion";
@@ -89,7 +89,7 @@ export function useDrag(options: UseDragOptions) {
 		return {
 			onPointerDown(event) {
 				// Только основная кнопка мыши; касание и перо проходят всегда.
-				if (event.pointerType === "mouse" && event.button !== 0) {
+				if (sessionRef.current || (event.pointerType === "mouse" && event.button !== 0)) {
 					return;
 				}
 				const handle = event.currentTarget;
@@ -154,11 +154,10 @@ export function useDrag(options: UseDragOptions) {
 				endSession();
 				optionsRef.current.onDrop({ itemId: session.itemId, targetId, element: session.element, offset, rect });
 			},
-			onPointerCancel() {
+			onPointerCancel(event) {
 				const session = sessionRef.current;
-				if (session) {
-					resetElement(session);
-				}
+				if (!session || session.pointerId !== event.pointerId) return;
+				resetElement(session);
 				endSession();
 			},
 			onClickCapture(event) {
@@ -168,7 +167,7 @@ export function useDrag(options: UseDragOptions) {
 					event.stopPropagation();
 				}
 			},
-			style: { touchAction: "none" },
+			style: { touchAction: "var(--acc-drag-touch-action, none)" },
 			...(draggingId === itemId ? { "data-dragging": "true" as const } : {}),
 		};
 	}

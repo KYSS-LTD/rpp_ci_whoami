@@ -15,6 +15,7 @@ export function read_Record(value, index) {
 // Часы идут и при разметке в диалоге. Инструктаж, меню, подтверждение сдачи и скрытая вкладка исключены.
 export function track_Practice(record, signal) {
 	const tutorial = document.querySelector('#stage-tutorial');
+	const orientation = document.querySelector('#flight-orientation');
 	const menu = document.querySelector('#stage-menu');
 	const confirm = document.querySelector('#stage-submit');
 	let since = null;
@@ -22,7 +23,7 @@ export function track_Practice(record, signal) {
 	function measure() {
 		const now = performance.now();
 		if (since !== null) record.elapsed += Math.round(now - since);
-		const paused = document.hidden || tutorial.open || confirm.open || (menu.showPopover ? menu.matches(':popover-open') : !menu.hidden);
+		const paused = document.hidden || orientation?.open || tutorial.open || confirm.open || (menu.showPopover ? menu.matches(':popover-open') : !menu.hidden);
 		since = paused ? null : now;
 		if (!paused && !started) {
 			started = true;
@@ -30,7 +31,7 @@ export function track_Practice(record, signal) {
 		}
 	}
 	const observer = new MutationObserver(measure);
-	for (const node of [tutorial, menu, confirm]) observer.observe(node, { attributes: true, attributeFilter: ['open', 'hidden'] });
+	for (const node of [tutorial, menu, confirm, orientation].filter(Boolean)) observer.observe(node, { attributes: true, attributeFilter: ['open', 'hidden'] });
 	menu.addEventListener('toggle', measure, { signal });
 	document.addEventListener('visibilitychange', measure, { signal });
 	window.addEventListener('pagehide', measure, { signal });

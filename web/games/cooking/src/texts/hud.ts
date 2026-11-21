@@ -29,6 +29,11 @@ const rejectReasons: Record<ActionRejectReason, string> = {
 };
 
 export const hudTexts = {
+	orientation: {
+		title: "Поверните телефон горизонтально",
+		detail: "В широком кадре удобнее следить за кухней и заказами.",
+		continue: "Продолжить вертикально",
+	},
 	dishNames,
 	rejectReasons,
 

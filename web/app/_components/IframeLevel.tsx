@@ -33,7 +33,7 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 	const levelRef = useRef<HTMLElement>(null);
 	const [nativeFullscreen, setNativeFullscreen] = useState(false);
 	const [expanded, setExpanded] = useState(() => typeof window !== "undefined"
-		&& window.matchMedia?.("(pointer: coarse) and (max-width: 900px)").matches === true);
+		&& window.matchMedia?.("(pointer: coarse) and (max-width: 900px), (pointer: coarse) and (max-height: 600px)").matches === true);
 	const isFullscreen = nativeFullscreen || expanded;
 
 	useEffect(() => {
@@ -228,7 +228,7 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 	}
 
 	return (
-		<section ref={levelRef} className={styles.level} data-expanded={expanded}>
+		<section ref={levelRef} className={styles.level} data-expanded={expanded} aria-label={gameTitle}>
 			<div className={styles.header}>
 				<div className={styles.titles}>
 					<p className={styles.gameTitle}>{gameTitle}</p>

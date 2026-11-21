@@ -60,6 +60,7 @@ export function createScreens(deps: ScreensDeps): Screens {
 	let phase: ShiftPhase = "ready";
 	let paused = false;
 	let startRequested = false;
+	let orientationDismissed = false;
 	let tutorialDismissed = deps.tutorialDishes.length === 0;
 	let tutorialDishIndex = 0;
 	let tutorialStepIndex = 0;
@@ -100,6 +101,25 @@ export function createScreens(deps: ScreensDeps): Screens {
 	const startActions = createElement("div", { className: "hud-start-actions" });
 	startActions.append(startButton);
 	start.dialog.append(prologue, dayLabel, dayGoal, startGoal, rules, controlsSection, startActions);
+
+	const orientation = createDialog("orientation", hudTexts.orientation.title, { dismissible: true });
+	const continuePortrait = createButton(hudTexts.orientation.continue, "hud-button--secondary");
+	orientation.dialog.append(createElement("p", { className: "hud-dialog__lead", text: hudTexts.orientation.detail }), continuePortrait);
+	root.append(orientation.dialog);
+	function syncOrientation(): void {
+		if (start.dialog.open && !orientationDismissed && inputMode === "touch" && ownerWindow.innerWidth < ownerWindow.innerHeight) {
+			openModal(orientation.dialog);
+		} else {
+			closeModal(orientation.dialog);
+		}
+	}
+
+	continuePortrait.addEventListener("click", () => {
+		orientationDismissed = true;
+		closeModal(orientation.dialog);
+	});
+	orientation.dialog.addEventListener("cancel", () => { orientationDismissed = true; });
+	ownerWindow.addEventListener("resize", syncOrientation);
 
 	// Подсказки рецептов открываются до смены. Для reduced motion <picture> подставляет неподвижный постер вместо GIF.
 	const tutorial = createDialog("tutorial", "", { dismissible: false });
@@ -340,6 +360,7 @@ export function createScreens(deps: ScreensDeps): Screens {
 				startRequested = true;
 				closeModal(start.dialog);
 			}
+			syncOrientation();
 
 			if (phase === "failed") {
 				fillFailure(snapshot);
@@ -355,6 +376,7 @@ export function createScreens(deps: ScreensDeps): Screens {
 		setInputMode(mode) {
 			inputMode = mode;
 			renderControls();
+			syncOrientation();
 		},
 		setPaused(nextPaused) {
 			paused = nextPaused;
@@ -372,7 +394,8 @@ export function createScreens(deps: ScreensDeps): Screens {
 		},
 		dispose() {
 			ownerWindow.removeEventListener("keydown", handleKeyDown);
-			for (const dialog of [start.dialog, tutorial.dialog, pause.dialog, failure.dialog, dayComplete.dialog]) {
+			ownerWindow.removeEventListener("resize", syncOrientation);
+			for (const dialog of [orientation.dialog, start.dialog, tutorial.dialog, pause.dialog, failure.dialog, dayComplete.dialog]) {
 				closeModal(dialog);
 				dialog.remove();
 			}

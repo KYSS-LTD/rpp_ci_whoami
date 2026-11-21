@@ -146,7 +146,7 @@ function createSeat(chairRect: Rect, chairModel: string, rotationDeg: Rotation, 
 }
 
 // Уплотнённый ряд столов: все места подаются с одного свободного бокового прохода.
-function useSharedApproach(seats: SeatConfig[], approachX: number | undefined): SeatConfig[] {
+function assignSharedApproach(seats: SeatConfig[], approachX: number | undefined): SeatConfig[] {
 	if (approachX === undefined) {
 		return seats;
 	}
@@ -172,7 +172,7 @@ export function createTwoTop(id: string, number: number, x: number, z: number, s
 		rect: rect(x, z, 1, 1),
 		model: SQUARE_TABLE_MODEL,
 		rotationDeg: 0,
-		seats: useSharedApproach([
+		seats: assignSharedApproach([
 			createSeat(rect(x - 0.5, z, 0.5, 1), "chair_stool", 90, point(x - 1, centerZ), point(x + 0.3, centerZ)),
 			createSeat(rect(x + 1, z, 0.5, 1), "chair_stool", 270, point(x + 2, centerZ), point(x + 0.7, centerZ)),
 		], sharedApproachX),
@@ -189,7 +189,7 @@ export function createFourTop(id: string, number: number, x: number, z: number, 
 		rect: rect(x, z, 1.5, 1.5),
 		model: SQUARE_TABLE_MODEL,
 		rotationDeg: 0,
-		seats: useSharedApproach([
+		seats: assignSharedApproach([
 			createSeat(rect(x + 0.5, z - 0.5, 0.5, 0.5), "chair_A", 0, point(centerX, z - 1), point(centerX, z + 0.35)),
 			createSeat(rect(x + 1.5, z + 0.5, 0.5, 0.5), "chair_A", 270, point(x + 2.5, centerZ), point(x + 1.15, centerZ)),
 			createSeat(rect(x + 0.5, z + 1.5, 0.5, 0.5), "chair_A", 180, point(centerX, z + 2.5), point(centerX, z + 1.15)),

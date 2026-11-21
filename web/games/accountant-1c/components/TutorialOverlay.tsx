@@ -15,17 +15,19 @@ interface OverlayProps {
 	rootRef: RefObject<HTMLElement | null>;
 	tutorial: TutorialController;
 	step: TutorialStep;
+	appOpen: boolean;
+	onShowApp: (open: boolean) => void;
 }
 
 function cutout(box: DOMRect) {
 	return { x: box.x - padding, y: box.y - padding, width: box.width + padding * 2, height: box.height + padding * 2, rx: 9 };
 }
 
-export function TutorialOverlay({ rootRef, tutorial, step }: OverlayProps) {
+export function TutorialOverlay({ rootRef, tutorial, step, appOpen, onShowApp }: OverlayProps) {
 	const maskId = useId();
 	const arrowId = useId();
 	const noteRef = useRef<HTMLElement>(null);
-	const { width, height, noteWidth, noteHeight, targets } = useTutorialGeometry(rootRef, noteRef, step);
+	const { width, height, noteWidth, noteHeight, targets } = useTutorialGeometry(rootRef, noteRef, step, appOpen);
 	const actionsRef = useRef(tutorial);
 	const [lastShownId, setLastShownId] = useState("");
 	const visible = targets.filter(({ rect }) => rect.width > 0 && rect.height > 0);
@@ -55,6 +57,14 @@ export function TutorialOverlay({ rootRef, tutorial, step }: OverlayProps) {
 	}, [tutorial]);
 
 	useEffect(() => {
+		const root = rootRef.current;
+		if (root && step.action !== "next") {
+			const target = findTutorialTargets(root, step)[0];
+			if (target) onShowApp(!!target.closest('[data-accounting-app]'));
+		}
+	}, [rootRef, onShowApp, step]);
+
+	useEffect(() => {
 		const note = noteRef.current;
 		const root = rootRef.current;
 		if (!note || !root) {
@@ -64,7 +74,7 @@ export function TutorialOverlay({ rootRef, tutorial, step }: OverlayProps) {
 		note.focus({ preventScroll: true });
 		const targets = () => findTutorialTargets(root, step);
 		const allowed = (element: EventTarget | null) =>
-			element instanceof Node && (note.contains(element) || targets().some((target) => target.contains(element)));
+			element instanceof Element && (note.contains(element) || element.closest('[data-tutorial-switch]') || targets().some((target) => target.contains(element)));
 
 		function blockBackground(event: Event) {
 			if (!allowed(event.target)) {
@@ -75,16 +85,18 @@ export function TutorialOverlay({ rootRef, tutorial, step }: OverlayProps) {
 
 		function handleKey(event: KeyboardEvent) {
 			if (event.key === "Escape") {
+				if (event.target instanceof Element && event.target.closest('[data-accounting-app]')) return;
 				event.preventDefault();
 				event.stopPropagation();
 				actionsRef.current.skip();
 				return;
 			}
 			if (event.key === "Tab") {
-				const elements = [...new Set([note!, ...targets()].flatMap((element) => [
+				const switches = [...root!.querySelectorAll<HTMLElement>('[data-tutorial-switch]')];
+				const elements = [...new Set([note!, ...targets(), ...switches].flatMap((element) => [
 					...(element.matches(focusable) ? [element] : []),
 					...element.querySelectorAll<HTMLElement>(focusable),
-				]))].filter((element) => element.getClientRects().length > 0);
+				]))].filter((element) => !element.closest('[inert], [hidden]') && element.getClientRects().length > 0);
 				if (elements.length) {
 					const active = elements.indexOf(document.activeElement as HTMLElement);
 					const next = active < 0 ? (event.shiftKey ? elements.length - 1 : 0) : (active + (event.shiftKey ? -1 : 1) + elements.length) % elements.length;
@@ -120,8 +132,16 @@ export function TutorialOverlay({ rootRef, tutorial, step }: OverlayProps) {
 	function showTarget(id: string) {
 		const root = rootRef.current;
 		if (root) {
+			const target = findTutorialTargets(root, step).find((element) => element.dataset.tutorialId === id);
+			if (!target) return;
 			setLastShownId(id);
-			findTutorialTargets(root, step).find((element) => element.dataset.tutorialId === id)?.scrollIntoView({ block: "center", inline: "nearest" });
+			onShowApp(!!target.closest('[data-accounting-app]'));
+			window.requestAnimationFrame(() => {
+				const animations = target.closest('[data-accounting-app]')?.getAnimations?.() ?? [];
+				void Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
+					if (target.isConnected && !target.closest('[inert]')) target.scrollIntoView?.({ block: "center", inline: "nearest" });
+				});
+			});
 		}
 	}
 

@@ -6,7 +6,7 @@ export function useTutorial(enabled: boolean, steps: readonly TutorialStep[], on
 	const current = enabled ? run.steps[run.index] : undefined;
 
 	function close() {
-		setRun((previous) => ({ ...previous, index: previous.steps.length }));
+		setRun((previous) => ({ ...previous, index: previous.steps.length, failed: false }));
 		onClose?.();
 	}
 
@@ -56,6 +56,9 @@ export function findTutorialTargets(root: HTMLElement, step: TutorialStep): HTML
 }
 
 function measureTarget(element: HTMLElement, width: number, height: number) {
+	if (element.closest('[inert], [hidden]')) {
+		return { id: element.dataset.tutorialId!, rect: new DOMRect(), hidden: true };
+	}
 	const bounds = element.getBoundingClientRect();
 	let left = Math.max(0, bounds.left);
 	let top = Math.max(0, bounds.top);
@@ -84,7 +87,7 @@ function measureTarget(element: HTMLElement, width: number, height: number) {
 	return { id: element.dataset.tutorialId!, rect, hidden };
 }
 
-export function useTutorialGeometry(rootRef: RefObject<HTMLElement | null>, noteRef: RefObject<HTMLElement | null>, step: TutorialStep) {
+export function useTutorialGeometry(rootRef: RefObject<HTMLElement | null>, noteRef: RefObject<HTMLElement | null>, step: TutorialStep, appOpen: boolean) {
 	const [geometry, setGeometry] = useState({ width: 0, height: 0, noteWidth: 0, noteHeight: 0, targets: [] as ReturnType<typeof measureTarget>[] });
 
 	useEffect(() => {
@@ -94,6 +97,7 @@ export function useTutorialGeometry(rootRef: RefObject<HTMLElement | null>, note
 			return;
 		}
 		const targets = findTutorialTargets(root, step);
+		const app = root.querySelector('[data-accounting-app]');
 		let frame = 0;
 		let pointerId: number | undefined;
 
@@ -116,7 +120,7 @@ export function useTutorialGeometry(rootRef: RefObject<HTMLElement | null>, note
 		function tick() {
 			frame = 0;
 			measure();
-			if (pointerId !== undefined) {
+			if (pointerId !== undefined || app?.getAnimations?.().some((animation) => animation.playState === "running")) {
 				schedule();
 			}
 		}
@@ -151,14 +155,14 @@ export function useTutorialGeometry(rootRef: RefObject<HTMLElement | null>, note
 		window.addEventListener("pointerdown", start, true);
 		window.addEventListener("pointerup", stop, true);
 		window.addEventListener("pointercancel", stop, true);
-		const first = targets[0];
+		const first = targets.find((element) => !element.closest('[inert], [hidden]'));
 		if (first) {
 			const box = first.getBoundingClientRect();
 			if (box.top < 12 || box.bottom > window.innerHeight - 12 || measureTarget(first, window.innerWidth, window.innerHeight).hidden) {
 				first.scrollIntoView?.({ block: "center", inline: "nearest" });
 			}
 		}
-		measure();
+		schedule();
 		return () => {
 			observer?.disconnect();
 			window.cancelAnimationFrame(frame);
@@ -169,7 +173,7 @@ export function useTutorialGeometry(rootRef: RefObject<HTMLElement | null>, note
 			window.removeEventListener("pointerup", stop, true);
 			window.removeEventListener("pointercancel", stop, true);
 		};
-	}, [rootRef, noteRef, step]);
+	}, [rootRef, noteRef, step, appOpen]);
 
 	return geometry;
 }

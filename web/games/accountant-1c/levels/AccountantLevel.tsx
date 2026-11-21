@@ -51,6 +51,7 @@ export function AccountantLevel({ level, onFinish, random }: AccountantLevelProp
 	const [isOverviewOpen, setIsOverviewOpen] = useState(false);
 	const overview = useTutorial(isOverviewOpen, levelTutorials[levelId], () => {
 		setIsOverviewOpen(false);
+		notifyDirector("start");
 		goToPhase(getNextPhase("intro"));
 	});
 	const [outcomes, setOutcomes] = useState<MiniGameOutcome[]>([]);
@@ -213,10 +214,7 @@ export function AccountantLevel({ level, onFinish, random }: AccountantLevelProp
 									<button
 										type="button"
 										className={styles.bigButton}
-										onClick={() => {
-											notifyDirector("start");
-											setIsOverviewOpen(true);
-										}}
+										onClick={() => setIsOverviewOpen(true)}
 									>
 										{paper.start}
 									</button>
@@ -250,6 +248,7 @@ export function AccountantLevel({ level, onFinish, random }: AccountantLevelProp
 									{scoreA} / {miniGameMaxScore}
 								</strong>
 							</p>
+							<p>{accountantTexts.story[levelId].handoff}</p>
 							<button
 								type="button"
 								className={styles.bigButton}
@@ -275,7 +274,7 @@ export function AccountantLevel({ level, onFinish, random }: AccountantLevelProp
 				monitorTitle={accountantTexts.monthClose.title}
 				monitor={<p className={styles.monitorHeading}>{accountantTexts.monthClose.lead}</p>}
 				desk={
-					<Paper id="daySummary" variant="form" defaultPosition={{ x: 200, y: 24 }} width={400} tilt={-1} title={accountantTexts.daySummary.title}>
+					<Paper id="daySummary" variant="form" defaultPosition={{ x: 32, y: 16 }} width={770} title={accountantTexts.daySummary.title} className={styles.finalReport}>
 						<MonthClose
 							levelScore={levelScore}
 							isSent={isSent}
@@ -286,6 +285,7 @@ export function AccountantLevel({ level, onFinish, random }: AccountantLevelProp
 							}))}
 							hintsUsed={outcomes.reduce((total, outcome) => total + outcome.hintsUsed, 0)}
 							mistakesCount={mistakesCount}
+							epilogue={accountantTexts.story[levelId].ending}
 						/>
 					</Paper>
 				}

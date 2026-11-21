@@ -47,7 +47,7 @@ export function createHud(options: HudOptions): Hud {
 	// Левая зона: кнопка паузы и очередь (справа сверху карточки заказов, по центру таймер).
 	const left = createElement("div", { className: "hud-left", attributes: { "data-zone": "top-left" } });
 	left.append(screens.pauseButton, stats.queueElement);
-	element.append(left, stats.centerElement, orders.element);
+	element.append(left, stats.centerElement, orders.element, stats.noticesElement);
 	root.append(element);
 
 	// Размеры блоков HUD по окну: на низком экране центральный блок уже, а зазоры меньше (карточкам заказов остаётся больше места).

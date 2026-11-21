@@ -1,14 +1,17 @@
 const flightKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight']);
 
-export function bind_Joystick(root, signal) {
+export function bind_Joystick(root, zone, signal) {
 	const knob = root.firstElementChild;
 	const vector = { x: 0, y: 0 };
 	let activePointer = null;
+	let surface = null;
+	let centerX = 0;
+	let centerY = 0;
+	let radius = 1;
 
 	function move_Pointer(event) {
-		const rect = root.getBoundingClientRect();
-		const axisX = (event.clientX - rect.left - rect.width / 2) / (rect.width * .34);
-		const axisY = (event.clientY - rect.top - rect.height / 2) / (rect.height * .34);
+		const axisX = (event.clientX - centerX) / radius;
+		const axisY = (event.clientY - centerY) / radius;
 		const length = Math.max(1, Math.hypot(axisX, axisY));
 		vector.x = axisX / length;
 		vector.y = axisY / length;
@@ -21,33 +24,49 @@ export function bind_Joystick(root, signal) {
 
 	function reset() {
 		vector.x = vector.y = 0;
-		if (activePointer !== null && root.hasPointerCapture(activePointer)) root.releasePointerCapture(activePointer);
+		const pointer = activePointer;
 		activePointer = null;
+		if (pointer !== null && surface.hasPointerCapture(pointer)) surface.releasePointerCapture(pointer);
+		surface = null;
+		delete zone.dataset.active;
 		knob.style.transform = '';
 	}
 
-	root.addEventListener('pointerdown', event => {
-		if (event.button !== 0 || activePointer !== null) return;
-		activePointer = event.pointerId;
-		root.setPointerCapture(activePointer);
-		move_Pointer(event);
-	}, { signal });
-	root.addEventListener('pointermove', event => {
-		if (event.pointerId === activePointer) move_Pointer(event);
-	}, { signal });
-	root.addEventListener('lostpointercapture', event => {
-		if (event.pointerId === activePointer) reset();
-	}, { signal });
+	for (const element of [root, zone]) {
+		element.addEventListener('pointerdown', event => {
+			if (event.button !== 0 || activePointer !== null || (element === zone && event.pointerType !== 'touch')) return;
+			const rect = element.getBoundingClientRect();
+			const floating = element === zone;
+			centerX = floating ? event.clientX : rect.left + rect.width / 2;
+			centerY = floating ? event.clientY : rect.top + rect.height / 2;
+			radius = floating ? 38 : rect.width * .34;
+			activePointer = event.pointerId;
+			surface = element;
+			element.setPointerCapture(activePointer);
+			if (floating) {
+				zone.style.setProperty('--touch-x', `${centerX - rect.left}px`);
+				zone.style.setProperty('--touch-y', `${centerY - rect.top}px`);
+				zone.dataset.active = 'true';
+			}
+			move_Pointer(event);
+		}, { signal });
+		element.addEventListener('pointermove', event => {
+			if (event.pointerId === activePointer) move_Pointer(event);
+		}, { signal });
+		for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) element.addEventListener(name, event => {
+			if (event.pointerId === activePointer) reset();
+		}, { signal });
+	}
 	return { vector, reset };
 }
 
-export function bind_FlightInputs(attitudeStick, throttleStick, { action, toggleMap, restart, menu, bindings, blocked, signal, showAxes }) {
+export function bind_FlightInputs(attitudeStick, throttleStick, { action, toggleMap, restart, toggleCamera, menu, bindings, blocked, signal, showAxes }) {
 	const keys = new Set();
 	window.addEventListener('keydown', event => {
 		if (event.altKey || event.ctrlKey || event.metaKey) return;
 		if (event.target instanceof Element && event.target.closest('input, select, textarea, [contenteditable="true"]')) return;
 		const hotkey = event.code === bindings.menu ? menu : event.code === bindings.restart ? restart : blocked() ? null
-			: event.code === bindings.map ? toggleMap : event.code === bindings.action ? action : null;
+			: event.code === bindings.map ? toggleMap : event.code === bindings.action ? action : event.code === 'KeyV' ? toggleCamera : null;
 		if (hotkey) {
 			if (['Space', 'Enter'].includes(event.code) && event.target instanceof Element && event.target.closest('button, a, summary')) return;
 			event.preventDefault();

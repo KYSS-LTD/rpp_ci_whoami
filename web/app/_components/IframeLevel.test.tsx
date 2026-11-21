@@ -68,7 +68,7 @@ describe("iframe-уровень: запуск", () => {
 		expect(postMessageSpy).not.toHaveBeenCalled();
 		sendFromGame(frameWindow, "ready");
 		expect(postMessageSpy).toHaveBeenCalledWith(
-			{ source: "portal", version: 1, type: "start", gameId: "city-builder", levelId: "medium" },
+			{ source: "portal", version: 1, type: "start", gameId: "city-builder", levelId: "medium", progress: null },
 			"*",
 		);
 		expect(document.activeElement).toBe(frame);

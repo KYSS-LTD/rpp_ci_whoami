@@ -76,51 +76,78 @@ interface MonthCloseProps {
 	taskLines?: Array<{ title: string; score: number }>;
 	hintsUsed?: number;
 	mistakesCount?: number;
+	epilogue?: string;
 }
 
 // Лист «Итоги дня» (закрытие месяца): строки заданий, подсказки, замечания, итог, штамп по порогам и кнопка «Сдать отчёт».
-export function MonthClose({ levelScore, isSent, onSubmit, taskLines = [], hintsUsed = 0, mistakesCount = 0 }: MonthCloseProps) {
+export function MonthClose({ levelScore, isSent, onSubmit, taskLines = [], hintsUsed = 0, mistakesCount = 0, epilogue }: MonthCloseProps) {
+	const [interest, setInterest] = useState<number | null>(null);
 	const texts = accountantTexts.monthClose;
 	const summaryTexts = accountantTexts.daySummary;
-	const stampId = getStampId(calculateShare(levelScore, levelMaxScore) ?? 0);
+	const share = calculateShare(levelScore, levelMaxScore) ?? 0;
+	const stampId = getStampId(share);
+	const report = accountantTexts.professionReport;
+	const match = interest === null ? null : Math.round((share * 100 + interest * 50) / 2);
 	return (
 		<section className={styles.monthClose} aria-labelledby="month-close-title">
 			<h2 id="month-close-title" className={styles.formTitle}>
 				{texts.title}
 			</h2>
-			<table className={styles.ledger}>
-				<tbody>
-					{taskLines.map((line, index) => (
-						<tr key={line.title}>
-							<th scope="row">{fillTemplate(summaryTexts.taskLine, { number: String(index + 1), title: line.title })}</th>
+			<div className={styles.shiftSummary}>
+				<table className={styles.ledger}>
+					<tbody>
+						{taskLines.map((line, index) => (
+							<tr key={line.title}>
+								<th scope="row">{fillTemplate(summaryTexts.taskLine, { number: String(index + 1), title: line.title })}</th>
+								<td>
+									{line.score} / {miniGameMaxScore}
+								</td>
+							</tr>
+						))}
+						{taskLines.length > 0 ? (
+							<>
+								<tr>
+									<th scope="row">{summaryTexts.hintsLine}</th>
+									<td>{hintsUsed}</td>
+								</tr>
+								<tr>
+									<th scope="row">{summaryTexts.mistakesLine}</th>
+									<td>{mistakesCount}</td>
+								</tr>
+							</>
+						) : null}
+						<tr className={styles.totalRow}>
+							<th scope="row">{texts.totalLabel}</th>
 							<td>
-								{line.score} / {miniGameMaxScore}
+								<strong>
+									{levelScore} / {levelMaxScore}
+								</strong>
 							</td>
 						</tr>
-					))}
-					{taskLines.length > 0 ? (
-						<>
-							<tr>
-								<th scope="row">{summaryTexts.hintsLine}</th>
-								<td>{hintsUsed}</td>
-							</tr>
-							<tr>
-								<th scope="row">{summaryTexts.mistakesLine}</th>
-								<td>{mistakesCount}</td>
-							</tr>
-						</>
-					) : null}
-					<tr className={styles.totalRow}>
-						<th scope="row">{texts.totalLabel}</th>
-						<td>
-							<strong>
-								{levelScore} / {levelMaxScore}
-							</strong>
-						</td>
-					</tr>
-				</tbody>
-			</table>
-			<Stamp stampId={stampId} label={texts.stamps[stampId]} className={styles.stampPress} />
+					</tbody>
+				</table>
+				<Stamp stampId={stampId} label={texts.stamps[stampId]} className={styles.stampPress} />
+				{epilogue ? <p>{epilogue}</p> : null}
+			</div>
+			{taskLines.length > 0 ? (
+				<section className={styles.professionReport} aria-labelledby="accountant-profession-report">
+					<h3 id="accountant-profession-report">{report.title}</h3>
+					<p>{report.accuracy} · {Math.round(share * 100)}%</p>
+					<fieldset>
+						<legend>{report.interest}</legend>
+						{report.choices.map((choice, index) => (
+							<label key={choice}><input type="radio" name="accountant-career-interest" checked={interest === index} onChange={() => setInterest(index)} />{choice}</label>
+						))}
+					</fieldset>
+					<div role="status">
+						{match === null ? <p>{report.prompt}</p> : <>
+							<p><strong>{report.match} · {match}%</strong></p>
+							<p>{report.advice[match >= 75 ? 2 : match >= 40 ? 1 : 0]}</p>
+							<p>{report.scale}</p>
+						</>}
+					</div>
+				</section>
+			) : null}
 			<button type="button" className={styles.submitButton} onClick={onSubmit} disabled={isSent}>
 				{accountantTexts.buttons.submitReport}
 			</button>

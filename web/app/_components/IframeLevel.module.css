@@ -121,12 +121,20 @@
 }
 
 .level:is(:fullscreen, [data-expanded="true"]) .header {
-	padding: max(4px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 4px max(8px, env(safe-area-inset-left));
-	align-items: center;
+	justify-content: flex-end;
+	padding: env(safe-area-inset-top) max(4px, env(safe-area-inset-right)) 0 max(4px, env(safe-area-inset-left));
+	background: #0b130f;
 }
 
-.level:is(:fullscreen, [data-expanded="true"]) .titles h1 {
-	font-size: 1rem;
+.level:is(:fullscreen, [data-expanded="true"]) .titles {
+	display: none;
+}
+
+.level:is(:fullscreen, [data-expanded="true"]) .fullscreenButton {
+	color: #f3f5eb;
+	background: transparent;
+	border-color: transparent;
+	box-shadow: none;
 }
 
 .level:is(:fullscreen, [data-expanded="true"]) .stage {
@@ -135,9 +143,5 @@
 	min-height: 0;
 	border: 0;
 	border-radius: 0;
-	padding-block-end: env(safe-area-inset-bottom);
-}
-
-.level:is(:fullscreen, [data-expanded="true"]) .frame {
-	height: calc(100% - env(safe-area-inset-bottom));
+	margin-block-end: env(safe-area-inset-bottom);
 }

@@ -33,14 +33,14 @@
 /* ---------- Итоги дня ---------- */
 
 .monthClose {
-	display: flex;
-	flex-direction: column;
-	align-items: flex-start;
-	gap: 10px;
+	display: grid;
+	align-items: start;
+	gap: 12px 20px;
 	padding: 10px 12px 14px;
 }
 
 .monthClose .formTitle {
+	grid-column: 1 / -1;
 	font-family: var(--acc-font-pixel), "Courier New", monospace;
 	font-size: 1.25rem;
 	font-weight: 400;
@@ -73,15 +73,24 @@
 	border-bottom: 3px double #3b2f27;
 }
 
-.stampPress {
-	margin: 2px 0 2px 20px;
+.shiftSummary {
+	display: grid;
+	min-inline-size: 0;
+	gap: 8px;
+}
+
+.monthClose .stampPress {
+	width: min(155px, 100%);
+	margin-inline-start: 6px;
 	animation: stampPress 0.45s steps(5) both;
 }
+
+.monthClose .stampPress span { font-size: .72rem; }
 
 @keyframes stampPress {
 	from {
 		opacity: 0;
-		transform: rotate(-7deg) scale(2);
+		transform: rotate(-7deg) scale(1.3);
 	}
 	to {
 		opacity: 1;
@@ -90,7 +99,9 @@
 }
 
 .monthClose .submitButton {
-	min-height: 40px;
+	justify-self: start;
+	grid-column: 1 / -1;
+	min-height: 44px;
 	padding: 6px 18px;
 	font-family: var(--acc-font-pixel), "Courier New", monospace;
 	font-size: 1.1rem;
@@ -108,7 +119,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.stampPress {
+	.monthClose .stampPress {
 		animation: stampAppear 0.3s ease both;
 	}
 }
@@ -116,5 +127,22 @@
 @keyframes stampAppear {
 	from {
 		opacity: 0;
+	}
+}
+.professionReport {
+	display: grid;
+	gap: 6px;
+	padding-block: 8px;
+	border-block: 1px solid #b8ae96;
+}
+
+.professionReport h3 { color: inherit; font-size: 1rem; }
+.professionReport fieldset { display: flex; gap: 0 12px; flex-wrap: wrap; min-inline-size: 0; border: 0; padding: 0; }
+.professionReport label { display: inline-flex; gap: 6px; align-items: center; min-block-size: 44px; cursor: pointer; }
+.professionReport input { accent-color: #a33129; }
+
+@media (min-width: 760px) {
+	.monthClose:has(.professionReport) {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 	}
 }

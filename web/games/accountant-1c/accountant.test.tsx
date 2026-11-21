@@ -116,7 +116,7 @@ describe("LevelRunner запускает игру", () => {
 		render(<LevelRunner gameId="accountant-1c" levelId={levelId} />);
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.newspaper.openLetter }));
 		expect(screen.getByRole("heading", { name: accountantTexts.intros[levelId].subject })).toBeTruthy();
-		expect(screen.getByText(accountantTexts.window.appTitle)).toBeTruthy();
+		expect(screen.getByRole("button", { name: accountantTexts.window.open })).toBeTruthy();
 	});
 
 	it("досрочный выход сохраняется порталом как незавершённый уровень", () => {

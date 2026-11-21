@@ -3,6 +3,7 @@ import { text } from './text.js';
 export const glyphs = { assembly: '◈', flight: '✣', survey: '⌗' };
 export const coarsePointer = matchMedia('(any-pointer: coarse)');
 let statusTimer;
+let portraitDismissed = false;
 
 export function query(selector) {
 	return document.querySelector(selector);
@@ -46,6 +47,7 @@ export function close_StageMenu() {
 }
 
 export function toggle_StageMenu() {
+	if (query('#flight-orientation')?.open) return;
 	const dialog = query('.mission-view dialog[open]');
 	if (dialog) {
 		dialog.close();
@@ -88,7 +90,7 @@ export function stage_Shell(index, scene, panel, controls = '', tutorial = '', t
 	const submitQuestion = override.freeMode ? text.free.finishQuestion : text.submitQuestion;
 	const submitNotice = override.freeMode ? text.free.finishNotice : text.submitNotice;
 	const completeNotice = override.freeMode ? text.free.completeNotice : text.completeNotice;
-	const statusPrefix = index === 1 ? '<span id="stage-status-prefix" aria-hidden="true"></span>' : '';
+	const statusPrefix = '<span id="stage-status-prefix" aria-hidden="true"></span>';
 	return `<section class="mission-view ${mission.id}-view" aria-label="${title}">
 		${scene}${controls}
 		<p class="stage-status" id="stage-status" role="status">${statusPrefix}<span id="stage-status-text"></span></p>
@@ -119,6 +121,10 @@ export function stage_Shell(index, scene, panel, controls = '', tutorial = '', t
 			<h2 id="submit-title">${submitQuestion}</h2><p id="submit-notice">${submitNotice}</p>
 			<div class="dialog-actions"><button type="button" class="button button-quiet" id="cancel-submit">${text.keepPlaying}</button><button type="button" class="button button-primary" id="confirm-submit">${submit}</button></div>
 		</dialog>
+		${index === 1 ? `<dialog class="stage-dialog orientation-dialog" id="flight-orientation" aria-labelledby="orientation-title">
+			<h2 id="orientation-title">${text.flight.rotatePhone}</h2><p>${text.flight.rotateDetail}</p>
+			<button type="button" class="button button-quiet" id="keep-portrait">${text.flight.keepPortrait}</button>
+		</dialog>` : ''}
 	</section>`;
 }
 
@@ -182,4 +188,16 @@ export function bind_Stage({ signal, restart, exit, submit, focusScene, showTuto
 	}, { signal });
 	if (showTutorial) open_Tutorial();
 	else focusScene?.();
+	const orientation = query('#flight-orientation');
+	if (orientation) {
+		const portrait = matchMedia('(pointer: coarse) and (orientation: portrait) and (max-width: 700px)');
+		function sync_Orientation() {
+			if (portrait.matches && !portraitDismissed && !orientation.open) orientation.showModal();
+			else if (!portrait.matches && orientation.open) orientation.close();
+		}
+		portrait.addEventListener('change', sync_Orientation, { signal });
+		orientation.addEventListener('cancel', () => { portraitDismissed = true; }, { signal });
+		bind_Click('#keep-portrait', () => { portraitDismissed = true; orientation.close(); }, signal);
+		sync_Orientation();
+	}
 }

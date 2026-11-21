@@ -300,24 +300,21 @@
 	font-variant-numeric: tabular-nums;
 }
 
-.hud-banner,
-.hud-hint {
-	margin: 0;
-	padding: 0.3rem 0.8rem;
-	border-radius: 0.5rem;
-	box-sizing: border-box;
-	max-inline-size: 100%;
-	text-wrap: balance;
+.hud-notices {
+	position: absolute;
+	inset: calc(max(0.5rem, env(safe-area-inset-top)) + 4.25rem) auto auto max(0.5rem, env(safe-area-inset-left));
+	inline-size: min(34%, 20rem);
+	font: 500 clamp(0.7rem, 1.45vw, 0.88rem)/1.35 ui-monospace, monospace;
+	text-shadow: 0 1px 3px #151e24, 0 0 4px #151e24;
+}
+
+.hud-notices p {
+	margin: 0 0 .3rem;
+	text-wrap: pretty;
 }
 
 .hud-banner {
-	background: #ffcc4d;
-	color: #231a00;
-	font-weight: 700;
-}
-
-.hud-hint {
-	background: var(--hud-bg-strong);
+	color: #fff0ad;
 }
 
 .hud-banner:empty,
@@ -882,11 +879,23 @@
 		display: grid;
 	}
 
-	.hud-dialog--start .hud-dialog__title,
 	.hud-dialog--start .hud-dialog__lead,
 	.hud-dialog--start .hud-start-actions {
 		grid-column: 1 / -1;
 	}
+
+	.hud-dialog--start .hud-day-label {
+		grid-area: 1 / 2;
+		justify-self: end;
+		align-self: center;
+	}
+
+	.hud-dialog--start > .hud-dialog__note,
+	.hud-dialog--start > .hud-day-label + .hud-dialog__lead {
+		display: none;
+	}
+
+	.hud-dialog--start :is(.hud-controls, .hud-rules) { margin-block: 0; }
 
 	.hud-dialog--start .hud-button {
 		justify-self: center;
@@ -898,8 +907,9 @@
 		grid-template-columns: minmax(0, 1fr) auto;
 		grid-template-rows: auto minmax(0, 1fr);
 	}
-	.cooking-hud [data-zone="top-center"] { grid-column: 1; grid-row: 1; justify-self: start; }
-	.hud-right { grid-column: 2; grid-row: 1; }
+	.hud-stats { grid-column: 2; grid-row: 1; justify-self: end; }
+	.hud-left { grid-column: 1; grid-row: 1; }
+	.hud-notices { inset-block-start: calc(max(0.5rem, env(safe-area-inset-top)) + 7.75rem); inline-size: min(48%, 20rem); }
 	.hud-orders { grid-column: 1 / -1; grid-row: 2; inline-size: 100%; }
 	/* Сводка по блюдам на телефоне в портретной ориентации идёт строкой под таймером и счётчиками. */
 	.hud-orders[data-view="dishes"] { justify-content: flex-start; padding-block-start: 4px; }

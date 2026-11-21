@@ -1,13 +1,42 @@
-import { MathUtils, Matrix4, Quaternion, Vector3 } from 'three';
+import { MathUtils, Quaternion, Vector3 } from 'three';
 
-export function create_ChaseCamera(drone, center, distance) {
-	const mountPosition = new Vector3(0, .25, 1).setLength(distance).add(center);
-	const mountRotation = new Quaternion().setFromRotationMatrix(
-		new Matrix4().lookAt(mountPosition, center, new Vector3(0, 1, 0)),
-	);
-	return (camera) => {
-		drone.localToWorld(camera.position.copy(mountPosition));
-		drone.getWorldQuaternion(camera.quaternion).multiply(mountRotation);
+export function create_ChaseCamera(drone, center, distance, obstructed, groundAt = () => -Infinity) {
+	const target = new Vector3();
+	const boom = new Vector3();
+	const sample = new Vector3();
+	const attitude = new Quaternion();
+	let yaw;
+	let viewPitch;
+	let clearance = 1;
+	return (camera, heading, tilt, delta, immediate = false) => {
+		const pitch = MathUtils.degToRad(tilt);
+		const blend = yaw === undefined || immediate ? 1 : -Math.expm1(-12 * delta);
+		drone.getWorldQuaternion(attitude);
+		// Выделяем поворот вокруг мировой вертикали. В верхней точке флипа удерживаем предыдущий курс.
+		const course = Math.hypot(attitude.y, attitude.w) > .28 ? 2 * Math.atan2(attitude.y, attitude.w) : yaw ?? heading;
+		const turn = MathUtils.euclideanModulo(course - (yaw ?? heading) + Math.PI, 2 * Math.PI) - Math.PI;
+		yaw = MathUtils.euclideanModulo((yaw ?? heading) + turn * blend + Math.PI, 2 * Math.PI) - Math.PI;
+		viewPitch = MathUtils.lerp(viewPitch ?? pitch, pitch, blend);
+		const elevation = .28 - viewPitch * .55;
+		// Подвес следует за курсом, сохраняя горизонт при крене и переворотах.
+		drone.localToWorld(target.copy(center));
+		boom.set(Math.sin(yaw) * Math.cos(elevation), Math.sin(elevation), Math.cos(yaw) * Math.cos(elevation)).multiplyScalar(distance);
+		// Оставляем зазор для камеры у земли, даже когда игрок поднимает взгляд со стартовой площадки.
+		boom.y = Math.max(boom.y, groundAt(target.x + boom.x, target.z + boom.z) + .28 - target.y);
+		let available = 1;
+		for (let step = 1; step <= 12; step++) {
+			const fraction = step / 12;
+			sample.copy(target).addScaledVector(boom, fraction);
+			if (sample.y < groundAt(sample.x, sample.z) + fraction * .13 || obstructed(sample.x, sample.y, sample.z)) {
+				available = Math.max(.12, (step - 1) / 12);
+				break;
+			}
+		}
+		clearance = Math.min(available, MathUtils.lerp(clearance, available, blend));
+		camera.position.copy(target).addScaledVector(boom, clearance);
+		camera.position.y = Math.max(camera.position.y, groundAt(camera.position.x, camera.position.z) + .16);
+		camera.lookAt(target);
+		camera.rotateX(.07 + viewPitch * .48);
 	};
 }
 

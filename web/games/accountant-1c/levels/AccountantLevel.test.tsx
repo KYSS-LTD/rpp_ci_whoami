@@ -124,6 +124,8 @@ describe("отправка результата", () => {
 		clickButton(accountantTexts.buttons.next);
 		clickButton("fake-complete");
 		const submit = screen.getByRole("button", { name: accountantTexts.buttons.submitReport });
+		fireEvent.click(screen.getByRole("radio", { name: accountantTexts.professionReport.choices[2] }));
+		expect(screen.getByText(`${accountantTexts.professionReport.match} · 90%`)).toBeTruthy();
 		fireEvent.click(submit);
 		fireEvent.click(submit);
 		expect(onFinish).toHaveBeenCalledTimes(1);
@@ -183,6 +185,7 @@ describe("рабочее место уровня", () => {
 	it("окно программы: разделы, «Сообщения», нет названия чужой программы", () => {
 		renderLevel("medium");
 		const windowElement = screen.getByTestId("accounting-window");
+		clickButton(accountantTexts.window.open);
 		expect(within(windowElement).getByRole("navigation", { name: accountantTexts.window.sectionsLabel })).toBeTruthy();
 		expect(within(windowElement).getByRole("region", { name: accountantTexts.window.messagesTitle })).toBeTruthy();
 		expect(within(windowElement).getByText(accountantTexts.window.appTitle)).toBeTruthy();
@@ -200,6 +203,7 @@ describe("рабочее место уровня", () => {
 		expect(slipText.indexOf(explanation.reason)).toBeLessThan(slipText.indexOf(explanation.joke));
 		fireEvent.click(within(slips).getByRole("button", { name: accountantTexts.slips.removeLabel }));
 		expect(within(slips).queryByText(/Правильно/)).toBeNull();
+		clickButton(accountantTexts.window.open);
 		const messages = screen.getByRole("region", { name: accountantTexts.window.messagesTitle });
 		expect(within(messages).getByText(/Правильно: Дт 60 Кт 51 на 18 000/)).toBeTruthy();
 	});
