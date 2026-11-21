@@ -60,7 +60,7 @@ function draw_Map(context, x, z, heading, scanned) {
 	context.restore();
 }
 
-export function start_Flight({ mount, coast, renderer, signal, settings, restart, attempts, onLaunch, sound }) {
+export function start_Flight({ mount, coast, renderer, signal, settings, restart, attempts, onLaunch, sound, restarting, logAction }) {
 	const copy = text.flight;
 	const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 	const { scene, fieldDrone, seaTime, touchesTree } = coast;
@@ -82,7 +82,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		<div class="fpv-top"><span>${fpvKit.name.toUpperCase()}<br><span id="osd-mode">${modeLabel}</span><br><span id="attempt-count"></span></span><span id="course">000°</span><span class="fpv-right" id="navigation-osd"></span></div>
 		<div class="fpv-reticle" aria-hidden="true"></div><div class="fpv-message" id="osd-state"></div>
 		<div class="fpv-bottom"><span><span id="battery"></span><br><span id="consumption"></span></span><span class="fpv-center"><span id="altitude">0.0 m</span><br><span id="throttle"></span></span><span class="fpv-right"><time id="airtime">00:00</time><br><span id="speed">0 km/h</span></span></div>
-	</div>${markerLayer}`);
+	</div>${markerLayer}<div class="camera-boot" id="camera-boot" hidden><span role="status">${copy.connected}</span></div>`);
 	const controls = `<div class="flight-controls">
 		<div class="joystick-group"><div class="joystick" id="stick-view" aria-hidden="true"><i></i></div><span id="stick-left-label">${stabilized ? copy.attitude : copy.throttleYaw}</span></div>
 		<button class="button button-primary" id="flight-action" type="button">${copy.takeoff}</button>
@@ -104,6 +104,16 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	const tutorial = `<p class="keyboard-note">${keys}</p><p class="joystick-note">${sticks}</p><p>${copy.retryRule}</p>`;
 	mount(stage_Shell(1, sceneMarkup, panel, controls, tutorial));
 	const frame = query('#scene-frame');
+	const boot = query('#camera-boot');
+	let bootTimer;
+	let cameraStarted = false;
+	function connect_Camera() {
+		cameraStarted = true;
+		boot.hidden = false;
+		bootTimer = setTimeout(() => { boot.hidden = true; }, 1450);
+	}
+	if (restarting) connect_Camera();
+	signal.addEventListener('abort', () => clearTimeout(bootTimer), { once: true });
 	frame.tabIndex = -1;
 	const focus = () => frame.focus({ preventScroll: true });
 	const mapPanel = query('#flight-map');
@@ -212,6 +222,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		if (landing || landed) return;
 		if (!airborne) {
 			airborne = true;
+			if (!cameraStarted) connect_Camera();
 			if (!resting) attempts = onLaunch();
 			resting = false;
 			liftedThisHop = false;
@@ -229,6 +240,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		if (scanned.size === sectors.length) return attempt_Landing();
 		const target = target_InRange();
 		if (!target || motion.height < 3 || motion.height > 12) {
+			logAction(target ? 'wrongHeight' : 'missedSector');
 			errors++;
 			show_Message(copy.badScan, 'warn');
 			return;
@@ -236,6 +248,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		capture_Sector(target);
 		sound.play('shutter');
 		scanned.add(target);
+		logAction('captured');
 		query(`#sector-${target.label}`).classList.add('captured');
 		query(`#marker-${target.label}`).hidden = true;
 		flash = .24;
@@ -302,7 +315,9 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		else if (battery === 0) fail_Flight(copy.emergency);
 	}
 	function fail_Flight(message) {
+		logAction(message === copy.crash ? 'crash' : 'empty');
 		failed = true;
+		boot.hidden = true;
 		motion.vx = motion.vz = 0;
 		flightControls.classList.add('retry-flight');
 		button.hidden = false;
@@ -314,6 +329,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		set_Status(message, 'warn');
 	}
 	function finish_Flight() {
+		logAction('returned');
 		landing = airborne = false;
 		landed = scanned.size === sectors.length;
 		resting = !landed;
@@ -380,7 +396,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			const course = Math.round((360 - THREE.MathUtils.radToDeg(heading) % 360) % 360) % 360;
 			videoLoss = THREE.MathUtils.smoothstep(Math.hypot(distance(base), height), ...profile.videoRange);
 			sound.flight({ running: airborne && !failed, throttle: stabilized ? .48 + Math.hypot(motion.vx, motion.vz) * .014 : acro.throttle,
-				speed: Math.hypot(motion.vx, motion.vz), loss: failed ? 1 : videoLoss, paused });
+				speed: Math.hypot(motion.vx, motion.vz), signalLost: failed, paused });
 			camera.updateMatrixWorld();
 			fieldDrone.drone.visible = false;
 			fieldDrone.drone.scale.setScalar(.18);

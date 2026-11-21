@@ -91,7 +91,7 @@ export function create_Sound(signal) {
 			source.start();
 			source.stop(now + duration);
 		},
-		flight({ running, throttle, speed, loss, paused }) {
+		flight({ running, throttle, speed, signalLost, paused }) {
 			if (!master || (!rotors && !running)) return;
 			if (!rotors) start_Motors();
 			const now = context.currentTime;
@@ -104,7 +104,7 @@ export function create_Sound(signal) {
 			rotorFilter.frequency.setTargetAtTime(620 + load * 1900, now, .07);
 			motorGain.gain.setTargetAtTime(running && audible ? .052 + load * .053 : 0, now, .07);
 			wind.gain.setTargetAtTime(running && audible ? .038 + Math.min(speed / 28, 1) * .18 : 0, now, .15);
-			radio.gain.setTargetAtTime(audible ? loss ** 2 * .16 : 0, now, .09);
+			radio.gain.setTargetAtTime(audible && signalLost ? .16 : 0, now, .09);
 		},
 	};
 }

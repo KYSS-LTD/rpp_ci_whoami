@@ -8,6 +8,7 @@ import { difficultyIds, difficultySettings, read_UrlDifficulty, retryPenalty } f
 import { start_Flight } from './flight.js';
 import { dispose_Scene } from './models.js';
 import { debugEnabled, debug_Message, publish_Result, read_Progress, save_Progress } from './progress.js';
+import { bind_Report, read_Record, report_Markup, track_Practice } from './report.js';
 import { create_Home, create_Renderer, resize_Frame } from './scenes.js';
 import { start_Survey } from './survey.js';
 import { text } from './text.js';
@@ -209,7 +210,12 @@ function show_Stage(index, showTutorial = true) {
 	const sound = create_Sound(signal);
 	const run = current_Run();
 	const restart = () => show_Stage(index, false);
-	mode = modes[index]({ mount, coast, renderer, signal, difficulty, settings: difficultySettings[difficulty], sound, restart, invalidate: request_Frame,
+	const record = run.records[index] ??= read_Record({}, index);
+	const logAction = key => {
+		record.events[key]++;
+		save_Progress(progress);
+	};
+	mode = modes[index]({ mount, coast, renderer, signal, difficulty, settings: difficultySettings[difficulty], sound, logAction, restart, restarting: !showTutorial, invalidate: request_Frame,
 		attempts: run.attempts, onLaunch() {
 			run.attempts++;
 			if (run.attempts > 1 && run.scores.length >= 2) run.scores[1] = Math.max(0, run.scores[1] - retryPenalty);
@@ -223,6 +229,7 @@ function show_Stage(index, showTutorial = true) {
 	bind_Stage({ signal, restart, showTutorial, exit: open_Home, focusScene: mode.focus,
 		submit: () => save_Stage(index, mode.score(), mode.summary?.()),
 	});
+	track_Practice(record, signal, () => save_Progress(progress));
 	schedule_Frame();
 }
 
@@ -263,12 +270,15 @@ function show_Result() {
 		<p class="micro">${text.resultLabel} · ${text.difficulty[progress.difficulty].title}</p><h1 tabindex="-1">${text.allComplete}</h1>
 		<div class="score-big">${score}<span> / 300</span></div><p class="result-lesson">${text.resultIntro}</p>
 		<p>${text.flight.attempts} · ${run.attempts}</p><ul class="score-list">${text.stages.map((stage, index) => `<li><span>${stage.skill}</span><strong>${run.scores[index]} / 100</strong></li>`).join('')}</ul>
+		${report_Markup(run)}
 		<div class="result-actions"><button type="button" class="button button-primary" id="menu">${text.menu}</button><button type="button" class="button button-quiet" id="again">${text.repeat}</button></div>
 	</section>`);
+	bind_Report(run, signal, () => save_Progress(progress));
 	bind_Click('#menu', () => show_Home(), signal);
 	bind_Click('#again', () => {
 		run.scores = [];
 		run.attempts = 0;
+		run.records = [null, null, null];
 		save_Progress(progress);
 		show_Home();
 	}, signal);

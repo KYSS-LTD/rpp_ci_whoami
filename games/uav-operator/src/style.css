@@ -293,3 +293,21 @@ h1, h2, p { margin: 0; }
 .flight-controls.retry-flight { display: grid; }
 .retry-flight .joystick-group { visibility: hidden; }
 #mute[aria-pressed="true"] { color: var(--accent); border-color: currentColor; }
+
+.camera-boot { position: absolute; inset: 0; z-index: 3; display: grid; align-items: start; justify-items: center; padding-top: 23vh; pointer-events: none; overflow: hidden; }
+.camera-boot span { position: relative; padding: .3em .65em; background: #112119db; color: #d3f7db; font: 500 clamp(.9rem, 2.3vw, 1.65rem)/1.25 var(--mono); letter-spacing: .12em; text-shadow: -1px 0 #52aab4, 1px 0 #c88eaa; }
+@media (prefers-reduced-motion: no-preference) {
+	.camera-boot::before { content: ''; position: absolute; inset: 0; background: linear-gradient(#10201dd9, #13202133 64%, #b8dcc473 98%, transparent); animation: camera-sync .65s ease-out both; }
+	.camera-boot span { animation: camera-lock 1.45s ease-out both; }
+}
+@keyframes camera-sync { from { transform: translateY(0); } to { transform: translateY(-105%); } }
+@keyframes camera-lock { 0% { opacity: 0; transform: translateX(-.35em); } 22%, 83% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+
+.practice-report { margin: 1.5rem auto; text-align: start; }
+.practice-report article, #match-report { padding-block: 1rem; border-block-start: 1px solid var(--line); }
+.practice-report :is(p, ul, h4, fieldset) { margin-block: .55rem; }
+.practice-report fieldset { padding: 0; border: 0; }
+.practice-report label { display: inline-flex; gap: .35rem; align-items: center; min-height: 44px; margin-inline-end: .8rem; cursor: pointer; }
+.practice-report input { accent-color: var(--accent); }
+
+.lesson-video { display: block; width: 100%; aspect-ratio: 720 / 414; border-radius: .5rem; background: #14211d; }

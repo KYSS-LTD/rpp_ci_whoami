@@ -83,8 +83,12 @@ export function stage_Shell(index, scene, panel, controls = '', tutorial = '', t
 			<div class="actions-row"><button class="button button-quiet" id="mute" type="button">${text.mute}</button><button class="button button-quiet" id="tutorial-again" type="button">${text.tutorial}</button><button class="button button-quiet" id="restart" type="button">${text.restart}</button><button class="button button-quiet" id="stage-exit" type="button">${text.toHub}</button></div>
 		</aside>
 		<dialog class="stage-dialog" id="stage-tutorial" aria-labelledby="tutorial-title">
-			<h2 id="tutorial-title">${mission.title}</h2><p>${mission.guide}</p>${tutorial}
-			<form method="dialog" class="dialog-actions"><button class="button button-primary" autofocus>${text.beginStage}</button></form>
+			<h2 id="tutorial-title" tabindex="-1" autofocus>${mission.title}</h2>
+			<video class="lesson-video" controls playsinline preload="none" aria-label="${mission.title}"
+				poster="${new URL(`./assets/${mission.id}-lesson.jpg`, import.meta.url).href}"
+				src="${new URL(`./assets/${mission.id}-lesson.mp4`, import.meta.url).href}"></video>
+			<p>${mission.guide}</p>${tutorial}
+			<form method="dialog" class="dialog-actions"><button class="button button-primary">${text.beginStage}</button></form>
 		</dialog>
 		<dialog class="stage-dialog" id="stage-submit" aria-labelledby="submit-title" aria-describedby="submit-notice">
 			<h2 id="submit-title">${text.submitQuestion}</h2><p id="submit-notice">${text.submitNotice}</p>
@@ -129,7 +133,10 @@ export function bind_Stage({ signal, restart, exit, submit, focusScene, showTuto
 		if (confirmed) submit();
 		else (focusScene ?? (() => menuButton.focus()))();
 	}, { signal });
-	tutorial.addEventListener('close', () => focusScene?.(), { signal });
+	tutorial.addEventListener('close', () => {
+		tutorial.querySelector('video').pause();
+		focusScene?.();
+	}, { signal });
 	if (showTutorial) tutorial.showModal();
 	else focusScene?.();
 }

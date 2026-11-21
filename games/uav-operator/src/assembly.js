@@ -3,7 +3,7 @@ import { fpvKit } from './fpv.js';
 import { bind_Click, query, scene_Frame, set_Status, show_CompletePrompt, stage_Shell, vibrate_Device } from './ui.js';
 import { text } from './text.js';
 
-export function start_Assembly({ mount, signal, settings, sound }) {
+export function start_Assembly({ mount, signal, settings, sound, logAction }) {
 	const { parts, preinstalled } = settings.assembly;
 	const bench = create_Bench({ parts, preinstalled });
 	const copy = text.assembly;
@@ -133,6 +133,7 @@ export function start_Assembly({ mount, signal, settings, sound }) {
 
 	function finish_Assembly() {
 		phase = 'secured';
+		logAction('secured');
 		bench.driverState = 'table';
 		set_Status(copy.secured, 'success');
 		show_CompletePrompt(copy.completeNotice);
@@ -219,16 +220,19 @@ export function start_Assembly({ mount, signal, settings, sound }) {
 		if (phase !== 'wiring' || bench.installed.has(type)) return;
 		if (!bench.selected) return set_Status(copy.selectFirst);
 		if (bench.selected !== type) {
+			logAction('wrongPort');
 			errors++;
 			vibrate_Device([20, 40, 20]);
 			return set_Status(copy.wrong, 'warn');
 		}
 		if (type === 'battery' && playerInstalled() < parts.length - 1) {
+			logAction('earlyPower');
 			errors++;
 			vibrate_Device([20, 40, 20]);
 			return set_Status(copy.last, 'warn');
 		}
 		bench.installed.add(type);
+		logAction('connected');
 		sound.play('plug');
 		bench.selected = null;
 		vibrate_Device(15);
@@ -277,6 +281,12 @@ export function start_Assembly({ mount, signal, settings, sound }) {
 		const tolerance = { x: (touchInput ? 34 : 18) * 2 / canvas.clientWidth, y: (touchInput ? 34 : 18) * 2 / canvas.clientHeight };
 		const x = position.x * 2 - 1;
 		const y = 1 - position.y * 2;
+		if (accept === relevant) {
+			// Выбираем ближайшую активную головку прежде, чем луч попадёт в крышку или отвёртку в руке.
+			const radius = touchInput ? 48 : 32;
+			const screw = bench.nearest_Screw(x, y, radius * 2 / canvas.clientWidth, radius * 2 / canvas.clientHeight);
+			if (screw) return screw;
+		}
 		return bench.pick(x, y, accept, tolerance) ?? bench.pick(x, y, () => true, { x: 1e-6, y: 1e-6 });
 	}
 
