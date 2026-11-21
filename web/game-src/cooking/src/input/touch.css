@@ -1,0 +1,120 @@
+/* Сенсорное управление (стик и две кнопки). Слой лежит над canvas и под HUD (HUD должен иметь z-index больше 1),
+   показывается только в сенсорном режиме (атрибут hidden снимает код ввода). Владелец: SONNET-2. */
+
+.cooking-touch-layer {
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+	/* Жесты браузера (прокрутка, масштаб) на игровом слое не нужны: управление обрабатывает ввод игры. */
+	touch-action: none;
+	-webkit-user-select: none;
+	user-select: none;
+	-webkit-touch-callout: none;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.cooking-touch-layer[hidden] {
+	display: none;
+}
+
+/* Стик: в покое подсказка в левом нижнем углу, при касании переезжает в точку касания (переменные --stick-x и --stick-y). */
+.cooking-touch-stick {
+	--stick-size: 128px;
+	--stick-x: calc(max(16px, env(safe-area-inset-left, 0px)) + var(--stick-size) / 2);
+	--stick-y: calc(100% - max(16px, env(safe-area-inset-bottom, 0px)) - var(--stick-size) / 2);
+	position: absolute;
+	left: var(--stick-x);
+	top: var(--stick-y);
+	inline-size: var(--stick-size);
+	block-size: var(--stick-size);
+	translate: -50% -50%;
+	box-sizing: border-box;
+	border: 3px solid rgb(255 255 255 / 0.55);
+	border-radius: 50%;
+	background: rgb(255 255 255 / 0.12);
+	opacity: 0.4;
+	pointer-events: none;
+}
+
+.cooking-touch-stick[data-active="true"] {
+	opacity: 0.9;
+}
+
+.cooking-touch-stick-knob {
+	--knob-x: 0px;
+	--knob-y: 0px;
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	inline-size: 56px;
+	block-size: 56px;
+	translate: calc(-50% + var(--knob-x)) calc(-50% + var(--knob-y));
+	border-radius: 50%;
+	background: rgb(255 255 255 / 0.75);
+	box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+}
+
+/* Кнопки: у правого края, действие сверху, рабочее действие снизу. Размер не меньше 72px (цель для пальца не меньше 44px). */
+.cooking-touch-buttons {
+	position: absolute;
+	right: max(16px, env(safe-area-inset-right, 0px));
+	bottom: max(16px, env(safe-area-inset-bottom, 0px));
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.cooking-touch-button {
+	--button-size: clamp(72px, 20vmin, 104px);
+	inline-size: var(--button-size);
+	block-size: var(--button-size);
+	box-sizing: border-box;
+	padding: 0;
+	border: 3px solid rgb(255 255 255 / 0.85);
+	border-radius: 50%;
+	background: rgb(32 44 56 / 0.78);
+	color: #fff;
+	font: 700 1rem/1.1 system-ui, sans-serif;
+	text-shadow: 0 1px 2px rgb(0 0 0 / 0.6);
+	touch-action: none;
+	-webkit-user-select: none;
+	user-select: none;
+	-webkit-tap-highlight-color: transparent;
+	cursor: pointer;
+}
+
+.cooking-touch-button-work {
+	background: rgb(120 56 32 / 0.8);
+}
+
+/* Нажатие видно сразу: кнопка уменьшается и светлеет. */
+.cooking-touch-button[data-pressed="true"],
+.cooking-touch-button:active {
+	scale: 0.94;
+	border-color: #fff;
+	filter: brightness(1.35);
+}
+
+.cooking-touch-button:focus-visible {
+	outline: 3px solid #fff;
+	outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.cooking-touch-button,
+	.cooking-touch-stick {
+		transition:
+			scale 120ms ease-out,
+			filter 120ms ease-out,
+			opacity 120ms ease-out;
+	}
+}
+
+@media (forced-colors: active) {
+	.cooking-touch-button {
+		border-color: ButtonText;
+		background: ButtonFace;
+		color: ButtonText;
+		text-shadow: none;
+	}
+}

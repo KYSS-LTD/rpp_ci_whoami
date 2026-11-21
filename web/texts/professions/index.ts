@@ -3,6 +3,7 @@
 
 export const professionNames: Record<string, string> = {
 	analyst: "Аналитик",
+	cook: "Повар",
 	designer: "Дизайнер",
 	engineer: "Инженер",
 	programmer: "Программист",

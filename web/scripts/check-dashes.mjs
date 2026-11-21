@@ -9,7 +9,8 @@ const projectRoot = resolve(import.meta.dirname, "..");
 
 // Папки и файлы по умолчанию. AGENTS.md не входит: его генерирует next dev.
 // sdk и public/game-builds - код моста и сборки iframe-игр; сторонние библиотеки в папках vendor пропускаются.
-const defaultTargets = ["app", "core", "games", "texts", "scripts", "docs", "sdk", "public/game-builds", ".env.example", "README.md"];
+// game-src - исходники iframe-игр, из которых собираются сборки (например, game-src/cooking).
+const defaultTargets = ["app", "core", "games", "texts", "scripts", "docs", "sdk", "game-src", "public/game-builds", ".env.example", "README.md"];
 
 const checkedExtensions = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs", ".json", ".css", ".md", ".html", ".example", ".cs", ".jslib"]);
 const skippedDirectories = new Set(["node_modules", ".next", "out", "build", "coverage", "vendor"]);

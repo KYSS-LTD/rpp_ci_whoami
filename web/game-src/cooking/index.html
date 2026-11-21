@@ -1,0 +1,19 @@
+<!doctype html>
+<!--
+	Игра "Повар" (cooking): 3D-кухня на three.js, подключается к порталу готовой веб-сборкой во фрейме.
+	Портал открывает страницу так: /game-builds/cooking/index.html?level=easy.
+	Мост с порталом: portal-bridge.js (копия sdk/web/portal-bridge.js, копируется шагом перед сборкой).
+	Весь отображаемый текст лежит в src/texts/, в разметке строк нет.
+-->
+<html lang="ru">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<title></title>
+	</head>
+	<body>
+		<div id="game-root"></div>
+		<script src="/portal-bridge.js"></script>
+		<script type="module" src="./src/main.ts"></script>
+	</body>
+</html>

@@ -1,0 +1,17 @@
+<!doctype html>
+<!--
+	Харнесс разработчика (владелец: SONNET-3): страница для визуальной проверки сцены и HUD на самодельном снимке,
+	до сборки main.ts. В сборку игры не попадает (Vite собирает только index.html), dev-сервер отдаёт её по /harness.html.
+	Параметры адреса: ?level=easy|medium|hard, ?phase=ready|running|failed, ?elapsed=секунды смены, ?mode=keyboard|touch, ?fail=queue|table.
+-->
+<html lang="ru">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<title>Харнесс cooking</title>
+	</head>
+	<body>
+		<div id="game-root"></div>
+		<script type="module" src="./src/render/devHarness.ts"></script>
+	</body>
+</html>
