@@ -91,6 +91,7 @@ export function recordLevelResult(
 	result: LevelResult,
 	storage: PlatformStorage = platformStorage,
 	awardedAt: string = new Date().toISOString(),
+	issueStoredDiploma = true,
 ): RecordOutcome {
 	const validation = validateLevelResult(result);
 	if (!validation.ok) {
@@ -109,7 +110,7 @@ export function recordLevelResult(
 	if (newlyAwarded.length > 0) {
 		storage.write(storageKeys.achievements, updated);
 	}
-	const diploma = issueDiploma(result, readPlayerName(storage), awardedAt);
+	const diploma = issueStoredDiploma ? issueDiploma(result, readPlayerName(storage), awardedAt) : null;
 	if (diploma) {
 		storage.write(storageKeys.diplomas, [...readDiplomas(storage), diploma]);
 	}

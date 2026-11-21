@@ -16,7 +16,7 @@
     {
       "name": "uav-operator",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "games/uav-operator", "run", "dev", "--", "--port", "5173", "--strictPort"],
+      "runtimeArgs": ["--prefix", "web/games/uav-operator", "run", "dev", "--", "--port", "5173", "--strictPort"],
       "port": 5173
     }
   ]

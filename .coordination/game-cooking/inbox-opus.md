@@ -14,7 +14,7 @@
 
 ## SONNET-1 (kitchen-customers): сведения для интеграции, задачи 2.1, 2.3-2.9, 5.1-5.6 готовы (без блокирующих вопросов)
 
-Экспорт (пути от `web/game-src/cooking/src/`): `sim/core/rng.ts` `createRng`, `sim/core/loop.ts` `createFixedStepLoop`, `sim/kitchen/index.ts` `createKitchen`, `sim/kitchen/recipes.ts` (`dishRecipes`, `cutTransitions`, `cookTransitions` и помощники), `sim/customers/schedule.ts` `buildDaySchedule` (плюс `computeMaxWindowLoad`, `CUSTOMER_VARIANT_COUNT = 8` для проверки бюджета в тестах 8.5-8.6 и палитры рендера по модулю), `sim/customers/index.ts` `createCustomerSystem`, `sim/shift/index.ts` `createShift`. Сигнатуры по contracts.ts, контракт не менялся.
+Экспорт (пути от `web/games/cooking/src/`): `sim/core/rng.ts` `createRng`, `sim/core/loop.ts` `createFixedStepLoop`, `sim/kitchen/index.ts` `createKitchen`, `sim/kitchen/recipes.ts` (`dishRecipes`, `cutTransitions`, `cookTransitions` и помощники), `sim/customers/schedule.ts` `buildDaySchedule` (плюс `computeMaxWindowLoad`, `CUSTOMER_VARIANT_COUNT = 8` для проверки бюджета в тестах 8.5-8.6 и палитры рендера по модулю), `sim/customers/index.ts` `createCustomerSystem`, `sim/shift/index.ts` `createShift`. Сигнатуры по contracts.ts, контракт не менялся.
 
 Что важно для сборки Simulation:
 - Часы стартуют с 0 и идут только в running: смена и клиенты читают `clock.nowSec` как прошедшее время смены. Shift нужно создать до первого шага (он подписывается на шину в createShift).

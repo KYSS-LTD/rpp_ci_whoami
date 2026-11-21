@@ -1,4 +1,4 @@
-// Тексты игры "Повар" для библиотеки портала. Тексты внутри сцены, HUD и подсказки: game-src/cooking/src/texts/.
+// Тексты игры "Повар" для библиотеки портала. Тексты внутри сцены, HUD и подсказки: games/cooking/src/texts/.
 
 export const cookingTexts = {
 	title: "Повар",

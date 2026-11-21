@@ -11,9 +11,9 @@ afterEach(() => {
 });
 
 describe("демо-игра", () => {
-	it("манифест проходит валидацию и игра зарегистрирована", () => {
+	it("манифест примера проходит валидацию, игра скрыта из библиотеки", () => {
 		expect(validateManifest(demoManifest).ok).toBe(true);
-		expect(gameRegistry.games.map((game) => game.manifest.gameId)).toContain("demo");
+		expect(gameRegistry.games.map((game) => game.manifest.gameId)).not.toContain("demo");
 	});
 
 	it("полное прохождение отправляет результат с completed=true", () => {

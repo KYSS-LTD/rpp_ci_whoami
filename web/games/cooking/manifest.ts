@@ -1,5 +1,5 @@
 // Манифест игры "Повар" по контракту game-module-contract.
-// Игра подключена готовой веб-сборкой на three.js (public/game-builds/cooking, исходники game-src/cooking),
+// Игра подключена готовой веб-сборкой на three.js (public/game-builds/cooking, исходники games/cooking),
 // см. capability game-iframe-bridge.
 import type { GameManifest } from "@/core/contract/types";
 import { cookingTexts } from "./texts";
@@ -17,8 +17,7 @@ export const cookingManifest: GameManifest = {
 	professionTags: [{ professionId: "cook", weight: 1 }],
 	format: "3d",
 	summary: cookingTexts.summary,
-	// Кадры из игры 1280x800 (16:10): первый показывается в ленте, оба листаются в карточке игры.
-	preview: { frames: ["/game-previews/cooking/frame-1.webp", "/game-previews/cooking/frame-2.webp"] },
+	preview: { frames: ["/game-previews/cooking/poster.webp"], animation: "/game-previews/cooking/play.webp" },
 	estimatedMinutes: 4,
 	runtime: {
 		kind: "iframe",

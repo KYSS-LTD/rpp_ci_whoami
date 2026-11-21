@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { platformStorage, storageKeys } from "@/core/storage";
 import { bridgeProtocolVersion, gameMessageSource } from "@/core/bridge";
 import { commonTexts } from "@/texts/common";
+import { diplomasTexts } from "@/texts/diplomas";
 import { LevelRunner } from "./LevelRunner";
 
 // Тестовая игра с одним компонентом уровня, который сразу сообщает результат.
@@ -50,6 +51,15 @@ vi.mock("@/core/registry", () => {
 	return {
 		gameRegistry: {
 			games: [
+				{
+					manifest: {
+						gameId: "uav-operator",
+						title: "Оператор БПЛА",
+						levels,
+						runtime: { kind: "iframe", entry: "/game-builds/uav-operator/index.html" },
+					},
+					module: { manifest: {} },
+				},
 				{
 					manifest: {
 						gameId: "frame-game",
@@ -101,17 +111,14 @@ describe("запуск уровня и ввод имени", () => {
 		cleanup();
 	});
 
-	it("при первом входе запрашивает имя, а после сохранения не показывает запрос повторно", () => {
-		const { unmount } = render(<LevelRunner gameId="demo" levelId="easy" />);
-		expect(screen.getByRole("heading", { name: commonTexts.nameTitle })).toBeTruthy();
-		fireEvent.change(screen.getByLabelText(commonTexts.nameLabel), { target: { value: "Анна" } });
-		fireEvent.click(screen.getByRole("button", { name: commonTexts.nameSubmit }));
-		expect(screen.queryByRole("heading", { name: commonTexts.nameTitle })).toBeNull();
-		expect(screen.getByRole("button", { name: "Завершить уровень" })).toBeTruthy();
-		unmount();
-
-		render(<LevelRunner gameId="demo" levelId="medium" />);
-		expect(screen.queryByRole("heading", { name: commonTexts.nameTitle })).toBeNull();
+	it("сразу запускает уровень и запрашивает ФИО на экране результата", () => {
+		render(<LevelRunner gameId="demo" levelId="easy" />);
+		expect(screen.queryByLabelText(diplomasTexts.result.name)).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: "Завершить уровень" }));
+		expect(screen.getByLabelText(diplomasTexts.result.name)).toBeTruthy();
+		expect(screen.getByText(diplomasTexts.ratings.gold)).toBeTruthy();
+		expect(platformStorage.read(storageKeys.playerName, "")).toBe("");
+		expect(platformStorage.read<unknown[]>(storageKeys.diplomas, [])).toEqual([]);
 	});
 
 	it("после завершения уровня сохраняет результат", () => {
@@ -194,6 +201,30 @@ describe("запуск iframe-игры", () => {
 		const frame = screen.getByTitle("Игра во фрейме");
 		expect(frame.getAttribute("src")).toBe("/game-builds/frame-game/index.html?level=easy");
 		expect(screen.queryByText(commonTexts.levelMissingComponent)).toBeNull();
+	});
+
+	it.each([
+		{ activity: "race", offersDiploma: false },
+		{ activity: "field", offersDiploma: false },
+		{ activity: "beach", offersDiploma: true },
+	])("результат свободного полёта ($activity) показывает диплом по правилам упражнения", ({ activity, offersDiploma }) => {
+		render(<LevelRunner gameId="uav-operator" levelId="free" />);
+		const frameWindow = (screen.getByTitle("Оператор БПЛА") as HTMLIFrameElement).contentWindow as Window;
+		vi.spyOn(frameWindow, "postMessage").mockImplementation(() => undefined);
+		for (const message of [
+			{ type: "ready" },
+			{ type: "practice-result", activity, difficulty: null, score: 88, completed: true, durationSec: 29 },
+		]) {
+			act(() => {
+				window.dispatchEvent(new MessageEvent("message", {
+					source: frameWindow,
+					data: { source: gameMessageSource, version: bridgeProtocolVersion, ...message },
+				}));
+			});
+		}
+		expect(screen.getByRole("heading", { name: commonTexts.levelCompletedTitle })).toBeTruthy();
+		expect(Boolean(screen.queryByLabelText(diplomasTexts.result.name))).toBe(offersDiploma);
+		expect(platformStorage.read<unknown[]>(storageKeys.levelResults, [])).toEqual([]);
 	});
 
 	it("выход из игры без результата показывает экран незавершённого уровня и ничего не сохраняет", () => {

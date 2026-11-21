@@ -11,7 +11,7 @@ const bridgeCopies = [
 	"sdk/unity/WebGLTemplates/Portal/portal-bridge.js",
 	"public/game-builds/city-builder/portal-bridge.js",
 	// Копия в исходниках игры cooking: создаётся шагом prebuild перед сборкой (scripts/copy-portal-bridge.mjs).
-	"game-src/cooking/public/portal-bridge.js",
+	"games/cooking/public/portal-bridge.js",
 ];
 
 function readWebFile(relativePath: string): string {

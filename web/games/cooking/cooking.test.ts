@@ -37,7 +37,7 @@ describe("манифест игры cooking", () => {
 		expect(registered).toBeDefined();
 		expect(registered?.manifest.levels.map((level) => level.id)).toEqual(["easy", "medium", "hard"]);
 		expect(registered?.manifest.format).toBe("3d");
-		expect(registered?.manifest.preview?.frames.length).toBeGreaterThanOrEqual(2);
+		expect(registered?.manifest.preview?.animation).toBe("/game-previews/cooking/play.webp");
 		expect("levelComponents" in cookingGameModule).toBe(false);
 	});
 
@@ -47,15 +47,19 @@ describe("манифест игры cooking", () => {
 		}
 	});
 
-	it("кадры превью сняты из игры: WebP в пропорции 16:10 (1280x800), не временные SVG", () => {
+	it("обложка и анимация имеют пропорции 16:10, в анимации несколько кадров", () => {
 		const frames = cookingManifest.preview?.frames ?? [];
-		expect(frames.length).toBeGreaterThanOrEqual(2);
-		for (const frame of frames) {
+		const animation = cookingManifest.preview!.animation!;
+		expect(frames.length).toBeGreaterThanOrEqual(1);
+		for (const frame of [...frames, animation]) {
 			expect(frame.endsWith(".webp"), frame).toBe(true);
 			const size = readWebpSize(resolve(publicDirectory, frame.replace(/^\//, "")));
 			expect(size.width / size.height, frame).toBeCloseTo(16 / 10, 5);
-			expect(size.width, frame).toBeGreaterThanOrEqual(1280);
+			expect(size.width, frame).toBeGreaterThanOrEqual(640);
 		}
+		const bytes = readFileSync(resolve(publicDirectory, animation.slice(1)));
+		expect(bytes.indexOf("ANMF")).toBeGreaterThan(0);
+		expect(bytes.lastIndexOf("ANMF")).toBeGreaterThan(bytes.indexOf("ANMF"));
 	});
 
 	it("сборка во фрейме лежит внутри /game-builds/cooking/ и ждёт готовность 60 секунд", () => {

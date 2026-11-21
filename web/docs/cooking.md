@@ -2,14 +2,14 @@
 
 3D-игра про работу повара в стиле PlateUp! и Overcooked: игрок готовит блюда на кухне и сдаёт их в окно выдачи, ИИ-официант относит их клиентам в зале. Игра подключена к порталу готовой веб-сборкой в изолированном фрейме (`docs/adding-game.md`, раздел "Игра на Unity или three.js"; протокол обмена в `docs/game-bridge-protocol.md`). Три уровня: easy (3:00), medium (4:00), hard (5:00).
 
-Все команды ниже запускаются из папки `web`. Пути в разделах про код даны от `game-src/cooking/src/`, если не сказано иное.
+Все команды ниже запускаются из папки `web`. Пути в разделах про код даны от `games/cooking/src/`, если не сказано иное.
 
 ## Где что лежит
 
 | Что | Где |
 | --- | --- |
 | Портальная часть: манифест, тексты витрины, модуль | `games/cooking/` |
-| Исходники игры (Vite, TypeScript, three.js) | `game-src/cooking/` |
+| Исходники игры (Vite, TypeScript, three.js) | `games/cooking/` |
 | Результат сборки (хранится в git, как у `city-builder`) | `public/game-builds/cooking/` |
 | Кадры превью для библиотеки игр | `public/game-previews/cooking/` |
 | Общие типы и интерфейсы между областями | `contracts.ts` |
@@ -62,7 +62,7 @@
 npm run dev:cooking
 ```
 
-Dev-сервер Vite стартует на порту 5174. Игра открывается по адресу `http://localhost:5174/?level=easy` (так же `medium` и `hard`). Без портала мост работает автономно: уровень берётся из адреса, старт приходит сразу. Перед запуском скрипт `predev:cooking` копирует `sdk/web/portal-bridge.js` в `game-src/cooking/public/`.
+Dev-сервер Vite стартует на порту 5174. Игра открывается по адресу `http://localhost:5174/?level=easy` (так же `medium` и `hard`). Без портала мост работает автономно: уровень берётся из адреса, старт приходит сразу. Перед запуском скрипт `predev:cooking` копирует `sdk/web/portal-bridge.js` в `games/cooking/public/`.
 
 Для запуска из Claude Code есть конфигурация `cooking` в `.claude/launch.json` (корень репозитория). Встроенная панель браузера Claude Code блокирует запросы из изолированных фреймов, но обычная страница dev-сервера в ней открывается.
 
@@ -103,7 +103,7 @@ NEXT_PUBLIC_DEBUG=true
 3. Баланс: цена, чаевые и трудоёмкость блюда в `config/levels/dishes.ts` (`calibratedDishes`, настоящие уровни) и в `config/levels/defaults.ts` (значения для тестов областей); время готовки и подгорания по процессам в `params.kitchen.cooking` (`defaults.ts`). Трудоёмкость (`effort`) не выдумывается, а измеряется ботом (раздел "Проверенные seed").
 4. Уровни: добавьте блюдо в `params.menu` нужных уровней (`config/levels/easy.ts`, `medium.ts`, `hard.ts`) и поставьте ящики и станции, которые для него нужны. Тесты `config/levels/levels.test.ts` проверяют, что у меню есть ящики и станции.
 5. Тексты: название блюда в `texts/hud.ts` (`dishNames`).
-6. Модели (`config/assets.ts`): модель каждой пары предмета в `itemModelByKey`, модель готового блюда в `dishModelNames`, модель ящика в `crateModelNames`. Новые файлы glTF кладутся в `game-src/cooking/public/models/` и добавляются в `coreModelNames` (тест `config/assets.test.ts` проверяет, что все файлы из списка существуют).
+6. Модели (`config/assets.ts`): модель каждой пары предмета в `itemModelByKey`, модель готового блюда в `dishModelNames`, модель ящика в `crateModelNames`. Новые файлы glTF кладутся в `games/cooking/public/models/` и добавляются в `coreModelNames` (тест `config/assets.test.ts` проверяет, что все файлы из списка существуют).
 7. Бот: если у блюда новый процесс готовки, он должен знать его (`COMPONENT_OF_DISH` и `COOKER_KIND_OF_COMPONENT` в `bot/bot.ts`). Иначе бот не пройдёт уровень с этим блюдом.
 8. Тесты: `sim/kitchen/recipes.test.ts` проверяет, что для каждого блюда цепочка таблиц ведёт от ящиков к готовому блюду, сценарии кухни лежат в `sim/kitchen/index.test.ts`.
 9. После смены меню или трудоёмкости пересоберите список проверенных seed (раздел ниже).
@@ -117,7 +117,7 @@ createStation("board-3", "cuttingBoard", 5, 4),    // id, вид, x, z (клет
 createCrate("onion", 6.5, 0.5),                    // ящик с ингредиентом
 ```
 
-Правила: идентификатор уникален, станция 1 x 1 стоит на сетке 0.5 внутри границ мира и не пересекается с другой мебелью, к ней можно подойти. Проверка: `npx vitest run game-src/cooking/src/config` (`validateLevelConfig` и тесты достижимости обходят все цели по навигационной сетке из точки старта повара и из точек ожидания официантов). Затем пересоберите список seed: новая станция меняет время бота.
+Правила: идентификатор уникален, станция 1 x 1 стоит на сетке 0.5 внутри границ мира и не пересекается с другой мебелью, к ней можно подойти. Проверка: `npx vitest run games/cooking/src/config` (`validateLevelConfig` и тесты достижимости обходят все цели по навигационной сетке из точки старта повара и из точек ожидания официантов). Затем пересоберите список seed: новая станция меняет время бота.
 
 Станция нового вида:
 
@@ -145,7 +145,7 @@ createCrate("onion", 6.5, 0.5),                    // ящик с ингреди
 Что менять и что запускать:
 
 1. Измените значение в файле уровня (число баланса не пишется в код симуляции: если нужного поля нет, добавьте его в `LevelParams` в `contracts.ts` и значение в `defaults.ts`).
-2. Проверьте данные уровней: `npx vitest run game-src/cooking/src/config`.
+2. Проверьте данные уровней: `npx vitest run games/cooking/src/config`.
 3. Прогоните бота и обновите списки seed (следующие разделы). Спецификация требует, чтобы терпение не возрастало, а поток клиентов не убывал от easy к hard: это проверяет `levels.test.ts` (сценарий "Сравнение уровней").
 4. Весь отображаемый текст правится только в `texts/`.
 
@@ -167,13 +167,13 @@ Seed подходит, если бот (`bot/verify.ts`, функция `verifyS
 После смены параметров уровня, меню, раскладки или трудоёмкости блюд:
 
 ```
-COOKING_SEED_SEARCH=1 npx vitest run game-src/cooking/src/bot/seedSearch.test.ts
+COOKING_SEED_SEARCH=1 npx vitest run games/cooking/src/bot/seedSearch.test.ts
 ```
 
 В PowerShell переменная задаётся отдельной командой:
 
 ```
-$env:COOKING_SEED_SEARCH=1; npx vitest run game-src/cooking/src/bot/seedSearch.test.ts
+$env:COOKING_SEED_SEARCH=1; npx vitest run games/cooking/src/bot/seedSearch.test.ts
 ```
 
 Без переменной этот тест пропускается, поэтому обычный прогон тестов не тратит на него время. Поиск идёт около двух минут: бот проходит по 120 кандидатов на каждый уровень. Результат печатается в консоль и пишется в файл `cooking-seed-search.json` во временной папке системы (`os.tmpdir()`), для каждого уровня там два поля:
@@ -190,7 +190,7 @@ $env:COOKING_SEED_SEARCH=1; npx vitest run game-src/cooking/src/bot/seedSearch.t
 Тесты бота и данных уровней (около 30 секунд):
 
 ```
-npx vitest run game-src/cooking/src/bot game-src/cooking/src/config
+npx vitest run games/cooking/src/bot games/cooking/src/config
 ```
 
 - `bot/bot.test.ts`: бот проходит тестовый мини-уровень с `completed = true`, готовит все четыре блюда, воспроизводим по seed;
@@ -200,13 +200,13 @@ npx vitest run game-src/cooking/src/bot game-src/cooking/src/config
 Сквозные тесты симуляции с ботом на easy, medium и hard:
 
 ```
-npx vitest run game-src/cooking/src/sim/simulation.test.ts
+npx vitest run games/cooking/src/sim/simulation.test.ts
 ```
 
 Все тесты игры одной командой (около минуты, из них тесты бота полминуты):
 
 ```
-npx vitest run game-src/cooking
+npx vitest run games/cooking
 ```
 
 Перед коммитом выполняется полная проверка проекта: `npm run check` (типы, тесты, тире, линтер). Проверка тире отдельно: `npm run check:dashes`. В тестах симуляции первой строкой стоит `// @vitest-environment node`, остальные тесты выполняются в jsdom (общий конфиг).

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import type { GameManifest, LevelId } from "@/core/contract/types";
 import { gamesTexts } from "@/texts/games";
 import { professionNames } from "@/texts/professions";
+import { uavTexts } from "@/games/uav-operator/texts";
 import { GamePreview } from "./GamePreview";
 import styles from "./GameSheet.module.css";
 
@@ -20,50 +21,31 @@ interface GameSheetProps {
 // Карточка игры поверх ленты: превью из игры, краткая сводка и выбор сложности.
 // На телефоне выезжает снизу, на компьютере открывается по центру. Закрывается кнопкой, клавишей Escape и кликом по фону.
 export function GameSheet({ game, completedLevelIds, rating, ratingMessage, onRate, onClose }: GameSheetProps) {
-	const dialogRef = useRef<HTMLDivElement>(null);
+	const dialogRef = useRef<HTMLDialogElement>(null);
 	// По умолчанию выбран первый непройденный уровень: так игрок продолжает с того места, где остановился.
 	const [selectedLevelId, setSelectedLevelId] = useState<LevelId>(
 		() => game.levels.find((level) => !completedLevelIds.includes(level.id))?.id ?? game.levels[0].id,
 	);
 
-	// Фокус переходит в окно, страница под окном не прокручивается, Escape закрывает окно.
 	useEffect(() => {
-		const previousFocus = document.activeElement as HTMLElement | null;
-		const previousOverflow = document.documentElement.style.overflow;
-		document.documentElement.style.overflow = "hidden";
-		dialogRef.current?.focus({ preventScroll: true });
-
-		function handleKeyDown(event: KeyboardEvent) {
-			if (event.key === "Escape") {
-				onClose();
-			}
-		}
-		document.addEventListener("keydown", handleKeyDown);
-
-		return () => {
-			document.removeEventListener("keydown", handleKeyDown);
-			document.documentElement.style.overflow = previousOverflow;
-			previousFocus?.focus?.();
-		};
-	}, [onClose]);
+		const dialog = dialogRef.current;
+		dialog?.showModal();
+		return () => dialog?.close();
+	}, []);
 
 	const titleId = `game-sheet-title-${game.gameId}`;
 
 	return (
-		<div className={styles.backdrop} onClick={onClose}>
+		<dialog ref={dialogRef} aria-labelledby={titleId} className={styles.backdrop}
+			onCancel={(event) => { event.preventDefault(); onClose(); }}
+			onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
 			<div
-				ref={dialogRef}
-				role="dialog"
-				aria-modal="true"
-				aria-labelledby={titleId}
-				tabIndex={-1}
 				className={styles.sheet}
-				onClick={(event) => event.stopPropagation()}
 			>
 				<button type="button" className={styles.close} aria-label={gamesTexts.sheetClose} onClick={onClose} />
 				{/* Слева превью и сводка, справа выбор сложности. На телефоне всё в одну колонку. */}
 				<div className={styles.media}>
-					<GamePreview frames={game.preview?.frames ?? []} title={game.title} variant="stage" priority />
+					<GamePreview animation={game.preview?.animation} frames={game.preview?.frames ?? []} title={game.title} variant="stage" priority />
 				</div>
 
 				<div className={styles.about}>
@@ -129,8 +111,11 @@ export function GameSheet({ game, completedLevelIds, rating, ratingMessage, onRa
 
 				<div className={styles.actions}>
 					<Link href={`/games/${game.gameId}/${selectedLevelId}`} className={`button-primary ${styles.start}`}>
-						{gamesTexts.startLevel}
+						{game.gameId === "uav-operator" ? uavTexts.story : gamesTexts.startLevel}
 					</Link>
+					{game.gameId === "uav-operator" ? <Link href="/games/uav-operator/free" className="button-secondary">
+						<span aria-hidden="true">✣</span> {uavTexts.free}
+					</Link> : null}
 				</div>
 
 				<fieldset className={styles.rating}>
@@ -149,6 +134,6 @@ export function GameSheet({ game, completedLevelIds, rating, ratingMessage, onRa
 					) : null}
 				</fieldset>
 			</div>
-		</div>
+		</dialog>
 	);
 }

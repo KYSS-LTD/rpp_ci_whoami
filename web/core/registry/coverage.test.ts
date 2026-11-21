@@ -13,9 +13,11 @@ function listGameFolders(): string[] {
 }
 
 describe("покрытие реестра", () => {
-	it("каждая папка games/* подключена в реестр", () => {
+	it("все игры подключены, демопримеры исключены", () => {
 		const registeredIds = gameRegistry.games.map((game) => game.manifest.gameId);
-		const notRegistered = listGameFolders().filter((folderName) => !registeredIds.includes(folderName));
+		const examples = ["demo", "city-builder", "pixel-lab"];
+		expect(registeredIds.filter((id) => examples.includes(id))).toEqual([]);
+		const notRegistered = listGameFolders().filter((folder) => !examples.includes(folder)).filter((folderName) => !registeredIds.includes(folderName));
 		expect(notRegistered).toEqual([]);
 	});
 });

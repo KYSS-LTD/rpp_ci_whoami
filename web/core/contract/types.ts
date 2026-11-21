@@ -31,6 +31,8 @@ export type GameFormat = (typeof gameFormats)[number];
 // Кадр может быть анимированным (SVG с анимацией, GIF, анимированный WebP).
 export interface GamePreview {
 	frames: string[];
+	// Анимация первого кадра в открытой карточке, если движение разрешено настройкой браузера.
+	animation?: string;
 }
 
 // Время ожидания сообщения о готовности от iframe-игры по умолчанию, в секундах.

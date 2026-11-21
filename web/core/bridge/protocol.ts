@@ -16,10 +16,20 @@ export const portalMessageSource = "portal";
 // Параметр адреса сборки, в котором портал передаёт уровень (entry?level=easy).
 export const levelQueryParameter = "level";
 
+export type PracticeResult = {
+	type: "practice-result";
+	activity: "assembly" | "survey" | "beach" | "field" | "race";
+	difficulty: LevelId | null;
+	score: number;
+	completed: boolean;
+	durationSec: number;
+};
+
 // Сообщения игры, которые портал понимает.
 export type GameMessage =
 	| { type: "ready" }
 	| { type: "level-result"; score: number; maxScore: number; completed: boolean }
+	| PracticeResult
 	| { type: "exit" }
 	| { type: "error"; message: string };
 
@@ -64,6 +74,18 @@ export function parseGameMessage(data: unknown): ParsedGameMessage {
 				ok: true,
 				message: { type: "level-result", score: raw.score, maxScore: raw.maxScore, completed: raw.completed },
 			};
+		case "practice-result": {
+			const { activity, difficulty, score, completed, durationSec } = raw;
+			const isolatedStage = activity === "assembly" || activity === "survey";
+			const flight = activity === "beach" || activity === "field" || activity === "race";
+			const knownDifficulty = difficulty === "easy" || difficulty === "medium" || difficulty === "hard";
+			if ((!isolatedStage && !flight) || (isolatedStage ? !knownDifficulty : difficulty !== null)
+				|| typeof score !== "number" || !Number.isInteger(score) || score < 0 || score > 100
+				|| typeof completed !== "boolean" || typeof durationSec !== "number" || !Number.isSafeInteger(durationSec) || durationSec < 0) {
+				return { ok: false, reason: "неверный результат свободного упражнения" };
+			}
+			return { ok: true, message: { type: "practice-result", activity, difficulty: knownDifficulty ? difficulty : null, score, completed, durationSec } };
+		}
 		default:
 			return { ok: false, reason: `неизвестный тип сообщения: ${String(raw.type)}` };
 	}

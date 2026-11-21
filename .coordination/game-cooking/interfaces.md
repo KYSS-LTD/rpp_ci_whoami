@@ -1,8 +1,8 @@
 # Интерфейсы игры cooking простым языком
 
-Источник истины: `web/game-src/cooking/src/contracts.ts` (версия контрактов `CONTRACTS_VERSION`, сейчас 1). Этот документ коротко объясняет его, но при расхождении верен `contracts.ts`. Все числа баланса лежат в `LevelParams` (`config/levels/defaults.ts`), в код их не пишем.
+Источник истины: `web/games/cooking/src/contracts.ts` (версия контрактов `CONTRACTS_VERSION`, сейчас 1). Этот документ коротко объясняет его, но при расхождении верен `contracts.ts`. Все числа баланса лежат в `LevelParams` (`config/levels/defaults.ts`), в код их не пишем.
 
-Пути ниже относительны `web/game-src/cooking/src/`. Команды запускаются из папки `web`.
+Пути ниже относительны `web/games/cooking/src/`. Команды запускаются из папки `web`.
 
 ## 1. Общие договорённости
 
@@ -133,7 +133,7 @@
 
 ## 10. Тесты
 
-- Тесты лежат рядом с кодом (`*.test.ts`), запуск из `web`: `npx vitest run game-src/cooking/src/<папка>`. Окружение по умолчанию jsdom (общий конфиг); чисто симуляционным тестам добавляйте первой строкой `// @vitest-environment node`, DOM-тесты оставляйте на jsdom.
+- Тесты лежат рядом с кодом (`*.test.ts`), запуск из `web`: `npx vitest run games/cooking/src/<папка>`. Окружение по умолчанию jsdom (общий конфиг); чисто симуляционным тестам добавляйте первой строкой `// @vitest-environment node`, DOM-тесты оставляйте на jsdom.
 - Общие помощники: `sim/testing/testLevel.ts` (`createTestLevel`), `sim/testing/fakeNav.ts` (`createFakeNavSystem`, `createStraightPathfinder`), `config/levels/defaults.ts` (`createParams(overrides)`), `sim/eventBus.ts` (`createEventBus(clock)`), `config/levels/validate.ts` (`validateLevelConfig`, `collectObstacles`).
 - Проверять свои файлы: `npx vitest run <путь>` и `npx tsc --noEmit` (смотреть только ошибки своих файлов). Полный `npm run check`, `npm run build` и `npm run build:cooking` запускает только Opus-агент.
 - Игра по прямому адресу `/game-builds/cooking/index.html?level=easy` в встроенном браузере Claude не работает (CSP sandbox), для просмотра сцены в нём запускается `dev:cooking` (конфигурация `cooking` в `.claude/launch.json`, порт 5174, адрес `http://localhost:5174/?level=easy`).

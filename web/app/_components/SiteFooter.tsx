@@ -5,7 +5,6 @@ import styles from "./SiteFooter.module.css";
 // Ссылки в подвале повторяют основные разделы шапки.
 const footerLinks = [
 	{ href: "/games", label: commonTexts.navGames },
-	{ href: "/diplomas", label: commonTexts.navDiplomas },
 	{ href: "/achievements", label: commonTexts.navAchievements },
 	{ href: "/me", label: commonTexts.navProfile },
 ];

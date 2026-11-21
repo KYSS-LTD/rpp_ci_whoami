@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { buildLevelUrl, buildStartMessage, parseGameMessage } from "@/core/bridge";
+import type { PracticeResult } from "@/core/bridge/protocol";
 import { defaultReadyTimeoutSec, type IframeRuntime, type LevelDefinition, type LevelResult } from "@/core/contract/types";
 import { debugLog } from "@/core/debug";
 import { commonTexts } from "@/texts/common";
@@ -16,6 +17,7 @@ interface IframeLevelProps {
 	runtime: IframeRuntime;
 	// Результат уровня с gameId, levelId и временем запуска. Проверку и сохранение делает LevelRunner.
 	onFinish: (result: LevelResult) => void;
+	onPracticeFinish?: (result: PracticeResult) => void;
 	// Игра сообщила о выходе без результата: показать экран незавершённого уровня, ничего не сохранять.
 	onExitWithoutResult: () => void;
 }
@@ -24,8 +26,54 @@ interface IframeLevelProps {
 type LevelPhase = "loading" | "running" | "failed";
 
 // Уровень iframe-игры (capability game-iframe-bridge): сборка в изолированном фрейме и обмен сообщениями по протоколу.
-export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onExitWithoutResult }: IframeLevelProps) {
+export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPracticeFinish, onExitWithoutResult }: IframeLevelProps) {
 	const frameRef = useRef<HTMLIFrameElement>(null);
+	const levelRef = useRef<HTMLElement>(null);
+	const [nativeFullscreen, setNativeFullscreen] = useState(false);
+	const [expanded, setExpanded] = useState(() => typeof window !== "undefined"
+		&& window.matchMedia?.("(pointer: coarse) and (max-width: 900px)").matches === true);
+	const isFullscreen = nativeFullscreen || expanded;
+
+	useEffect(() => {
+		function syncFullscreen() {
+			setNativeFullscreen(Boolean(document.fullscreenElement && document.fullscreenElement === levelRef.current));
+		}
+		document.addEventListener("fullscreenchange", syncFullscreen);
+		return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+	}, []);
+
+	useEffect(() => {
+		if (!expanded) return;
+		const overflow = document.documentElement.style.overflow;
+		document.documentElement.style.overflow = "hidden";
+		function onKeyDown(event: KeyboardEvent) {
+			if (event.key === "Escape") setExpanded(false);
+		}
+		document.addEventListener("keydown", onKeyDown);
+		return () => {
+			document.documentElement.style.overflow = overflow;
+			document.removeEventListener("keydown", onKeyDown);
+		};
+	}, [expanded]);
+
+	async function toggleFullscreen() {
+		if (expanded) {
+			setExpanded(false);
+		} else if (document.fullscreenElement === levelRef.current) {
+			await document.exitFullscreen();
+		} else {
+			try {
+				if (document.fullscreenEnabled && levelRef.current?.requestFullscreen && !matchMedia("(pointer: coarse)").matches) {
+					await levelRef.current.requestFullscreen();
+				} else {
+					setExpanded(true);
+				}
+			} catch {
+				setExpanded(true);
+			}
+		}
+		frameRef.current?.focus();
+	}
 	const [phase, setPhase] = useState<LevelPhase>("loading");
 	// Номер попытки: повтор после сбоя пересоздаёт фрейм через key.
 	const [attempt, setAttempt] = useState(0);
@@ -34,10 +82,11 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onExi
 	const phaseRef = useRef<LevelPhase>("loading");
 	const startedAtRef = useRef(0);
 	const hasResultRef = useRef(false);
-	const callbacksRef = useRef({ onFinish, onExitWithoutResult });
+	const freeMode = Boolean(onPracticeFinish);
+	const callbacksRef = useRef({ onFinish, onPracticeFinish, onExitWithoutResult });
 	useEffect(() => {
-		callbacksRef.current = { onFinish, onExitWithoutResult };
-	}, [onFinish, onExitWithoutResult]);
+		callbacksRef.current = { onFinish, onPracticeFinish, onExitWithoutResult };
+	}, [onFinish, onPracticeFinish, onExitWithoutResult]);
 
 	function changePhase(nextPhase: LevelPhase) {
 		phaseRef.current = nextPhase;
@@ -72,7 +121,12 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onExi
 				frameRef.current?.focus();
 				return;
 			}
-			if (message.type === "level-result" && currentPhase === "running" && !hasResultRef.current) {
+			if (message.type === "practice-result" && freeMode && currentPhase === "running" && !hasResultRef.current) {
+				hasResultRef.current = true;
+				callbacksRef.current.onPracticeFinish?.(message);
+				return;
+			}
+			if (message.type === "level-result" && !freeMode && currentPhase === "running" && !hasResultRef.current) {
 				hasResultRef.current = true;
 				callbacksRef.current.onFinish({
 					gameId,
@@ -92,6 +146,7 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onExi
 				debugLog("bridge", "игра сообщила об ошибке", message.message);
 				phaseRef.current = "failed";
 				setPhase("failed");
+				setExpanded(false);
 				return;
 			}
 			debugLog("bridge", `сообщение ${message.type} не подходит этапу ${currentPhase}`);
@@ -99,7 +154,36 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onExi
 
 		window.addEventListener("message", handleMessage);
 		return () => window.removeEventListener("message", handleMessage);
-	}, [gameId, level.id, attempt]);
+	}, [gameId, level.id, attempt, freeMode]);
+
+	// Разрешение Gamepad для изолированного iframe различается между браузерами.
+	// В таком случае портал передаёт игре только значения органов управления, без данных об устройстве.
+	useEffect(() => {
+		if (gameId !== "uav-operator" || phase !== "running" || !navigator.getGamepads) return;
+		let frame = 0;
+		let lastSample = "";
+		function poll() {
+			try {
+				const pad = !document.hidden && document.activeElement === frameRef.current
+					? Array.from(navigator.getGamepads()).find((entry) => entry?.connected && entry.mapping === "standard")
+					: undefined;
+				const sample = pad ? {
+					axes: pad.axes.slice(0, 4).map((axis) => Math.round(axis * 100) / 100),
+					buttons: [0, 1, 2, 3, 9].map((index) => Boolean(pad.buttons[index]?.pressed)),
+				} : null;
+				const serialized = JSON.stringify(sample);
+				if (serialized !== lastSample) {
+					lastSample = serialized;
+					frameRef.current?.contentWindow?.postMessage({ source: "portal", type: "gamepad", sample }, "*");
+				}
+			} catch {
+				return;
+			}
+			frame = requestAnimationFrame(poll);
+		}
+		frame = requestAnimationFrame(poll);
+		return () => cancelAnimationFrame(frame);
+	}, [gameId, phase]);
 
 	// Таймаут загрузки: если игра не прислала ready вовремя, показывается запасной экран.
 	useEffect(() => {
@@ -111,6 +195,7 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onExi
 			debugLog("bridge", `игра не прислала ready за ${timeoutMs} мс`);
 			phaseRef.current = "failed";
 			setPhase("failed");
+			setExpanded(false);
 		}, timeoutMs);
 		return () => window.clearTimeout(timerId);
 	}, [phase, attempt, runtime.readyTimeoutSec]);
@@ -127,26 +212,33 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onExi
 	}
 
 	return (
-		<section className={styles.level}>
+		<section ref={levelRef} className={styles.level} data-expanded={expanded}>
 			<div className={styles.header}>
 				<div className={styles.titles}>
 					<p className={styles.gameTitle}>{gameTitle}</p>
 					<h1>{level.title}</h1>
 				</div>
-				{/* Выход портала работает, даже если игра зависла, и ничего не сохраняет */}
-				<Link href="/games" className="button-secondary">
-					{commonTexts.levelExit}
-				</Link>
+				<div className={styles.actions}>
+					<button type="button" className={styles.fullscreenButton} onClick={toggleFullscreen}
+						aria-label={isFullscreen ? commonTexts.fullscreenExit : commonTexts.fullscreenEnter}
+						title={isFullscreen ? commonTexts.fullscreenExit : commonTexts.fullscreenEnter}>
+						<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+							<path d={isFullscreen ? "M3 8h5V3m8 0v5h5M3 16h5v5m8 0v-5h5" : "M3 9V3h6m6 0h6v6M3 15v6h6m6 0h6v-6"} />
+						</svg>
+					</button>
+					<Link href="/games" className={`button-secondary ${styles.fullscreenButton}`}
+						aria-label={commonTexts.levelExit} title={commonTexts.levelExit}><span aria-hidden="true">×</span></Link>
+				</div>
 			</div>
 			<div className={styles.stage} data-phase={phase}>
 				<iframe
 					key={attempt}
 					ref={frameRef}
 					className={styles.frame}
-					src={buildLevelUrl(runtime.entry, level.id)}
+					src={`${buildLevelUrl(runtime.entry, level.id)}${freeMode ? "&mode=free" : ""}`}
 					title={gameTitle}
-					sandbox="allow-scripts"
-					allow="autoplay; gamepad"
+					sandbox={gameId === "uav-operator" ? "allow-scripts allow-popups allow-popups-to-escape-sandbox" : "allow-scripts"}
+					allow="autoplay; gamepad *"
 				/>
 				{phase === "loading" ? (
 					<div className={styles.loading} role="status">

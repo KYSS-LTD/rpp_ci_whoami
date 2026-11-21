@@ -12,9 +12,9 @@
 - Полностью закрыто тестом и кодом: 122 пункта (из них 6 строк с пометкой "в работе": бот и seed, `game.ts`). Закрыто частично (код есть, теста нет или тест косвенный): 7 пунктов (доска/индикатор, отображение состояний и смена вида, достаточность слотов очереди, нарастание строгости, независимое открытие уровня, автономный запуск). Без реализации и без теста: 0.
 - Пробелов и сомнений: 15 (high 0, medium 3, low 11, info 1). Самое серьёзное: фактический поток клиентов на единицу времени УБЫВАЕТ от easy к hard (противоречит требованию "Нарастание строгости", тест проверяет только параметр `meanGapSec`); для "Отображение состояний" нет автотеста смены вида и индикатора; собранный `public/game-builds/cooking/` пока от спайка (в работе).
 - Тесты: падений нет (см. раздел "Прогон тестов"). Три падения в sim/customers и sim/shift, о которых сообщал SONNET-3, уже не воспроизводятся.
-- Изоляция фрейма: нарушений нет (нет localStorage, sessionStorage, IndexedDB, cookie; внешних адресов нет). Тире: нет (проверено по game-src/cooking, games/cooking, openspec и .coordination). Строки игроку вне `texts/`: нет (кроме placeholder `<title>cooking</title>` в index.html, он заменяется кодом).
+- Изоляция фрейма: нарушений нет (нет localStorage, sessionStorage, IndexedDB, cookie; внешних адресов нет). Тире: нет (проверено по games/cooking, games/cooking, openspec и .coordination). Строки игроку вне `texts/`: нет (кроме placeholder `<title>cooking</title>` в index.html, он заменяется кодом).
 
-Обозначения тестов: K = `sim/kitchen/index.test.ts`; R = `sim/kitchen/recipes.test.ts`; C = `sim/customers/index.test.ts`; S = `sim/customers/schedule.test.ts`; T = `sim/customers/seating.test.ts`; H = `sim/shift/index.test.ts`; SIM = `sim/simulation.test.ts`; G = `game.test.ts`; HUD = `hud/hud.test.ts`; REP = `hud/reporter.test.ts`; PREP = `render/prepare.test.ts`; SCN = `render/sceneRenderer.test.ts`; AST = `config/assets.test.ts`; LV = `config/levels/levels.test.ts`; LB = `bot/levelsBot.test.ts`; MAN = `web/games/cooking/cooking.test.ts`; BR = `web/sdk/web/portal-bridge.test.ts`. Пути относительны `web/game-src/cooking/src/`, если не сказано иное.
+Обозначения тестов: K = `sim/kitchen/index.test.ts`; R = `sim/kitchen/recipes.test.ts`; C = `sim/customers/index.test.ts`; S = `sim/customers/schedule.test.ts`; T = `sim/customers/seating.test.ts`; H = `sim/shift/index.test.ts`; SIM = `sim/simulation.test.ts`; G = `game.test.ts`; HUD = `hud/hud.test.ts`; REP = `hud/reporter.test.ts`; PREP = `render/prepare.test.ts`; SCN = `render/sceneRenderer.test.ts`; AST = `config/assets.test.ts`; LV = `config/levels/levels.test.ts`; LB = `bot/levelsBot.test.ts`; MAN = `web/games/cooking/cooking.test.ts`; BR = `web/sdk/web/portal-bridge.test.ts`. Пути относительны `web/games/cooking/src/`, если не сказано иное.
 
 Статус: "ok" - есть код и тест; "частично" - есть код, теста нет или он косвенный; "пробел" - нет; "в работе" - у architect.
 
@@ -197,9 +197,9 @@
 
 ## 6. Прогон тестов
 
-- `npx vitest run game-src/cooking` (из `web`, 22:15): 33 файла, 515 тестов, все прошли (32.6 с).
-- `npx vitest run game-src/cooking games/cooking sdk` (из `web`, 09:11 следующего дня, с новыми файлами architect): 36 файлов прошли, 1 пропущен (`bot/seedSearch.test.ts`, опциональный инструмент); 530 тестов прошли, 1 пропущен; падений нет (60 с).
-- `npx tsc --noEmit` по game-src/cooking: ошибок нет на момент моей сдачи работы; `npm run check:dashes`: тире не найдено.
+- `npx vitest run games/cooking` (из `web`, 22:15): 33 файла, 515 тестов, все прошли (32.6 с).
+- `npx vitest run games/cooking games/cooking sdk` (из `web`, 09:11 следующего дня, с новыми файлами architect): 36 файлов прошли, 1 пропущен (`bot/seedSearch.test.ts`, опциональный инструмент); 530 тестов прошли, 1 пропущен; падений нет (60 с).
+- `npx tsc --noEmit` по games/cooking: ошибок нет на момент моей сдачи работы; `npm run check:dashes`: тире не найдено.
 
 ## 7. Расчёт по проверенным seed (вне репозитория, `buildDaySchedule` + `levels/*.verifiedSeeds`)
 

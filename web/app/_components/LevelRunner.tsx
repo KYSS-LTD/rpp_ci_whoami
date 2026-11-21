@@ -1,16 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { gameRegistry } from "@/core/registry";
-import { readPlayerName, recordLevelResult } from "@/core/progress";
+import { recordLevelResult } from "@/core/progress";
 import type { LevelResult } from "@/core/contract/types";
 import { achievementDefinitions, type AwardedAchievement } from "@/core/achievements";
 import { commonTexts } from "@/texts/common";
-import { useProgressVersion } from "../_hooks/useProgressVersion";
+import type { PracticeResult } from "@/core/bridge/protocol";
+import { uavTexts } from "@/games/uav-operator/texts";
 import { IframeLevel } from "./IframeLevel";
 import { LevelErrorBoundary } from "./LevelErrorBoundary";
-import { NameForm } from "./NameForm";
+import { ResultDiploma } from "./ResultDiploma";
 import styles from "./LevelRunner.module.css";
 import ui from "./ui.module.css";
 
@@ -19,11 +20,11 @@ interface LevelRunnerProps {
 	levelId: string;
 }
 
-// Запускает уровень: сначала запрашивает имя, затем показывает компонент уровня и сохраняет результат.
+// Запускает игру и предлагает именной диплом после успешного прохождения.
 export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
-	// Перерисовка при сохранении имени или результатов.
-	useProgressVersion();
 	const [lastResult, setLastResult] = useState<LevelResult | null>(null);
+	const resultHeading = useRef<HTMLHeadingElement>(null);
+	const [practice, setPractice] = useState<PracticeResult | null>(null);
 	const [isSaveFailed, setIsSaveFailed] = useState(false);
 	// Результат не прошёл проверку платформы и не засчитан.
 	const [isResultRejected, setIsResultRejected] = useState(false);
@@ -34,7 +35,12 @@ export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
 	const [hasExitedWithoutResult, setHasExitedWithoutResult] = useState(false);
 
 	const game = gameRegistry.games.find((registered) => registered.manifest.gameId === gameId);
-	const level = game?.manifest.levels.find((definition) => definition.id === levelId);
+	const isFree = gameId === "uav-operator" && levelId === "free";
+	const level = isFree ? { id: "easy" as const, title: uavTexts.free } : game?.manifest.levels.find((definition) => definition.id === levelId);
+
+	useEffect(() => {
+		if (lastResult) resultHeading.current?.focus();
+	}, [lastResult]);
 
 	if (!game || !level) {
 		return (
@@ -48,19 +54,21 @@ export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
 		);
 	}
 
-	if (readPlayerName() === "") {
-		return <NameForm onSaved={() => undefined} />;
-	}
-
 	function handleFinish(result: LevelResult) {
 		if (result.gameId !== gameId || result.levelId !== levelId) {
 			return;
 		}
-		const outcome = recordLevelResult(result);
+		const outcome = recordLevelResult(result, undefined, undefined, false);
 		setIsResultRejected(!outcome.accepted);
 		setIsSaveFailed(!outcome.writeResult.ok);
 		setNewlyAwarded(outcome.newlyAwarded);
 		setLastResult(result);
+	}
+
+	function handlePractice(result: PracticeResult) {
+		setPractice(result);
+		setLastResult({ gameId, levelId: result.difficulty ?? "easy", score: result.score,
+			maxScore: 100, completed: result.completed, durationSec: result.durationSec });
 	}
 
 	if (hasExitedWithoutResult) {
@@ -117,7 +125,7 @@ export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
 		return (
 			<section className={`${ui.card} ${styles.result}`} data-completed={lastResult.completed ? "true" : "false"}>
 				<span className={styles.badge} aria-hidden="true" />
-				<h1>{lastResult.completed ? commonTexts.levelCompletedTitle : commonTexts.levelAbandonedTitle}</h1>
+				<h1 ref={resultHeading} tabIndex={-1}>{lastResult.completed ? commonTexts.levelCompletedTitle : commonTexts.levelAbandonedTitle}</h1>
 				<div className={styles.stats}>
 					<p className={styles.stat}>
 						<span className={styles.statLabel}>{commonTexts.levelScoreLabel}:</span>{" "}
@@ -130,6 +138,9 @@ export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
 						<span className={styles.statValue}>{lastResult.durationSec}</span>
 					</p>
 				</div>
+				{lastResult.completed && practice?.activity !== "race" && practice?.activity !== "field" ? <ResultDiploma result={lastResult} gameTitle={game.manifest.title}
+					levelTitle={practice ? uavTexts.practice[practice.activity] : level.title}
+					difficulty={practice ? game.manifest.levels.find((definition) => definition.id === practice.difficulty)?.title ?? uavTexts.freeDifficulty : level.title} /> : null}
 				{isSaveFailed ? (
 					<p role="alert" className={styles.error}>
 						{commonTexts.levelSaveError}
@@ -150,10 +161,11 @@ export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
 						type="button"
 						onClick={() => {
 							setLastResult(null);
+							setPractice(null);
 							setNewlyAwarded([]);
 						}}
 					>
-						{commonTexts.levelRetry}
+						{isFree ? uavTexts.freeBack : commonTexts.levelRetry}
 					</button>{" "}
 					<Link href="/games" className="button-primary">
 						{commonTexts.backToGames}
@@ -173,6 +185,7 @@ export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
 				level={level}
 				runtime={game.manifest.runtime}
 				onFinish={handleFinish}
+				onPracticeFinish={isFree ? handlePractice : undefined}
 				onExitWithoutResult={() => setHasExitedWithoutResult(true)}
 			/>
 		);

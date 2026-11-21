@@ -3,15 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { platformStorage, storageKeys } from "@/core/storage";
 import { commonTexts } from "@/texts/common";
 import { diplomasTexts } from "@/texts/diplomas";
-import { demoTexts } from "@/games/demo/texts";
+import { accountantTexts } from "@/games/accountant-1c/texts";
 import { DiplomasList } from "./DiplomasList";
 
 describe("страница дипломов", () => {
 	beforeEach(() => {
 		platformStorage.clearProgress();
 		platformStorage.write(storageKeys.diplomas, [
-			{ id: "a", gameId: "demo", levelId: "hard", playerName: "Анна", score: 9, maxScore: 10, rating: "gold", issuedAt: "2026-03-01T00:00:00.000Z" },
-			{ id: "b", gameId: "demo", levelId: "easy", playerName: "Анна", score: 4, maxScore: 10, rating: "bronze", issuedAt: "2026-03-02T00:00:00.000Z" },
+			{ id: "a", gameId: "accountant-1c", levelId: "hard", playerName: "Анна", score: 9, maxScore: 10, rating: "gold", issuedAt: "2026-03-01T00:00:00.000Z" },
+			{ id: "b", gameId: "accountant-1c", levelId: "easy", playerName: "Анна", score: 4, maxScore: 10, rating: "bronze", issuedAt: "2026-03-02T00:00:00.000Z" },
 		]);
 	});
 
@@ -46,12 +46,12 @@ describe("страница дипломов", () => {
 		fireEvent.click(buttons[0]);
 
 		expect(clickSpy).toHaveBeenCalledTimes(1);
-		expect(downloadedNames).toEqual(["certificate-demo-hard-2026-03-01.html"]);
+		expect(downloadedNames).toEqual(["certificate-accountant-1c-hard-2026-03-01.html"]);
 		expect(createdBlobs[0].type).toBe("text/html;charset=utf-8");
 		const html = await createdBlobs[0].text();
 		expect(html).toContain("Анна");
-		expect(html).toContain(demoTexts.title);
-		expect(html).toContain(demoTexts.levelTitles.hard);
+		expect(html).toContain(accountantTexts.title);
+		expect(html).toContain(accountantTexts.levelTitles.hard);
 		expect(html).toContain("9 / 10");
 
 		clickSpy.mockRestore();

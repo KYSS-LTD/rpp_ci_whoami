@@ -12,7 +12,16 @@ import { SiteHeader } from "./SiteHeader";
 import { StorageWarning } from "./StorageWarning";
 import type { GameManifest } from "@/core/contract/types";
 
-// Очистка отрисованных деревьев после каждого теста, иначе элементы от предыдущих тестов мешают поиску.
+// В jsdom нет нативного верхнего слоя диалогов.
+beforeEach(() => {
+	Object.defineProperty(HTMLDialogElement.prototype, "showModal", {
+		configurable: true, value(this: HTMLDialogElement) { this.open = true; },
+	});
+	Object.defineProperty(HTMLDialogElement.prototype, "close", {
+		configurable: true, value(this: HTMLDialogElement) { this.open = false; },
+	});
+});
+
 afterEach(() => {
 	cleanup();
 });
@@ -87,7 +96,7 @@ describe("экран игр", () => {
 	it("закрывает карточку игры по Escape и по кнопке Закрыть", () => {
 		render(<GamesList games={[demoGame]} />);
 		fireEvent.click(screen.getByRole("button", { name: gamesTexts.playLevel }));
-		fireEvent.keyDown(document, { key: "Escape" });
+		fireEvent(screen.getByRole("dialog"), new Event("cancel", { cancelable: true }));
 		expect(screen.queryByRole("dialog")).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: gamesTexts.playLevel }));
 		fireEvent.click(screen.getByRole("button", { name: gamesTexts.sheetClose }));
@@ -178,9 +187,9 @@ describe("карточка игры", () => {
 		render(<GamesList games={[demoGame]} />);
 		fireEvent.click(screen.getByRole("button", { name: gamesTexts.playLevel }));
 		const dialog = screen.getByRole("dialog");
-		fireEvent.click(dialog);
+		fireEvent.click(within(dialog).getByRole("heading", { name: "Демо" }));
 		expect(screen.getByRole("dialog")).toBe(dialog);
-		fireEvent.click(dialog.parentElement as HTMLElement);
+		fireEvent.click(dialog);
 		expect(screen.queryByRole("dialog")).toBeNull();
 		expect(screen.getByRole("heading", { level: 2, name: "Демо" })).toBeTruthy();
 	});

@@ -37,8 +37,8 @@
 ## Impact
 
 - Портальная часть: `web/games/cooking/` (манифест, тексты витрины, модуль `{ manifest }`), строка в `web/core/registry/index.ts`, строка `cook` в `web/texts/professions/index.ts`, кадры в `web/public/game-previews/cooking/`.
-- Игровая часть: `web/game-src/cooking/` (симуляция на чистом TypeScript, ввод, рендер, HUD, тексты, конфиги уровней, тесты vitest) и результат сборки в `web/public/game-builds/cooking/`.
-- Общие файлы проекта с минимальными правками: `web/package.json` (devDependencies `vite`, `three`, `@types/three`, скрипты `dev:cooking`, `build:cooking`), `web/scripts/check-dashes.mjs` (папка `game-src`), `web/sdk/sdk-consistency.test.ts` (путь копии `portal-bridge.js`).
+- Игровая часть: `web/games/cooking/` (симуляция на чистом TypeScript, ввод, рендер, HUD, тексты, конфиги уровней, тесты vitest) и результат сборки в `web/public/game-builds/cooking/`.
+- Общие файлы проекта: `web/package.json` (devDependencies `vite`, `three`, `@types/three`, скрипты `dev:cooking`, `build:cooking`), `web/scripts/check-dashes.mjs`, `web/sdk/sdk-consistency.test.ts` (путь копии `portal-bridge.js`).
 - Ассеты: копия нужных моделей glTF и текстуры из пака KayKit в папку игры. Лицензию пака нужно подтвердить перед публикацией.
 - Переменная `NEXT_PUBLIC_DEBUG` включает отладочный оверлей сетки навигации и путей.
 

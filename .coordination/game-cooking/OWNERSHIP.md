@@ -2,7 +2,7 @@
 
 Правило: каждый агент правит только свои файлы. Нужна правка чужого файла: написать владельцу или Opus-агенту в его inbox (см. `inbox-*.md` в этой папке). Опус-агент и architect это одна роль (Opus-агент, фактически выполняется Sonnet).
 
-Все пути ниже относительны `web/game-src/cooking/src/`, если не сказано иное. Задачи берутся из `openspec/changes/game-cooking/tasks.md` через skill `openspec-apply-change` строго по своим номерам. Коммиты делает только пользователь, git-команды, меняющие состояние (commit, push, stash, reset, checkout, rebase), не запускать.
+Все пути ниже относительны `web/games/cooking/src/`, если не сказано иное. Задачи берутся из `openspec/changes/game-cooking/tasks.md` через skill `openspec-apply-change` строго по своим номерам. Коммиты делает только пользователь, git-команды, меняющие состояние (commit, push, stash, reset, checkout, rebase), не запускать.
 
 ## Агенты и задачи
 
@@ -39,7 +39,7 @@
 - `render/` (`index.ts`: `prepareAssets`, `createSceneRenderer`, `createDishIcons`; `frameLoop.ts`: `createFrameLoop`; `assets.ts`: загрузка моделей, тип `LoadedAssets`)
 - `hud/` (`index.ts`: `createHud`; `reporter.ts`: `createResultReporter`; стили HUD `hud/*.css`)
 - `texts/hud.ts` (тексты HUD, экранов, названия блюд, причины отказов)
-- `public/models/` (копии glTF, `.bin`, `restaurantbits_texture.png`, лицензия пака; путь `web/game-src/cooking/public/models/`)
+- `public/models/` (копии glTF, `.bin`, `restaurantbits_texture.png`, лицензия пака; путь `web/games/cooking/public/models/`)
 - `config/assets.ts` (список моделей)
 - тесты рядом с кодом
 
@@ -53,7 +53,7 @@
 - `sim/testing/` (общие фикстуры и двойники: `testLevel.ts`, `fakeNav.ts`)
 - `bot/` (эталонный бот, задача 8.4), тесты уровней и бота (8.5, 8.6)
 - `texts/index.ts` (общий реэкспорт), `texts/system.ts`
-- вне `src/`: `web/game-src/cooking/index.html`, `vite.config.ts`, `public/portal-bridge.js` (копия, создаётся шагом перед сборкой), `web/package.json`, `web/scripts/check-dashes.mjs`, `web/scripts/copy-portal-bridge.mjs`, `web/sdk/sdk-consistency.test.ts`, `web/eslint.config.mjs`, `web/core/registry/index.ts`, `web/texts/professions/index.ts`, `web/games/cooking/`, `web/public/game-previews/cooking/`, `web/public/game-builds/cooking/` (результат сборки, только через `npm run build:cooking`), `web/docs/cooking.md`, `.claude/launch.json`
+- вне `src/`: `web/games/cooking/index.html`, `vite.config.ts`, `public/portal-bridge.js` (копия, создаётся шагом перед сборкой), `web/package.json`, `web/scripts/check-dashes.mjs`, `web/scripts/copy-portal-bridge.mjs`, `web/sdk/sdk-consistency.test.ts`, `web/eslint.config.mjs`, `web/core/registry/index.ts`, `web/texts/professions/index.ts`, `web/games/cooking/`, `web/public/game-previews/cooking/`, `web/public/game-builds/cooking/` (результат сборки, только через `npm run build:cooking`), `web/docs/cooking.md`, `.claude/launch.json`
 
 ## Решённые неоднозначности
 
@@ -65,4 +65,4 @@
 6. Названия блюд и причины отказов (`ActionRejectReason`) для игрока лежат в `texts/hud.ts` (SONNET-3). Подсказки клавиш и экранных кнопок: `texts/controls.ts` (SONNET-2); HUD берёт строки управления из него.
 7. Слои экрана (снизу вверх): canvas (рендер), слой касаний (ввод, SONNET-2), HUD (`pointer-events: none` везде, кроме интерактивных элементов), оверлеи (старт, пауза, провал, ориентация). Карточки заказов HUD вверху слева, нижняя часть и правый край на сенсорных устройствах свободны для стика и кнопок.
 8. Новые параметры баланса (числа) агенты в код не пишут: просят Opus-агента добавить поле в `LevelParams` и значение в `config/levels/defaults.ts`.
-9. Общие файлы проекта вне `game-src/cooking` и `games/cooking` правит только Opus-агент.
+9. Общие файлы проекта вне `games/cooking` и `games/cooking` правит только Opus-агент.

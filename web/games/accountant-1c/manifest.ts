@@ -18,6 +18,6 @@ export const accountantManifest: GameManifest = {
 	],
 	format: "simulation",
 	summary: accountantTexts.summary,
-	preview: { frames: ["/game-previews/accountant-1c/frame-1.svg", "/game-previews/accountant-1c/frame-2.svg"] },
+	preview: { frames: ["/game-previews/accountant-1c/poster.webp"], animation: "/game-previews/accountant-1c/play.webp" },
 	estimatedMinutes: 5,
 };

@@ -30,15 +30,11 @@
 	color: var(--color-heading);
 }
 
-/* Значок-логотип из CSS, без картинки */
-.brand::before {
-	content: "";
-	width: 28px;
-	height: 28px;
-	border-radius: 9px;
-	background:
-		radial-gradient(circle at 70% 30%, var(--color-highlight) 0 22%, transparent 23%),
-		var(--gradient-brand);
+.brand img {
+	padding: 4px;
+	border-radius: 50%;
+	background: var(--color-accent-deep);
+	object-fit: contain;
 }
 
 .nav {
@@ -122,21 +118,15 @@
 		font-size: 0.9rem;
 	}
 
-	.brand::before {
+	.brand img {
 		width: 24px;
 		height: 24px;
-		border-radius: 8px;
+		padding: 3px;
 	}
 
 	.resetButton {
 		min-height: 32px;
 		padding: 4px 9px;
 		font-size: 0.8rem;
-	}
-}
-
-@media (max-width: 360px) {
-	.brand::before {
-		display: none;
 	}
 }
