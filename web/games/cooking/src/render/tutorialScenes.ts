@@ -1,7 +1,7 @@
 // Сцены GIF-подсказок рецептов (страница tutorial-capture.html, только для разработки). Каждый шаг рецепта - небольшая сцена из
 // настоящих моделей игры: функция update(t) ставит объекты для момента t от 0 до 1 и возвращает подписи (клавиши, полосы прогресса).
 import { CylinderGeometry, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Scene, SphereGeometry, Vector3 } from "three";
-import type { DishId, IngredientKind, ItemState, PotItem } from "../contracts";
+import { MODEL_SCALE, type DishId, type IngredientKind, type ItemState, type PotItem } from "../contracts";
 import type { LoadedAssets } from "./assets";
 import type { ItemVisualFactory } from "./items";
 
@@ -70,11 +70,11 @@ function burgerStack(ctx: Ctx, patty: IngredientKind, withTop: boolean): Object3
 	const group = new Group();
 	const bottom = ctx.assets.cloneModel("food_ingredient_bun_bottom");
 	const meat = ctx.items.createSpecVisual({ kind: patty, state: "cooked" }).object;
-	group.add(wrapScaled(ctx, bottom, 0));
+	group.add(wrapScaled(bottom, 0));
 	meat.position.y = 0.1;
 	group.add(meat);
 	if (withTop) {
-		const top = wrapScaled(ctx, ctx.assets.cloneModel("food_ingredient_bun_top"), 0.2);
+		const top = wrapScaled(ctx.assets.cloneModel("food_ingredient_bun_top"), 0.2);
 		group.add(top);
 	}
 	ctx.scene.add(group);
@@ -83,12 +83,10 @@ function burgerStack(ctx: Ctx, patty: IngredientKind, withTop: boolean): Object3
 }
 
 // Модель пака с масштабом игры, основание на высоте y внутри группы.
-function wrapScaled(ctx: Ctx, model: Object3D, y: number): Object3D {
-	const name = model.name;
-	void name;
+function wrapScaled(model: Object3D, y: number): Object3D {
 	const wrapper = new Group();
 	wrapper.add(model);
-	wrapper.scale.setScalar(0.5);
+	wrapper.scale.setScalar(MODEL_SCALE);
 	wrapper.position.y = y;
 	return wrapper;
 }
@@ -184,18 +182,18 @@ function panScene(rawMake: (ctx: Ctx, x: number, z: number) => Object3D, cookedM
 function plateScene(heldMake: (ctx: Ctx) => Object3D, dish: DishId): SceneBuilder {
 	return (ctx) => {
 		ctx.put("kitchencounter_straight_A", 0.15, 0, 0);
-		ctx.put("kitchencounter_straight_A", -1.15, 0, 0);
-		ctx.put("dishrack_plates", -1.15, COUNTER_TOP, 0);
+		ctx.put("kitchencounter_straight_A", -0.85, 0, 0);
+		ctx.put("dishrack_plates", -0.85, COUNTER_TOP, 0);
 		const plate = ctx.item(ctx.items.createItemVisual({ type: "assembly", plated: true, dish: null, contents: [] }).object, 0, 0, 0);
 		const held = heldMake(ctx);
 		const result = ctx.item(ctx.items.createDishVisual(dish).object, 0.15, COUNTER_TOP, 0);
 		return {
 			posterT: 0.97,
-			view: { distance: 4.0, x: -0.5, y: 0.8 },
+			view: { distance: 4.0, x: -0.35, y: 0.8 },
 			update(t) {
 				const platePath = seg(t, 0.05, 0.35);
 				const servedDish = t >= 0.78;
-				fly(plate, v(-1.15, COUNTER_TOP + 1.0), v(0.15, COUNTER_TOP), platePath, 0.3);
+				fly(plate, v(-0.85, COUNTER_TOP + 0.6), v(0.15, COUNTER_TOP), platePath, 0.3);
 				const heldPath = seg(t, 0.4, 0.75);
 				fly(held, v(0.15, COUNTER_TOP + 0.9), v(0.15, COUNTER_TOP + 0.12), heldPath, 0.0);
 				if (heldPath === 0) held.position.set(0.15, COUNTER_TOP + 0.9 + Math.sin(t * Math.PI * 6) * 0.03, 0);
@@ -203,7 +201,7 @@ function plateScene(heldMake: (ctx: Ctx) => Object3D, dish: DishId): SceneBuilde
 				show(held, !servedDish);
 				show(result, servedDish);
 				const overlays: Overlay[] = [];
-				if (t < 0.35) overlays.push(key("E", -1.15, 1.8));
+				if (t < 0.35) overlays.push(key("E", -0.85, 1.7));
 				else if (t < 0.78) overlays.push(key("E", 0.15, 1.5));
 				return overlays;
 			},
@@ -215,7 +213,7 @@ function plateScene(heldMake: (ctx: Ctx) => Object3D, dish: DishId): SceneBuilde
 function serveScene(heldMake: ((ctx: Ctx) => Object3D) | null, dish: DishId, staticMake?: (ctx: Ctx) => Object3D): SceneBuilder {
 	return (ctx) => {
 		ctx.put("kitchencounter_straight_A", -1.1, 0, 0);
-		ctx.put("dishrack_plates", -1.1, COUNTER_TOP, 0.3);
+		ctx.put("dishrack_plates", -1.1, COUNTER_TOP, staticMake ? -0.25 : 0);
 		ctx.put("wall_orderwindow", 1.0, 0, -0.8);
 		const held = heldMake ? heldMake(ctx) : null;
 		const still = staticMake ? staticMake(ctx) : null;
@@ -231,7 +229,7 @@ function serveScene(heldMake: ((ctx: Ctx) => Object3D) | null, dish: DishId, sta
 					show(held, !plated);
 					held.position.set(lerp(-0.6, -1.1, toPlate), lerp(COUNTER_TOP + 0.5, COUNTER_TOP + 0.95, toPlate) + Math.sin(toPlate * Math.PI) * 0.2, 0);
 				}
-				if (still) still.position.set(-1.1, COUNTER_TOP, -0.2);
+				if (still) still.position.set(-1.1, COUNTER_TOP, 0.3);
 				show(result, plated);
 				result.position.set(lerp(-1.1, 0.95, toWindow), lerp(COUNTER_TOP + 0.95, 0.55, toWindow) + Math.sin(toWindow * Math.PI) * 0.45, lerp(0, -0.35, toWindow));
 				const overlays: Overlay[] = [];
@@ -314,29 +312,33 @@ const burgerPrepare: SceneBuilder = (ctx) => {
 
 const burgerCook = panScene((ctx) => ingredient(ctx, "patty", "raw"), (ctx) => ingredient(ctx, "patty", "cooked"));
 
+// Во сколько раз бургер в руках крупнее игрового, чтобы собранный бургер был хорошо виден в маленьком кадре.
+const BIG = 1.6;
+
 // Бургер из котлеты и булочек: котлета в руках, булочка летит из ящика и ложится сверху, получается бургер.
 function assembleScene(patty: IngredientKind): SceneBuilder {
 	return (ctx) => {
 		ctx.put("kitchencounter_straight_A", -0.45, 0, 0);
 		ctx.put("crate_buns", 1.05, 0, 0);
 		const base = new Group();
-		const bottom = wrapScaled(ctx, ctx.assets.cloneModel("food_ingredient_bun_bottom"), 0);
+		const bottom = wrapScaled(ctx.assets.cloneModel("food_ingredient_bun_bottom"), 0);
 		const meat = ctx.items.createSpecVisual({ kind: patty, state: "cooked" }).object;
 		meat.position.y = 0.1;
 		base.add(bottom, meat);
 		ctx.scene.add(base);
-		const top = wrapScaled(ctx, ctx.assets.cloneModel("food_ingredient_bun_top"), 0);
+		const top = wrapScaled(ctx.assets.cloneModel("food_ingredient_bun_top"), 0);
 		ctx.scene.add(top);
 		return {
 			posterT: 0.97,
-			view: { distance: 3.9, x: 0.3, y: 0.85 },
+			view: { distance: 3.4, x: 0.3, y: 0.95 },
 			update(t) {
 				const move = seg(t, 0.2, 0.6);
 				const hover = COUNTER_TOP + 0.3 + Math.sin(t * Math.PI * 4) * 0.02;
 				base.position.set(-0.45, hover, 0);
-				fly(top, v(1.05, 0.55), v(-0.45, hover + 0.2), move, 0.4);
-				if (move >= 1) top.position.set(-0.45, hover + 0.2 - Math.sin(seg(t, 0.6, 0.75) * Math.PI) * 0.05, 0);
-				top.scale.setScalar(0.5 * (1 + Math.sin(seg(t, 0.6, 0.78) * Math.PI) * 0.1));
+				base.scale.setScalar(BIG);
+				fly(top, v(1.05, 0.55), v(-0.45, hover + 0.2 * BIG), move, 0.4);
+				if (move >= 1) top.position.set(-0.45, hover + 0.2 * BIG - Math.sin(seg(t, 0.6, 0.75) * Math.PI) * 0.05, 0);
+				top.scale.setScalar(BIG * MODEL_SCALE * (1 + Math.sin(seg(t, 0.6, 0.78) * Math.PI) * 0.1));
 				return t < 0.55 ? [key("E", 1.05, 1.05)] : [];
 			},
 		};
@@ -474,7 +476,7 @@ const stewFill: SceneBuilder = (ctx) => {
 	const starts = [v(-1.2, 0.95), v(-0.7, 1.05), v(-0.2, 0.95)];
 	return {
 		posterT: 0.95,
-		view: { distance: 3.8, x: -0.2, y: 0.85 },
+		view: { distance: 4.3, x: -0.35, y: 0.85 },
 		update(t) {
 			const slots = [seg(t, 0.1, 0.36), seg(t, 0.36, 0.62), seg(t, 0.62, 0.88)];
 			const count = slots.filter((value) => value >= 1).length;
@@ -516,9 +518,6 @@ const stewCook: SceneBuilder = (ctx) => {
 };
 
 const stewServe = serveScene(null, "stew", (ctx) => potItem(ctx, { hasWater: true, portions: 2 }));
-
-const stewPotCookedHolder = (ctx: Ctx): Object3D => potItem(ctx, { hasWater: true, portions: 2 });
-void stewPotCookedHolder;
 
 export const dishScenes: Record<string, readonly SceneBuilder[]> = {
 	ham: [hamTake, hamCook, hamPlate, hamServe],
