@@ -21,7 +21,7 @@ import { MODEL_SCALE, type Item, type LevelConfig, type StationConfig, type Stat
 import { rectCenter } from "../common/math";
 import type { LoadedAssets } from "./assets";
 import { getItemSignature, type ItemVisualFactory } from "./items";
-import { rotationToYaw, type PlacedRegistry } from "./layout";
+import { fitWallThickness, rotationToYaw, type PlacedRegistry } from "./layout";
 import { barBackgroundColor, barBurnColor, barBurnWarningColor, barProgressColor, trashColors } from "./palette";
 import { CAMERA_PITCH_DEG } from "./camera";
 
@@ -203,7 +203,8 @@ export function createStationViews(level: LevelConfig, assets: LoadedAssets, ite
 				surfaceY = 0.7;
 				break;
 			case "servingWindow":
-				addLocalModel(stationRoot, station.model ?? (stationBaseModelNames.servingWindow as string));
+				// Окно выдачи - кусок разделяющей стены: толщина стенки как у соседних кусков (выступы прилавка растут вместе с ней).
+				fitWallThickness(addLocalModel(stationRoot, station.model ?? (stationBaseModelNames.servingWindow as string)).children[0], station.rect);
 				surfaceY = 0.5;
 				break;
 			case "tap": {

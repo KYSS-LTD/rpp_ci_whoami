@@ -13,6 +13,10 @@
 	--hud-muted: #b7c3cc;
 	--hud-accent: #ffd23f;
 	--hud-danger: #ff5a4d;
+	--hud-line: rgb(255 255 255 / 0.08);
+	--hud-ok-text: #8be29c;
+	--hud-ok-bg: #1f7a3a;
+	--hud-ok-line: rgb(76 217 100 / 0.6);
 	/* Зазор и ширину центрального блока задаёт код (hud/index.ts) по размеру окна: те же числа использует расчёт раскладки карточек. */
 	--hud-gap: 8px;
 	--hud-center-width: auto;
@@ -53,7 +57,7 @@
 	display: grid;
 	grid-auto-flow: column;
 	grid-template-rows: repeat(var(--hud-orders-rows, 1), auto);
-	grid-auto-columns: var(--hud-full-card-width, 13rem);
+	grid-auto-columns: var(--hud-full-card-width, 16.5rem);
 	align-content: start;
 	align-items: start;
 	gap: var(--hud-orders-gap, 8px);
@@ -61,62 +65,90 @@
 
 .hud-card {
 	box-sizing: border-box;
-	padding: 0.35rem 0.5rem 0.45rem;
-	border-radius: 0.6rem;
+	padding: 8px 12px 12px;
+	border: 1px solid var(--hud-line);
+	border-radius: 12px;
 	background: var(--hud-bg);
-	border-inline-start: 0.25rem solid #4cd964;
+	box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
 }
 
 .hud-card[data-urgent="true"] {
-	border-inline-start-color: var(--hud-danger);
+	border-color: var(--hud-danger);
 }
 
 .hud-card[data-state="served"] {
-	border-inline-start-color: #4cd964;
+	border-color: var(--hud-ok-line);
 }
 
 .hud-card__header {
 	display: flex;
 	justify-content: space-between;
-	align-items: baseline;
-	gap: 0.5rem;
+	align-items: center;
+	gap: 8px;
+	min-block-size: 28px;
 }
 
 .hud-card__title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
 	margin: 0;
 	font-size: 1em;
-	font-weight: 800;
+	font-weight: 600;
+}
+
+.hud-card__title-word {
+	color: var(--hud-muted);
+}
+
+.hud-card__title-number {
+	display: grid;
+	place-items: center;
+	min-inline-size: 24px;
+	block-size: 24px;
+	padding: 0 6px;
+	box-sizing: border-box;
+	border-radius: 12px;
+	background: rgb(255 255 255 / 0.12);
+	font-variant-numeric: tabular-nums;
+}
+
+.hud-card[data-state="served"] .hud-card__title-number {
+	background: var(--hud-ok-bg);
 }
 
 .hud-card__state {
-	font-size: 0.8em;
-	color: #8be29c;
-	font-weight: 700;
+	font-size: 0.85em;
+	font-weight: 600;
+	color: var(--hud-ok-text);
 }
 
 .hud-card__orders {
-	margin: 0.2rem 0 0;
+	display: grid;
+	gap: 2px;
+	margin: 4px 0 0;
 	padding: 0;
 	list-style: none;
 }
 
+/* Строка заказа: значок блюда слева на две строки, справа название и статус, под ними полоса терпения. */
 .hud-order {
 	position: relative;
 	display: grid;
-	grid-template-columns: 2rem minmax(0, 1fr) auto;
+	grid-template-columns: 40px minmax(0, 1fr) auto;
 	grid-template-areas:
 		"icon name status"
-		"bar bar bar";
+		"icon bar bar";
 	align-items: center;
-	gap: 0.1rem 0.4rem;
-	padding: 0.2rem 0.25rem;
-	border-radius: 0.4rem;
+	gap: 6px 10px;
+	padding: 4px 6px;
+	border-radius: 8px;
 }
 
 .hud-order__icon {
 	grid-area: icon;
-	inline-size: 2rem;
-	block-size: 2rem;
+	inline-size: 40px;
+	block-size: 40px;
 	object-fit: contain;
 }
 
@@ -124,38 +156,39 @@
 	display: grid;
 	place-items: center;
 	border-radius: 50%;
-	background: rgb(255 255 255 / 0.16);
-	font-weight: 800;
+	background: rgb(255 255 255 / 0.12);
+	font-weight: 600;
 }
 
 .hud-order__name {
 	grid-area: name;
 	overflow-wrap: break-word;
-	font-weight: 700;
+	font-weight: 600;
+	line-height: 1.2;
 }
 
 .hud-order__status {
 	grid-area: status;
-	padding: 0.05rem 0.45rem;
-	border-radius: 999px;
-	background: rgb(255 255 255 / 0.16);
-	font-size: 0.78em;
+	font-size: 0.8em;
+	color: var(--hud-muted);
 	white-space: nowrap;
 }
 
 .hud-order[data-status="delivering"] .hud-order__status {
+	padding: 2px 8px;
+	border-radius: 999px;
 	background: #ffcc4d;
 	color: #231a00;
-	font-weight: 700;
+	font-weight: 600;
 }
 
 .hud-order[data-status="served"] .hud-order__status {
-	background: #1f7a3a;
-	color: #fff;
+	color: var(--hud-ok-text);
+	font-weight: 600;
 }
 
 .hud-order[data-status="served"] {
-	opacity: 0.8;
+	opacity: 0.7;
 }
 
 /* Индикатор терпения: цвет от зелёного к красному по оттенку --patience-hue (120 - полное терпение, 0 - нет терпения). */
@@ -165,9 +198,9 @@
 	border: 0 solid;
 	overflow: clip;
 	inline-size: 100%;
-	block-size: 0.45rem;
+	block-size: 6px;
 	border-radius: 999px;
-	background: rgb(255 255 255 / 0.18);
+	background: rgb(255 255 255 / 0.14);
 }
 
 .hud-order__patience::-webkit-progress-bar {
@@ -177,7 +210,7 @@
 .hud-order__patience::-webkit-progress-value {
 	background: hsl(var(--patience-hue, 120) 78% 46%);
 	border-radius: 999px;
-	transition: inline-size 0.25s;
+	transition: inline-size 0.25s ease-out;
 }
 
 .hud-order__patience::-moz-progress-bar {
@@ -185,21 +218,21 @@
 	border-radius: 999px;
 }
 
-/* Терпение на исходе (менее четверти): красная подложка пульсирует. Без анимации при reduced motion: подложка и рамка остаются. */
-.hud-order[data-urgent="true"]::after {
+/* Терпение на исходе (менее четверти): красная подложка пульсирует. Без анимации при reduced motion: подложка остаётся. */
+.hud-order[data-urgent="true"]::after,
+.hud-dish[data-urgent="true"]::after {
 	content: "";
 	position: absolute;
 	inset: 0;
-	border-radius: 0.4rem;
+	border-radius: inherit;
 	background: var(--hud-danger);
-	opacity: 0.22;
-	outline: 2px solid var(--hud-danger);
-	outline-offset: -2px;
+	opacity: 0.2;
 	pointer-events: none;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-	.hud-order[data-urgent="true"]::after {
+	.hud-order[data-urgent="true"]::after,
+	.hud-dish[data-urgent="true"]::after {
 		animation: hud-pulse 1.1s ease-in-out infinite;
 	}
 }
@@ -605,17 +638,21 @@
 .hud-orders[data-density="compact"] .hud-card {
 	display: flex;
 	align-items: center;
-	gap: var(--hud-compact-inner-gap, 4px);
-	block-size: var(--hud-compact-card-height, 32px);
-	padding: 0 var(--hud-compact-pad-x, 4px);
-	border-radius: 0.45rem;
-	/* Цветная полоска слева рисуется тенью, а не рамкой: рамка добавила бы ширину, которой нет в расчёте раскладки. */
-	border-inline-start: 0;
-	box-shadow: inset 3px 0 0 #4cd964;
+	gap: var(--hud-compact-inner-gap, 8px);
+	block-size: var(--hud-compact-card-height, 48px);
+	padding: 0 var(--hud-compact-pad-x, 8px);
+	border-radius: 10px;
+	/* Контур рисуется тенью, а не рамкой: рамка добавила бы ширину, которой нет в расчёте раскладки. */
+	border: 0;
+	box-shadow: inset 0 0 0 1px var(--hud-line);
 }
 
 .hud-orders[data-density="compact"] .hud-card[data-urgent="true"] {
-	box-shadow: inset 3px 0 0 var(--hud-danger);
+	box-shadow: inset 0 0 0 2px var(--hud-danger);
+}
+
+.hud-orders[data-density="compact"] .hud-card[data-state="served"] {
+	box-shadow: inset 0 0 0 1px var(--hud-ok-line);
 }
 
 .hud-orders[data-density="compact"] .hud-card__header {
@@ -628,19 +665,11 @@
 }
 
 .hud-orders[data-density="compact"] .hud-card__title-number {
-	display: grid;
-	place-items: center;
-	inline-size: var(--hud-compact-badge, 18px);
-	block-size: var(--hud-compact-badge, 18px);
-	border-radius: 50%;
-	background: rgb(255 255 255 / 0.2);
-	font-size: 0.7rem;
-	font-weight: 800;
-	font-variant-numeric: tabular-nums;
-}
-
-.hud-orders[data-density="compact"] .hud-card[data-state="served"] .hud-card__title-number {
-	background: #1f7a3a;
+	min-inline-size: var(--hud-compact-badge, 24px);
+	inline-size: var(--hud-compact-badge, 24px);
+	block-size: var(--hud-compact-badge, 24px);
+	padding: 0;
+	font-size: 0.8125rem;
 }
 
 /* Слово "Стол", название блюда и надпись "Стол обслужен" на компактной карточке не видны, но остаются для вспомогательных технологий. */
@@ -657,39 +686,40 @@
 
 .hud-orders[data-density="compact"] .hud-card__orders {
 	display: flex;
-	gap: var(--hud-compact-icon-gap, 3px);
+	gap: var(--hud-compact-icon-gap, 4px);
 	margin: 0;
 }
 
 .hud-orders[data-density="compact"] .hud-order {
 	display: block;
-	inline-size: var(--hud-compact-icon, 20px);
+	inline-size: var(--hud-compact-icon, 32px);
 	padding: 0;
+	border-radius: 6px;
 }
 
 .hud-orders[data-density="compact"] .hud-order__icon {
 	display: block;
-	inline-size: var(--hud-compact-icon, 20px);
-	block-size: var(--hud-compact-icon, 20px);
-	font-size: 0.65rem;
+	inline-size: var(--hud-compact-icon, 32px);
+	block-size: var(--hud-compact-icon, 32px);
+	font-size: 0.75rem;
 }
 
 .hud-orders[data-density="compact"] .hud-order__patience {
 	display: block;
 	inline-size: 100%;
-	block-size: 3px;
+	block-size: 4px;
 	margin-top: 2px;
 }
 
 /* Статус заказа значком в углу значка блюда: цвет и знак показывают состояние, текст остаётся для вспомогательных технологий. */
 .hud-orders[data-density="compact"] .hud-order__status {
 	position: absolute;
-	inset-block-start: -3px;
+	inset-block-start: -4px;
 	inset-inline-end: -4px;
 	display: grid;
 	place-items: center;
-	inline-size: 11px;
-	block-size: 11px;
+	inline-size: 14px;
+	block-size: 14px;
 	padding: 0;
 	border-radius: 50%;
 	background: rgb(0 0 0 / 0.75);
@@ -698,8 +728,8 @@
 }
 
 .hud-orders[data-density="compact"] .hud-order__status::before {
-	font-size: 8px;
-	font-weight: 800;
+	font-size: 10px;
+	font-weight: 600;
 	line-height: 1;
 	content: "\2026";
 }
@@ -714,11 +744,85 @@
 }
 
 .hud-orders[data-density="compact"] .hud-order[data-status="served"] .hud-order__status {
-	background: #1f7a3a;
+	background: var(--hud-ok-bg);
 }
 
 .hud-orders[data-density="compact"] .hud-order[data-status="served"] .hud-order__status::before {
 	content: "\2713";
+}
+
+/* --- Телефон: сводка по блюдам (плитка блюда, в кружке справа снизу число порций, которые ждут все столы) --- */
+
+.hud-orders[data-view="dishes"] {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	align-content: flex-start;
+	gap: 12px;
+	padding: 0 6px 6px 0;
+}
+
+.hud-dish {
+	position: relative;
+	box-sizing: border-box;
+	display: grid;
+	place-items: center;
+	inline-size: 56px;
+	block-size: 56px;
+	padding-block-end: 6px;
+	border-radius: 12px;
+	background: var(--hud-bg);
+	box-shadow: inset 0 0 0 1px var(--hud-line);
+}
+
+.hud-dish[data-urgent="true"] {
+	box-shadow: inset 0 0 0 2px var(--hud-danger);
+}
+
+.hud-dish__icon {
+	inline-size: 40px;
+	block-size: 40px;
+	object-fit: contain;
+}
+
+.hud-dish__count {
+	position: absolute;
+	z-index: 1;
+	inset-inline-end: -6px;
+	inset-block-end: -6px;
+	display: grid;
+	place-items: center;
+	box-sizing: border-box;
+	min-inline-size: 24px;
+	block-size: 24px;
+	padding: 0 6px;
+	border-radius: 12px;
+	background: var(--hud-accent);
+	box-shadow: 0 0 0 2px rgb(21 30 36);
+	color: #231a00;
+	font-size: 0.875rem;
+	font-weight: 600;
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Полоса терпения самого срочного заказа этого блюда; правый край оставлен под кружок с числом. */
+.hud-dish__patience {
+	position: absolute;
+	inset-inline: 8px 20px;
+	inset-block-end: 6px;
+	block-size: 4px;
+	overflow: hidden;
+	border-radius: 2px;
+	background: rgb(255 255 255 / 0.14);
+}
+
+.hud-dish__patience::after {
+	content: "";
+	display: block;
+	inline-size: calc(var(--patience-ratio, 1) * 100%);
+	block-size: 100%;
+	background: hsl(var(--patience-hue, 120) 78% 46%);
 }
 
 /* --- Низкий экран (телефон в альбомной ориентации): компактный центральный блок --- */
@@ -796,11 +900,14 @@
 	}
 	.cooking-hud [data-zone="top-center"] { grid-column: 1; grid-row: 1; justify-self: start; }
 	.hud-right { grid-column: 2; grid-row: 1; }
-	.hud-orders {
-		grid-column: 1 / -1; grid-row: 2; inline-size: 100%;
-		flex-flow: row wrap; max-block-size: min(23dvh, 10rem); overflow: auto;
+	.hud-orders { grid-column: 1 / -1; grid-row: 2; inline-size: 100%; }
+	/* Сводка по блюдам на телефоне в портретной ориентации идёт строкой под таймером и счётчиками. */
+	.hud-orders[data-view="dishes"] { justify-content: flex-start; padding-block-start: 4px; }
+	/* Узкое окно, но не телефон: карточки столов прокручиваются, если не помещаются. */
+	.hud-orders[data-view="tables"] {
+		max-block-size: min(23dvh, 10rem); overflow: auto;
 		pointer-events: auto; touch-action: pan-y;
 	}
 	.hud-orders:not(:has(.hud-card)) { pointer-events: none; }
-	.hud-card { inline-size: calc((100% - var(--hud-gap)) / 2); min-inline-size: 0; }
+	.hud-orders[data-view="tables"] .hud-card { inline-size: calc((100% - var(--hud-gap)) / 2); min-inline-size: 0; }
 }

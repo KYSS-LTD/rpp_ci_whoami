@@ -1,11 +1,14 @@
 // Расстановка статичных объектов по данным уровня (задача 6.2): пол по зонам, стены и мебель (props), столы и стулья.
 // Станции расставляет stations.ts. Все объекты ставятся в те же координаты, что использует игровая логика: центр модели
 // в центре прямоугольника, поворот rotationDeg по yaw, масштаб MODEL_SCALE (по Y дополнительно heightScale).
-import { Box3, BoxGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, Object3D, Quaternion, SphereGeometry, Vector3 } from "three";
+// В реестр попадают только объекты конфига; декор улицы и зала строят environment.ts и interior.ts отдельно.
+import { Box3, BoxGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, Object3D, Quaternion, Vector3, type BufferGeometry, type Material } from "three";
 import { MODEL_SCALE, type FloorConfig, type LevelConfig, type PropConfig, type Rect, type Rotation, type ZoneKind } from "../contracts";
 import { rectCenter } from "../common/math";
 import type { LoadedAssets } from "./assets";
 import { floorColors } from "./palette";
+import { textureTileSizes, type SceneTextures } from "./textures";
+import { WALL_MODEL_THICKNESS } from "./wallModels";
 
 // Толщина плиты пола под нулевой отметкой (верх пола лежит на y = 0).
 const floorSlabThickness = 0.1;
@@ -33,9 +36,39 @@ export interface StaticLayout {
 	dispose(): void;
 }
 
+// Поверхности пола, которые задаёт сцена: дерево зала из текстур и общий с окружением материал тротуара.
+export interface LayoutSurfaces {
+	textures?: SceneTextures;
+	// Материал зоны улицы: тот же, что у продолжения тротуара в environment.ts (плитка без шва).
+	streetMaterial?: Material;
+}
+
 // Переводит rotationDeg в yaw (радианы): 0 - модель смотрит на камеру (+z), 90 - на +x.
 export function rotationToYaw(rotationDeg: Rotation | number): number {
 	return (rotationDeg * Math.PI) / 180;
+}
+
+// Номер куска стены по идентификатору ("wall-north-3" -> 3) или null, если кусок из другого ряда.
+export function wallPieceIndex(propId: string, run: "north" | "east" | "west"): number | null {
+	const match = new RegExp(`^wall-${run}-(\\d+)$`).exec(propId);
+	return match ? Number(match[1]) : null;
+}
+
+// Модель окна для куска наружной стены или null. Окна прорезаны в северной стене (кухня и зал) и в боковых стенах через кусок,
+// чтобы стены не были глухими. Меняется только модель: размер, положение и коллизия стены остаются из конфига.
+export function getWallWindowModel(prop: Pick<PropConfig, "id" | "model">): string | null {
+	if (prop.model !== "wall") {
+		return null;
+	}
+	const north = wallPieceIndex(prop.id, "north");
+	if (north !== null) {
+		return north === 1 || north === 5 ? "wall_window_closed" : null;
+	}
+	const side = wallPieceIndex(prop.id, "east") ?? wallPieceIndex(prop.id, "west");
+	if (side !== null) {
+		return side === 1 || side === 3 ? "wall_window_closed" : null;
+	}
+	return null;
 }
 
 // Ставит корень модели в центр прямоугольника с поворотом и масштабом MODEL_SCALE (по Y умножается на heightScale).
@@ -47,8 +80,19 @@ export function placeAtRect(object: Object3D, rect: Rect, rotationDeg: Rotation,
 	return object;
 }
 
-// Участок пола. Кухня: плитки модели пака через InstancedMesh (одна отрисовка на всю зону), остальные зоны: плита цвета зоны.
-function createFloor(floor: FloorConfig, assets: LoadedAssets, disposables: Array<{ dispose(): void }>): Object3D {
+// UV по мировым x и z: плиты пола разных зон и тротуары окружения стыкуются без шва текстуры.
+function applyWorldUv(geometry: BufferGeometry, centerX: number, centerZ: number, tileSize: number): void {
+	const position = geometry.getAttribute("position");
+	const uv = geometry.getAttribute("uv");
+	for (let index = 0; index < position.count; index += 1) {
+		uv.setXY(index, (position.getX(index) + centerX) / tileSize, -(position.getZ(index) + centerZ) / tileSize);
+	}
+	uv.needsUpdate = true;
+}
+
+// Участок пола. Кухня: плитки модели пака через InstancedMesh (одна отрисовка на всю зону); зал: доски из текстуры;
+// улица: плитка тротуара общим материалом окружения. Без текстур зоны рисуются плитой цвета зоны.
+function createFloor(floor: FloorConfig, assets: LoadedAssets, surfaces: LayoutSurfaces, disposables: Array<{ dispose(): void }>): Object3D {
 	const tileModelName = floorTileModels[floor.zone];
 	const rect = floor.rect;
 	if (tileModelName !== null && assets.has(tileModelName)) {
@@ -65,11 +109,23 @@ function createFloor(floor: FloorConfig, assets: LoadedAssets, disposables: Arra
 		}
 	}
 	const geometry = new BoxGeometry(rect.width, floorSlabThickness, rect.depth);
-	const material = new MeshStandardMaterial({ color: floorColors[floor.zone], roughness: 0.9, metalness: 0 });
-	disposables.push(geometry, material);
-	const slab = new Mesh(geometry, material);
 	const center = rectCenter(rect);
+	disposables.push(geometry);
+	let material: Material;
+	if (floor.zone === "street" && surfaces.streetMaterial) {
+		material = surfaces.streetMaterial;
+		applyWorldUv(geometry, center.x, center.z, textureTileSizes.paving);
+	} else if (floor.zone === "hall" && surfaces.textures?.hallFloor) {
+		material = new MeshStandardMaterial({ map: surfaces.textures.hallFloor, roughness: 0.78, metalness: 0 });
+		applyWorldUv(geometry, center.x, center.z, textureTileSizes.hallFloor);
+		disposables.push(material);
+	} else {
+		material = new MeshStandardMaterial({ color: floorColors[floor.zone], roughness: 0.9, metalness: 0 });
+		disposables.push(material);
+	}
+	const slab = new Mesh(geometry, material);
 	slab.position.set(center.x, -floorSlabThickness / 2, center.z);
+	slab.receiveShadow = true;
 	return slab;
 }
 
@@ -97,22 +153,50 @@ function createTiledFloor(tileMesh: Mesh, rect: Rect): InstancedMesh {
 		}
 	}
 	instanced.instanceMatrix.needsUpdate = true;
+	instanced.receiveShadow = true;
 	return instanced;
 }
 
+// Включает тени у всех мешей объекта: статичные стены и мебель отбрасывают и принимают запечённые тени солнца.
+function enableShadows(object: Object3D): void {
+	object.traverse((node) => {
+		const mesh = node as Mesh;
+		if (mesh.isMesh) {
+			mesh.castShadow = true;
+			mesh.receiveShadow = true;
+		}
+	});
+}
+
+// Растягивает модель куска стены (и окна выдачи) по толщине на всю полосу из конфига. Стенка моделей пака тоньше полосы
+// (0.25 против 0.5): по центру полосы она оставляла щели до пола и тротуара, через которые видна трава, а в углах торцы боковых
+// стен не доходили до поперечных, и те выступали наружу. Во всю полосу стыки пола и углы смыкаются, видимая стена совпадает
+// с коллизией. Модель должна стоять в обёртке с масштабом MODEL_SCALE (placeAtRect, addLocalModel).
+export function fitWallThickness(model: Object3D, rect: Rect): void {
+	model.scale.z *= Math.min(rect.width, rect.depth) / (WALL_MODEL_THICKNESS * MODEL_SCALE);
+}
+
 // Препятствие или декор (стена, колонна, мебель). Модель null означает невидимый объект: на сцене его нет.
+// Наружные стены могут получить модель с окном того же размера (getWallWindowModel).
 function createProp(prop: PropConfig, assets: LoadedAssets): Object3D | null {
 	if (prop.model === null) {
 		return null;
 	}
+	const windowModel = getWallWindowModel(prop);
+	const modelName = windowModel !== null && assets.has(windowModel) ? windowModel : prop.model;
 	const wrapper = new Group();
-	wrapper.add(assets.cloneModel(prop.model));
+	const model = assets.cloneModel(modelName);
+	if (modelName.startsWith("wall")) {
+		fitWallThickness(model, prop.rect);
+	}
+	wrapper.add(model);
+	enableShadows(wrapper);
 	return placeAtRect(wrapper, prop.rect, prop.rotationDeg, prop.heightScale ?? 1);
 }
 
 // Расставляет пол, props, столы и стулья. Каждый созданный объект кладётся в реестр под идентификатором конфига:
 // "floor-<номер>", prop.id, id стола, "<id стола>-chair-<номер места>".
-export function buildStaticLayout(level: LevelConfig, assets: LoadedAssets): StaticLayout {
+export function buildStaticLayout(level: LevelConfig, assets: LoadedAssets, surfaces: LayoutSurfaces = {}): StaticLayout {
 	const root = new Group();
 	root.name = "level-static";
 	const registry: PlacedRegistry = new Map();
@@ -128,42 +212,17 @@ export function buildStaticLayout(level: LevelConfig, assets: LoadedAssets): Sta
 		root.add(object);
 	}
 
-	level.floors.forEach((floor, index) => addPlaced(`floor-${index}`, createFloor(floor, assets, disposables)));
+	level.floors.forEach((floor, index) => addPlaced(`floor-${index}`, createFloor(floor, assets, surfaces, disposables)));
 	level.props.forEach((prop) => addPlaced(prop.id, createProp(prop, assets)));
-
-	// Наружная тротуарная полоса и зелёные кадки создают улицу вокруг входа, не добавляя коллизий навигации.
-	const street = level.floors.find((floor) => floor.zone === "street");
-	if (street) {
-		const sidewalkGeometry = new BoxGeometry(street.rect.width, 0.035, Math.min(1.4, street.rect.depth));
-		const sidewalkMaterial = new MeshStandardMaterial({ color: 0xc7bba7, roughness: 0.94 });
-		disposables.push(sidewalkGeometry, sidewalkMaterial);
-		const sidewalk = new Mesh(sidewalkGeometry, sidewalkMaterial);
-		sidewalk.position.set(street.rect.x + street.rect.width / 2, 0.012, street.rect.z + 0.8);
-		addPlaced("street-sidewalk", sidewalk);
-
-		const planterMaterial = new MeshStandardMaterial({ color: 0xb86642, roughness: 0.86 });
-		const leafMaterial = new MeshStandardMaterial({ color: 0x49864e, roughness: 0.9 });
-		const planterGeometry = new BoxGeometry(0.88, 0.34, 0.62);
-		const leafGeometry = new SphereGeometry(0.28, 10, 8);
-		disposables.push(planterMaterial, leafMaterial, planterGeometry, leafGeometry);
-		const plantXs = [level.door.rect.x + level.door.rect.width + 2.25, street.rect.x + street.rect.width - 1.25];
-		plantXs.forEach((x, index) => {
-			if (x < street.rect.x + 0.5 || x > street.rect.x + street.rect.width - 0.5) return;
-			const planter = new Group();
-			const box = new Mesh(planterGeometry, planterMaterial);
-			box.position.y = 0.18;
-			planter.add(box);
-			for (let leaf = 0; leaf < 4; leaf += 1) {
-				const crown = new Mesh(leafGeometry, leafMaterial);
-				const angle = (leaf / 4) * Math.PI * 2;
-				crown.position.set(Math.cos(angle) * 0.18, 0.48 + (leaf % 2) * 0.12, Math.sin(angle) * 0.16);
-				crown.scale.set(1, 1.35, 0.9);
-				planter.add(crown);
-			}
-			planter.position.set(x, 0, street.rect.z + 1.15 + index * 0.2);
-			addPlaced(`street-plant-${index + 1}`, planter);
+	// Порог под проёмами (кухня-зал, входная дверь): зоны пола кончаются у полосы стены, и без порога в проёме видна трава.
+	// Доски зала с мировыми UV продолжают рисунок пола без шва. В реестр не попадает: это не объект конфига.
+	level.props
+		.filter((prop) => prop.model !== null && prop.model.includes("doorway"))
+		.forEach((prop) => {
+			const threshold = createFloor({ rect: prop.rect, zone: "hall" }, assets, surfaces, disposables);
+			threshold.name = `threshold-${prop.id}`;
+			root.add(threshold);
 		});
-	}
 
 	for (const table of level.tables) {
 		const tableWrapper = new Group();
@@ -176,10 +235,12 @@ export function buildStaticLayout(level: LevelConfig, assets: LoadedAssets): Sta
 			tableModel.scale.set(footprintScale, 1, footprintScale);
 		}
 		tableWrapper.add(tableModel);
+		enableShadows(tableWrapper);
 		addPlaced(table.id, placeAtRect(tableWrapper, table.rect, table.rotationDeg));
 		table.seats.forEach((seat, seatIndex) => {
 			const chairWrapper = new Group();
 			chairWrapper.add(assets.cloneModel(seat.chairModel));
+			enableShadows(chairWrapper);
 			addPlaced(`${table.id}-chair-${seatIndex}`, placeAtRect(chairWrapper, seat.chairRect, seat.rotationDeg));
 		});
 	}

@@ -11,6 +11,20 @@ export const floorColors = {
 // Цвет фона сцены (за краем улицы).
 export const backgroundColor = 0x1f2a30;
 
+// Небо и туман утром и вечером (туман прячет край травяного поля), цвет неба для полусферического света.
+export const skyColors = {
+	morning: 0xb7d6dc,
+	evening: 0xf2ab7e,
+	hemisphereMorning: 0xdfeaff,
+	hemisphereEvening: 0xffc49a,
+} as const;
+
+// Цвет солнца утром и вечером.
+export const sunColors = { morning: 0xfff3df, evening: 0xffa95e } as const;
+
+// Цвет общего света утром и вечером.
+export const ambientColors = { morning: 0xffffff, evening: 0xffd9bc } as const;
+
 // Цвет подсветки цели взаимодействия и подсветки отказа.
 export const targetHighlightColor = 0xffd23f;
 export const rejectHighlightColor = 0xff4d3d;
@@ -38,8 +52,8 @@ export const hairColors = [0x2b2118, 0x6b4423, 0xb5651d, 0xe3b04b, 0x9a9a9a, 0xb
 export const customerShirtColors = [0x4a7fc1, 0xe8552b, 0x1fa88a, 0xf2b84a, 0x8fbf3a, 0xe86a7a, 0x7a5b8c, 0xb0653c] as const;
 
 // Цвета повара и официанта.
-export const chefColors = { coat: 0xf6f8fa, trousers: 0x3b4a5a, hat: 0xffffff, scarf: 0xe8552b, shoes: 0x2b3138 } as const;
-export const waiterColors = { vest: 0x2b3138, shirt: 0xf6f8fa, trousers: 0x23282e, bowtie: 0xd8262c, hair: 0x2b2118, shoes: 0x14171a } as const;
+export const chefColors = { coat: 0xf6f8fa, trousers: 0x3b4a5a, hat: 0xffffff, scarf: 0xe8552b, shoes: 0x2b3138, apron: 0x2f4a6d } as const;
+export const waiterColors = { vest: 0x2b3138, shirt: 0xf6f8fa, trousers: 0x23282e, bowtie: 0xd8262c, hair: 0x2b2118, shoes: 0x14171a, apron: 0x1f2328 } as const;
 
 // Цвет тени-пятна под персонажем.
 export const shadowColor = 0x000000;

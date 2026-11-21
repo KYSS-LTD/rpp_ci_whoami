@@ -49,10 +49,10 @@ export const MAX_ORDERS_PER_TABLE = 4;
 
 // Полная карточка стола: ширина, высота шапки, внутренние отступы и запас высоты одной строки заказа (название блюда
 // может занять две строки). Оценка нарочно с запасом: карточка не должна выйти за свою зону.
-export const FULL_CARD_WIDTH_PX = 208;
-export const FULL_CARD_HEADER_PX = 30;
-export const FULL_CARD_PADDING_PX = 14;
-export const FULL_ORDER_ROW_PX = 52;
+export const FULL_CARD_WIDTH_PX = 264;
+export const FULL_CARD_HEADER_PX = 36;
+export const FULL_CARD_PADDING_PX = 20;
+export const FULL_ORDER_ROW_PX = 60;
 
 // Полный вид занимает много места и закрывает кухню: он допустим, пока блок не выше этой доли высоты зоны. Возврат из компактного
 // вида в полный только при заполнении не выше второй, меньшей доли (гистерезис: вид не мигает, когда число заказов колеблется у границы).
@@ -60,13 +60,20 @@ export const FULL_MAX_FILL_RATIO = 0.6;
 export const FULL_RETURN_FILL_RATIO = 0.45;
 
 // Компактная карточка стола (одна строка: номер и ряд значков блюд, под каждым значком полоса терпения).
-export const COMPACT_ICON_PX = 20;
-export const COMPACT_ICON_GAP_PX = 3;
-export const COMPACT_BADGE_PX = 18;
-export const COMPACT_CARD_PADDING_X_PX = 4;
-export const COMPACT_CARD_INNER_GAP_PX = 4;
-export const COMPACT_CARD_HEIGHT_PX = 32;
-export const COMPACT_CARD_GAP_PX = 3;
+export const COMPACT_ICON_PX = 32;
+export const COMPACT_ICON_GAP_PX = 4;
+export const COMPACT_BADGE_PX = 24;
+export const COMPACT_CARD_PADDING_X_PX = 8;
+export const COMPACT_CARD_INNER_GAP_PX = 8;
+export const COMPACT_CARD_HEIGHT_PX = 48;
+export const COMPACT_CARD_GAP_PX = 4;
+
+// Масштаб компактной карточки на обычном (не низком) экране: на компьютере и планшете значки крупнее.
+export const COMPACT_SCALE_NORMAL = 1.25;
+
+// Телефон: короткая сторона окна не больше этого числа. На телефоне вместо карточек столов показана сводка по блюдам
+// (плитка блюда и число порций, которые ещё ждут все столы), она помещается в зону при любой нагрузке.
+export const PHONE_MAX_SHORT_SIDE_PX = 500;
 
 // Зоны экрана, в которых размещается HUD. Нижние зоны HUD не занимает (там стик и кнопки на сенсорных устройствах).
 export type HudZone = "top-left" | "top-center" | "top-right";

@@ -279,12 +279,20 @@ describe("персонажи (6.4, 6.6)", () => {
 		const level = getLevelConfig("easy");
 		const { renderer } = createScene(level);
 		renderer.render(createDemoSnapshot(level, 3), 1 / 60);
+		// Цвета персонажа: цвет материала и цвета вершин (детали тела склеены в меши с цветами в вершинах).
 		const colorsOf = (name: string): string => {
-			const colors = new Set<number>();
+			const colors = new Set<string>();
 			(renderer.scene.getObjectByName(name) as Object3D).traverse((node) => {
 				const mesh = node as Mesh;
-				if (mesh.isMesh && (mesh.material as MeshStandardMaterial).color) {
-					colors.add((mesh.material as MeshStandardMaterial).color.getHex());
+				if (!mesh.isMesh) {
+					return;
+				}
+				if ((mesh.material as MeshStandardMaterial).color) {
+					colors.add((mesh.material as MeshStandardMaterial).color.getHexString());
+				}
+				const vertexColors = mesh.geometry.getAttribute("color");
+				for (let index = 0; vertexColors && index < vertexColors.count; index += 1) {
+					colors.add([vertexColors.getX(index), vertexColors.getY(index), vertexColors.getZ(index)].map((channel) => channel.toFixed(3)).join("/"));
 				}
 			});
 			return [...colors].sort().join(",");

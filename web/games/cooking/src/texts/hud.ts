@@ -45,6 +45,8 @@ export const hudTexts = {
 		},
 		// Имя индикатора терпения для вспомогательных технологий: блюдо и процент оставшегося терпения.
 		patienceLabel: (dishName: string, percent: number): string => `Терпение, ${dishName}: ${percent} процентов`,
+		// Сводка по блюдам на телефоне: блюдо и число порций, которые ещё ждут все столы.
+		dishCountLabel: (dishName: string, count: number): string => `${dishName}: ждут ${count}`,
 	},
 
 	// Верхняя панель.

@@ -31,6 +31,8 @@ export interface ItemVisualFactory {
 	createDishVisual(dish: DishId): ItemVisual;
 	// Объект для ингредиента по паре "вид + состояние" (содержимое кастрюли и доски).
 	createSpecVisual(spec: ItemSpec): ItemVisual;
+	// Высота пустой тарелки в единицах мира.
+	getPlateHeight(): number;
 }
 
 // Ключ предмета для сравнения: меняется только когда должен смениться вид.
@@ -141,5 +143,14 @@ export function createItemVisualFactory(assets: LoadedAssets): ItemVisualFactory
 		return { object: group, height };
 	}
 
-	return { createItemVisual, createDishVisual, createSpecVisual };
+	let plateHeight: number | null = null;
+	function getPlateHeight(): number {
+		if (plateHeight === null) {
+			assets.getBounds("plate").getSize(size);
+			plateHeight = size.y * MODEL_SCALE;
+		}
+		return plateHeight;
+	}
+
+	return { createItemVisual, createDishVisual, createSpecVisual, getPlateHeight };
 }

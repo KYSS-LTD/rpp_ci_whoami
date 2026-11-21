@@ -5,6 +5,7 @@ import { BoxGeometry, Box3, Color, Group, Mesh, MeshStandardMaterial, Vector3, t
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { assetModelNames, getModelUrl } from "../config/assets";
 import { debugLog } from "../config/debug";
+import { squareWallEnds } from "./wallModels";
 
 // Сколько моделей грузится одновременно: больше браузер всё равно не откроет соединений, а ошибка останавливает очередь раньше.
 const maxParallelLoads = 8;
@@ -112,6 +113,12 @@ function shareAtlasTexture(models: ReadonlyMap<string, Object3D>): Texture | nul
 export function createLoadedAssets(models: ReadonlyMap<string, Object3D>): LoadedAssets {
 	const store = new Map(models);
 	const atlas = shareAtlasTexture(store);
+	// Куски стен без боковой фаски на торцах: соседние куски и стены в углах смыкаются без канавок.
+	store.forEach((model, modelName) => {
+		if (modelName.startsWith("wall")) {
+			squareWallEnds(model);
+		}
+	});
 	const boundsCache = new Map<string, Box3>();
 	const tintedMaterials = new Map<string, Material>();
 	const reportedMissing = new Set<string>();

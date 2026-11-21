@@ -15,6 +15,7 @@ import {
 	COMPACT_CARD_PADDING_X_PX,
 	COMPACT_ICON_GAP_PX,
 	COMPACT_ICON_PX,
+	COMPACT_SCALE_NORMAL,
 	FULL_CARD_HEADER_PX,
 	FULL_CARD_PADDING_PX,
 	FULL_CARD_WIDTH_PX,
@@ -27,6 +28,7 @@ import {
 	HUD_GAP_LOW_PX,
 	HUD_GAP_PX,
 	LOW_SCREEN_MAX_HEIGHT_PX,
+	PHONE_MAX_SHORT_SIDE_PX,
 	TOUCH_BUTTON_GAP_PX,
 	TOUCH_BUTTON_MAX_PX,
 	TOUCH_BUTTON_MIN_PX,
@@ -53,6 +55,10 @@ export interface HudEnvironment {
 export interface HudMetrics {
 	// Низкий экран: сжатые отступы, центральный блок и счётчики.
 	lowScreen: boolean;
+	// Телефон: вместо карточек столов показана сводка по блюдам.
+	phone: boolean;
+	// Масштаб компактной карточки (1 на низком экране, больше на обычном).
+	compactScale: number;
 	gapPx: number;
 	centerWidthPx: number;
 	// Зона карточек заказов: справа сверху (правая зона сетки HUD).
@@ -70,28 +76,54 @@ export function getTouchControlsReservePx(viewportWidthPx: number, viewportHeigh
 // Размеры блоков HUD по окружению.
 export function computeHudMetrics(environment: HudEnvironment): HudMetrics {
 	const lowScreen = environment.viewportHeightPx <= LOW_SCREEN_MAX_HEIGHT_PX;
+	const phone = Math.min(environment.viewportWidthPx, environment.viewportHeightPx) <= PHONE_MAX_SHORT_SIDE_PX;
 	const gapPx = lowScreen ? HUD_GAP_LOW_PX : HUD_GAP_PX;
 	const centerWidthPx = lowScreen ? HUD_CENTER_WIDTH_LOW_PX : HUD_CENTER_WIDTH_PX;
 	// Сетка корня: левая зона, центр фиксированной ширины, правая зона (левая и правая равны).
 	const zoneWidthPx = Math.max(0, (environment.viewportWidthPx - environment.paddingLeftPx - environment.paddingRightPx - centerWidthPx - 2 * gapPx) / 2);
 	const bottomReservePx = environment.touch ? getTouchControlsReservePx(environment.viewportWidthPx, environment.viewportHeightPx) : HUD_EDGE_PADDING_PX;
 	const zoneHeightPx = Math.max(0, environment.viewportHeightPx - environment.paddingTopPx - bottomReservePx);
-	return { lowScreen, gapPx, centerWidthPx, zoneWidthPx, zoneHeightPx };
+	return { lowScreen, phone, compactScale: lowScreen ? 1 : COMPACT_SCALE_NORMAL, gapPx, centerWidthPx, zoneWidthPx, zoneHeightPx };
+}
+
+// Размеры компактной карточки при масштабе scale, в целых пикселях. Те же числа уходят в CSS (hud/orders.ts).
+export interface CompactSizes {
+	iconPx: number;
+	iconGapPx: number;
+	badgePx: number;
+	paddingXPx: number;
+	innerGapPx: number;
+	cardHeightPx: number;
+	cardGapPx: number;
+}
+
+export function getCompactSizes(scale: number): CompactSizes {
+	const px = (value: number): number => Math.round(value * scale);
+	return {
+		iconPx: px(COMPACT_ICON_PX),
+		iconGapPx: px(COMPACT_ICON_GAP_PX),
+		badgePx: px(COMPACT_BADGE_PX),
+		paddingXPx: px(COMPACT_CARD_PADDING_X_PX),
+		innerGapPx: px(COMPACT_CARD_INNER_GAP_PX),
+		cardHeightPx: px(COMPACT_CARD_HEIGHT_PX),
+		cardGapPx: px(COMPACT_CARD_GAP_PX),
+	};
 }
 
 // Ширина карточки стола с orderCount заказами.
-export function getCardWidthPx(density: OrdersDensity, orderCount: number): number {
+export function getCardWidthPx(density: OrdersDensity, orderCount: number, compactScale = 1): number {
 	if (density === "full") {
 		return FULL_CARD_WIDTH_PX;
 	}
+	const sizes = getCompactSizes(compactScale);
 	const icons = Math.max(1, orderCount);
-	return 2 * COMPACT_CARD_PADDING_X_PX + COMPACT_BADGE_PX + COMPACT_CARD_INNER_GAP_PX + icons * COMPACT_ICON_PX + (icons - 1) * COMPACT_ICON_GAP_PX;
+	return 2 * sizes.paddingXPx + sizes.badgePx + sizes.innerGapPx + icons * sizes.iconPx + (icons - 1) * sizes.iconGapPx;
 }
 
 // Высота карточки стола с orderCount заказами.
-export function getCardHeightPx(density: OrdersDensity, orderCount: number): number {
+export function getCardHeightPx(density: OrdersDensity, orderCount: number, compactScale = 1): number {
 	if (density === "compact") {
-		return COMPACT_CARD_HEIGHT_PX;
+		return getCompactSizes(compactScale).cardHeightPx;
 	}
 	return FULL_CARD_PADDING_PX + FULL_CARD_HEADER_PX + Math.max(1, orderCount) * FULL_ORDER_ROW_PX;
 }
@@ -125,7 +157,7 @@ export interface OrdersLayoutPlan {
 }
 
 // Раскладывает карточки по колонкам (сверху вниз, затем следующая колонка) и считает размеры блока.
-function arrange(density: OrdersDensity, orderCounts: readonly number[], rows: number, gapPx: number): Pick<OrdersLayoutPlan, "columns" | "rows" | "widthPx" | "heightPx" | "placements"> {
+function arrange(density: OrdersDensity, orderCounts: readonly number[], rows: number, gapPx: number, compactScale: number): Pick<OrdersLayoutPlan, "columns" | "rows" | "widthPx" | "heightPx" | "placements"> {
 	const cardCount = orderCounts.length;
 	if (cardCount === 0) {
 		return { columns: 0, rows: 0, widthPx: 0, heightPx: 0, placements: [] };
@@ -136,8 +168,8 @@ function arrange(density: OrdersDensity, orderCounts: readonly number[], rows: n
 	orderCounts.forEach((orderCount, index) => {
 		const column = Math.floor(index / rows);
 		const row = index % rows;
-		columnWidths[column] = Math.max(columnWidths[column], getCardWidthPx(density, orderCount));
-		rowHeights[row] = Math.max(rowHeights[row], getCardHeightPx(density, orderCount));
+		columnWidths[column] = Math.max(columnWidths[column], getCardWidthPx(density, orderCount, compactScale));
+		rowHeights[row] = Math.max(rowHeights[row], getCardHeightPx(density, orderCount, compactScale));
 	});
 	const columnStarts: number[] = [];
 	let cursorX = 0;
@@ -154,7 +186,7 @@ function arrange(density: OrdersDensity, orderCounts: readonly number[], rows: n
 	const placements: CardPlacement[] = orderCounts.map((orderCount, index) => {
 		const column = Math.floor(index / rows);
 		const row = index % rows;
-		return { index, column, row, xPx: columnStarts[column], yPx: rowStarts[row], widthPx: getCardWidthPx(density, orderCount), heightPx: getCardHeightPx(density, orderCount) };
+		return { index, column, row, xPx: columnStarts[column], yPx: rowStarts[row], widthPx: getCardWidthPx(density, orderCount, compactScale), heightPx: getCardHeightPx(density, orderCount, compactScale) };
 	});
 	return {
 		columns,
@@ -167,14 +199,14 @@ function arrange(density: OrdersDensity, orderCounts: readonly number[], rows: n
 
 // Перебирает число строк от одной (одна колонка) до числа карточек (один ряд) и берёт первую раскладку, которая помещается.
 // Если не помещается ни одна, возвращает самую низкую из тех, что умещаются по ширине (fits = false), либо самую узкую.
-function chooseArrangement(density: OrdersDensity, orderCounts: readonly number[], zone: { widthPx: number; heightPx: number }, gapPx: number): OrdersLayoutPlan {
+function chooseArrangement(density: OrdersDensity, orderCounts: readonly number[], zone: { widthPx: number; heightPx: number }, gapPx: number, compactScale: number): OrdersLayoutPlan {
 	const cardCount = orderCounts.length;
 	if (cardCount === 0) {
-		return { density, ...arrange(density, orderCounts, 1, gapPx), zoneWidthPx: zone.widthPx, zoneHeightPx: zone.heightPx, fits: true };
+		return { density, ...arrange(density, orderCounts, 1, gapPx, compactScale), zoneWidthPx: zone.widthPx, zoneHeightPx: zone.heightPx, fits: true };
 	}
 	const candidates: Array<ReturnType<typeof arrange>> = [];
 	for (let rows = cardCount; rows >= 1; rows -= 1) {
-		candidates.push(arrange(density, orderCounts, rows, gapPx));
+		candidates.push(arrange(density, orderCounts, rows, gapPx, compactScale));
 	}
 	// candidates идут от одной строки (одна колонка по высоте длинная) к максимуму строк; порядок: сначала меньше колонок.
 	const byColumns = [...candidates].sort((first, second) => first.columns - second.columns || first.heightPx - second.heightPx);
@@ -197,11 +229,11 @@ export interface OrdersLayoutInput {
 export function planOrdersLayout(input: OrdersLayoutInput): OrdersLayoutPlan {
 	const { metrics, orderCounts, previousDensity } = input;
 	const zone = { widthPx: metrics.zoneWidthPx, heightPx: metrics.zoneHeightPx };
-	const fullPlan = chooseArrangement("full", orderCounts, zone, metrics.gapPx);
+	const fullPlan = chooseArrangement("full", orderCounts, zone, metrics.gapPx, metrics.compactScale);
 	const returnZone = { widthPx: zone.widthPx, heightPx: zone.heightPx * (previousDensity === "full" ? FULL_MAX_FILL_RATIO : FULL_RETURN_FILL_RATIO) };
 	const fullFits = fullPlan.fits && fullPlan.widthPx <= returnZone.widthPx && fullPlan.heightPx <= returnZone.heightPx;
 	if (fullFits) {
 		return fullPlan;
 	}
-	return chooseArrangement("compact", orderCounts, zone, COMPACT_CARD_GAP_PX);
+	return chooseArrangement("compact", orderCounts, zone, getCompactSizes(metrics.compactScale).cardGapPx, metrics.compactScale);
 }
