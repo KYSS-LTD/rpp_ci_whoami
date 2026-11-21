@@ -9,6 +9,7 @@ const gameBuildHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+	output: process.env.DOCKER_STANDALONE === "1" ? "standalone" : undefined,
 	cacheComponents: true,
 	partialPrefetching: true,
 	async headers() {

@@ -1,0 +1,8 @@
+*
+!web/
+web/**/node_modules
+web/.next
+web/**/*.tsbuildinfo
+web/**/dist
+web/**/.env*
+web/public/game-builds/uav-operator
