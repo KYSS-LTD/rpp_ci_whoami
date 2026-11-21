@@ -37,11 +37,16 @@ export function bind_Joystick(root, signal) {
 	return { vector, reset };
 }
 
-export function bind_FlightInputs(attitudeStick, throttleStick, { action, toggleMap, blocked, signal }) {
+export function bind_FlightInputs(attitudeStick, throttleStick, { action, toggleMap, restart, blocked, signal }) {
 	const keys = new Set();
 	window.addEventListener('keydown', event => {
 		if (event.altKey || event.ctrlKey || event.metaKey || blocked()) return;
 		if (event.target instanceof Element && event.target.closest('input, select, textarea, dialog, [contenteditable="true"]')) return;
+		if (event.code === 'KeyR') {
+			event.preventDefault();
+			if (!event.repeat) restart();
+			return;
+		}
 		if (event.code === 'KeyM' || event.code === 'Space') {
 			if (event.code === 'Space' && event.target instanceof HTMLButtonElement) return;
 			event.preventDefault();

@@ -3,7 +3,7 @@ import { fpvKit } from './fpv.js';
 import { bind_Click, query, scene_Frame, set_Status, show_CompletePrompt, stage_Shell, vibrate_Device } from './ui.js';
 import { text } from './text.js';
 
-export function start_Assembly({ mount, signal, settings }) {
+export function start_Assembly({ mount, signal, settings, sound }) {
 	const { parts, preinstalled } = settings.assembly;
 	const bench = create_Bench({ parts, preinstalled });
 	const copy = text.assembly;
@@ -103,6 +103,7 @@ export function start_Assembly({ mount, signal, settings }) {
 	}
 
 	function engage_Screw(index) {
+		sound.play('metal');
 		bench.driverState = 'engaged';
 		bench.engagedScrew = index;
 	}
@@ -112,6 +113,7 @@ export function start_Assembly({ mount, signal, settings }) {
 		const entry = bench.screws[bench.engagedScrew];
 		const turns = Math.round(entry.depth * screwTurns) + (phase === 'opening' ? -1 : 1);
 		entry.depth = Math.min(screwTurns, Math.max(0, turns)) / screwTurns;
+		sound.play('turn');
 		vibrate_Device(12);
 		if (phase === 'opening' && entry.depth === 0) {
 			entry.state = 'tray';
@@ -154,6 +156,7 @@ export function start_Assembly({ mount, signal, settings }) {
 		const entry = bench.screws[index];
 		if (entry.state === 'tray') {
 			if (phase !== 'closing') return set_Status(phase === 'wiring' ? copy.closeFirst : copy.screwTray);
+			sound.play('metal');
 			entry.state = 'lid';
 			entry.depth = entry.shownDepth = 0;
 			set_Status(copy.screwPlaced, 'success');
@@ -177,6 +180,7 @@ export function start_Assembly({ mount, signal, settings }) {
 		} else if (phase === 'wiring') {
 			if (playerInstalled() < parts.length) return set_Status(copy.lidWait, 'warn');
 			bench.selected = null;
+			sound.play('lid');
 			bench.lidOpen = false;
 			phase = 'closing';
 			set_Status(copy.lidOn, 'success');
@@ -225,6 +229,7 @@ export function start_Assembly({ mount, signal, settings }) {
 			return set_Status(copy.last, 'warn');
 		}
 		bench.installed.add(type);
+		sound.play('plug');
 		bench.selected = null;
 		vibrate_Device(15);
 		set_Status(playerInstalled() === parts.length ? copy.good : `${copy.installed} ${playerInstalled()} / ${parts.length}`, 'success');

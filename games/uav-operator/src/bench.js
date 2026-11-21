@@ -321,6 +321,8 @@ export function create_Bench({ parts, preinstalled }) {
 	}
 
 	function pose_Lid(bench, delta) {
+		// После последнего подключения даём модулю опуститься в отсек перед движением крышки.
+		if (!bench.lidOpen && lidProgress > .5 && Object.values(models).some(entry => !entry.cable)) return;
 		lidProgress = THREE.MathUtils.damp(lidProgress, bench.lidOpen ? 1 : 0, 5, delta);
 		if (Math.abs(lidProgress - (bench.lidOpen ? 1 : 0)) < .002) lidProgress = bench.lidOpen ? 1 : 0;
 		lid.position.set(0, wallTop + lidHalf, 0).lerp(lidParking, lidProgress);

@@ -8,12 +8,13 @@ const gravity = 9.81;
 const hover = Math.sqrt(gravity * fpvKit.mass / fpvKit.maxThrust);
 const step = 1 / 120;
 
-export function create_Acro() {
+export function create_Acro(angleMode = false) {
 	const attitude = new THREE.Quaternion();
 	const rates = new THREE.Vector3();
 	const filtered = new THREE.Vector3();
 	const inputs = new THREE.Vector3();
 	const localRotation = new THREE.Euler(0, 0, 0, 'YXZ');
+	const tilt = new THREE.Euler(0, 0, 0, 'YXZ');
 	const increment = new THREE.Quaternion();
 	const acceleration = new THREE.Vector3();
 	const velocity = new THREE.Vector3();
@@ -31,13 +32,22 @@ export function create_Acro() {
 			filtered.set(0, 0, 0);
 			remaining = motor = this.throttle = 0;
 		},
-		update(delta, motion, axes, filter, groundAt, limits) {
-			const targetThrottle = THREE.MathUtils.clamp(hover + axes.y * (axes.y > 0 ? .235 : .32), 0, 1);
+		update(delta, motion, axes, filter, groundAt, limits, landOnContact) {
+			const baseThrottle = THREE.MathUtils.clamp(hover + axes.y * (axes.y > 0 ? .235 : .32), 0, 1);
 			inputs.set(shape(axes.z) * 2.05, -shape(axes.yaw) * 1.65, -shape(axes.x) * 2.35);
 			let hit = 0;
 			remaining += delta;
 			while (remaining >= step) {
 				remaining -= step;
+				let targetThrottle = baseThrottle;
+				if (angleMode) {
+					tilt.setFromQuaternion(attitude);
+					// На обычном уровне стик задаёт наклон до 32 градусов; тяга частично компенсирует крен.
+					inputs.x = (axes.z * .56 - tilt.x) * 3.2;
+					inputs.z = (-axes.x * .56 - tilt.z) * 3.2;
+					const vertical = Math.max(.55, Math.cos(tilt.x) * Math.cos(tilt.z));
+					targetThrottle = Math.min(1, baseThrottle / vertical ** .32);
+				}
 				filtered.lerp(inputs, 1 - Math.exp(-2 * Math.PI * filter * step));
 				rates.lerp(filtered, 1 - Math.exp(-step / .045));
 				attitude.multiply(increment.setFromEuler(localRotation.set(rates.x * step, rates.y * step, rates.z * step))).normalize();
@@ -64,6 +74,7 @@ export function create_Acro() {
 				motion.y = Math.max(floor, y);
 				motion.height = motion.y - floor + .72;
 				if (onGround && velocity.y < 0) velocity.y = 0;
+				if (onGround && landOnContact(x, z)) break;
 			}
 			forward.set(0, 0, -1).applyQuaternion(attitude);
 			motion.heading = Math.atan2(-forward.x, -forward.z);

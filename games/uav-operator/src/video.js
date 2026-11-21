@@ -39,13 +39,22 @@ export function create_AnalogFeed(renderer) {
 				color += noise * (grain * (.029 + signalLoss * .15) + .011 * sin(field * 1.17));
 				color = mix(color, vec3(.42 + grain * .65), band * signalLoss * noise * .32);
 				if (dropout > .5) {
-					float burst = floor(clock * 22.0);
-					float raster = floor(coord.y * 360.0);
-					float snow = hash(vec2(floor(coord.x * 640.0), raster + burst * 111.0));
-					float tear = hash(vec2(floor(raster / 12.0), floor(burst / 3.0)));
-					float streak = hash(vec2(floor(coord.x * 36.0 + tear * 20.0), raster + burst));
-					color = vec3(.014 + .23 * snow * snow + .11 * step(.77, tear) * streak);
-					color *= .55 + .45 * mod(raster, 2.0);
+					// Срыв строчной и кадровой синхронизации на последнем принятом поле.
+					float tick = floor(clock * 37.0);
+					float raster = floor(coord.y * 430.0);
+					float roll = fract(coord.y + clock * .68);
+					float envelope = smoothstep(.03, .20, roll) * (1.0 - smoothstep(.59, .97, roll));
+					float tear = hash(vec2(floor(raster / 9.0), floor(tick / 2.0)));
+					float offset = (tear - .5) * (.018 + .24 * envelope);
+					vec2 ghostUv = fract(vec2(coord.x + offset, coord.y + clock * .18));
+					float ghost = dot(texture2D(image, ghostUv).rgb, luma);
+					float snow = hash(vec2(floor(coord.x * pixels.x * .94), raster + tick * 61.0));
+					float streak = hash(vec2(floor(coord.x * 46.0 + tear * 9.0), raster + tick));
+					float flutter = hash(vec2(raster, floor(tick / 2.0)));
+					float staticLevel = .022 + .36 * snow * snow + .17 * step(.82, streak) * flutter;
+					color = vec3(staticLevel * (.58 + .42 * envelope) + ghost * .20 * (1.0 - envelope));
+					color *= .72 + .28 * mod(raster, 2.0);
+					color += vec3(.05, .016, .06) * step(.97, tear) * streak;
 				}
 				gl_FragColor = vec4(max(color, vec3(0.0)), 1.0);
 				#include <tonemapping_fragment>
