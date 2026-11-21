@@ -37,6 +37,8 @@ export const HUD_CENTER_WIDTH_LOW_PX = 160;
 // Нижний запас под сенсорные стик и кнопки, которые рисует слой касаний (input/touch.css): стик 128, отступ 16, запас 8.
 // Карточки заказов в сенсорном режиме не опускаются ниже этой границы.
 export const TOUCH_CONTROLS_RESERVE_PX = 152;
+export const ORDERS_MAX_HEIGHT_PERCENT_TOUCH = 48;
+export const ORDERS_MAX_HEIGHT_PERCENT_KEYBOARD = 78;
 
 // Наибольшее число мест (и заказов) у одного стола.
 export const MAX_ORDERS_PER_TABLE = 4;
