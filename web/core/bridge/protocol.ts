@@ -2,7 +2,7 @@
 // Только чистые функции: разбор сообщений игры и сборка сообщений портала. Подписка на события живёт в интерфейсе.
 // Те же значения повторены в SDK (sdk/web/portal-bridge.js): при изменении протокола править оба места и docs/game-bridge-protocol.md.
 
-import type { LevelId } from "../contract/types";
+import type { LevelId, PracticeAttempt } from "../contract/types";
 
 // Версия протокола. Сообщения с другой версией портал игнорирует.
 export const bridgeProtocolVersion = 1;
@@ -27,14 +27,7 @@ export function isValidGameProgress(data: unknown): boolean {
 	}
 }
 
-export type PracticeResult = {
-	type: "practice-result";
-	activity: "assembly" | "survey" | "beach" | "field" | "race";
-	difficulty: LevelId | null;
-	score: number;
-	completed: boolean;
-	durationSec: number;
-};
+export type PracticeResult = Omit<PracticeAttempt, "gameId"> & { type: "practice-result" };
 
 // Сообщения игры, которые портал понимает.
 export type GameMessage =

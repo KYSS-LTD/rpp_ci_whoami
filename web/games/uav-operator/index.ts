@@ -18,6 +18,6 @@ export const uavGameModule: GameModuleInput = {
 			frames: ["/game-previews/uav-operator/coast.webp"],
 			animation: "/game-previews/uav-operator/flight.webp",
 		},
-		runtime: { kind: "iframe", entry: "/game-builds/uav-operator/index.html", readyTimeoutSec: 60 },
+		runtime: { kind: "iframe", entry: "/game-builds/uav-operator/index.html", readyTimeoutSec: 20 },
 	},
 };

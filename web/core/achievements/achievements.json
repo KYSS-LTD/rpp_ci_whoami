@@ -2,19 +2,64 @@
 	{
 		"id": "first-level",
 		"title": "Первый уровень",
-		"description": "Завершите любой уровень любой игры",
+		"description": "Завершите любой уровень в любой игре.",
+		"icon": "/achievement-icons/first-level.webp",
 		"condition": {}
 	},
 	{
 		"id": "confident-start",
 		"title": "Уверенный старт",
-		"description": "Завершите уровень easy не ниже 50 процентов очков",
+		"description": "Наберите хотя бы половину очков на лёгком уровне.",
+		"icon": "/achievement-icons/confident-start.webp",
 		"condition": { "levelId": "easy", "minScorePercent": 50 }
 	},
 	{
 		"id": "hard-champion",
 		"title": "Гроза сложности",
-		"description": "Завершите уровень hard не ниже 80 процентов очков",
+		"description": "Наберите хотя бы 80% очков на сложном уровне.",
+		"icon": "/achievement-icons/hard-champion.webp",
 		"condition": { "levelId": "hard", "minScorePercent": 80 }
+	},
+	{
+		"id": "field-explorer",
+		"title": "Знакомство с полем",
+		"description": "Пролетите через все ворота в упражнении «Поле».",
+		"icon": "/achievement-icons/field-explorer.webp",
+		"condition": {"gameId":"uav-operator","practiceActivity":"field"}
+	},
+	{
+		"id": "steady-pilot",
+		"title": "Чистый пролёт",
+		"description": "Наберите 100 из 100 очков на поле.",
+		"icon": "/achievement-icons/steady-pilot.webp",
+		"condition": {"gameId":"uav-operator","practiceActivity":"field","minScorePercent":100}
+	},
+	{
+		"id": "gate-streak",
+		"title": "На всех винтах",
+		"description": "Финишируйте в гонке с результатом от 85 очков.",
+		"icon": "/achievement-icons/gate-streak.webp",
+		"condition": {"gameId":"uav-operator","practiceActivity":"race","minScorePercent":85}
+	},
+	{
+		"id": "second-lap",
+		"title": "Ещё круг!",
+		"description": "Финишируйте в двух гонках.",
+		"icon": "/achievement-icons/second-lap.webp",
+		"condition": {"gameId":"uav-operator","practiceActivity":"race","minPracticeFinishes":2}
+	},
+	{
+		"id": "survey-eye",
+		"title": "Глаз-алмаз",
+		"description": "Наберите от 80 очков в упражнении «Разбор фотографий».",
+		"icon": "/achievement-icons/survey-eye.webp",
+		"condition": {"gameId":"uav-operator","practiceActivity":"survey","minScorePercent":80}
+	},
+	{
+		"id": "skill-collector",
+		"title": "Компас профессий",
+		"description": "Пройдите хотя бы один уровень в каждой из трёх разных игр.",
+		"icon": "/achievement-icons/skill-collector.webp",
+		"condition": {"minCompletedGames":3}
 	}
 ]

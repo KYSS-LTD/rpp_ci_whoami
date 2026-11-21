@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { base as coastBase, flight_Ground, limits as coastLimits, on_Pad, padRadius as coastPadRadius, sectors as beachSectors, shore } from './coast.js';
 import { retryPenalty } from './difficulty.js';
 import { create_FleetModel, fleet } from './fleet.js';
-import { create_Damage, signal_AtEdge } from './flight-dynamics.js';
+import { create_ChaseCamera, create_Damage, signal_AtEdge } from './flight-dynamics.js';
 import { bind_DamageDisplay } from './flight-damage-display.js';
 import { bind_Preferences, flightPreferences, preference_Markup } from './flight-preferences.js';
 import { create_Acro, fpvKit } from './fpv.js';
@@ -10,7 +10,7 @@ import { bind_FlightInputs, bind_Joystick } from './inputs.js';
 import { add_Beacon } from './scenes.js';
 import { dispose_Scene, palette } from './models.js';
 import { create_Field, gate_Crossing } from './training-field.js';
-import { bind_Click, close_StageMenu, query, scene_Frame, set_Status, show_CompletePrompt, stage_OverlayOpen, stage_Shell, toggle_StageMenu } from './ui.js';
+import { bind_Click, close_StageMenu, query, scene_Frame, set_Status, show_CompletePrompt, stage_OverlayOpen, stage_Shell, toggle_StageMenu, vibrate_Device } from './ui.js';
 import { text } from './text.js';
 import { create_AnalogFeed } from './video.js';
 
@@ -87,9 +87,9 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	const fieldDrone = droneKey ? create_FleetModel(scene, droneKey) : world.fieldDrone;
 	if (droneKey && beach) coast.fieldDrone.drone.visible = false;
 	const chase = practice?.camera === 'chase';
-	const chaseTarget = new THREE.Vector3();
 	const droneCenter = chase ? fieldDrone.drone.worldToLocal(new THREE.Box3().setFromObject(fieldDrone.drone).getCenter(new THREE.Vector3())) : null;
 	const chaseDistance = chase ? Math.max(1.4, kit.length * 5.5) : 0;
+	const updateChase = chase ? create_ChaseCamera(fieldDrone.drone, droneCenter, chaseDistance) : null;
 	const camera = new THREE.PerspectiveCamera(flightPreferences.fov, 1, .07, 620);
 	const profile = practice ? { ...settings.flight, mode: practice.mode, drain: .7 } : settings.flight;
 	const { scanRadius } = profile;
@@ -215,6 +215,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	const speedText = query('#speed');
 	const stateText = query('#osd-state');
 	const throttleText = query('#throttle');
+	const completionNotice = query('#flight-complete-notice');
 	const updateDamageDisplay = bind_DamageDisplay(query('#damage-osd'), fieldDrone.propellers, kit.guards);
 	const markers = points.map(point => ({ point,
 		ring: beach ? add_Beacon(scene, point, point === base ? palette.mint : palette.lime, point === base ? padRadius : scanRadius) : null,
@@ -241,12 +242,23 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	let impactCooldown = 0;
 	let previousObstacle = false;
 	let nextGate = 0;
+	let completionTimer;
+	let completion = null;
+
+	function announce_Completion(message) {
+		if (!completionNotice) return show_CompletePrompt(message);
+		completion = { score: score_Flight(), duration: raceFinish ?? flightSeconds };
+		completionNotice.textContent = `${message} ${text.free.flightExitHint}`;
+		vibrate_Device([30, 60, 30]);
+		completionTimer = setTimeout(() => { completionNotice.textContent = ''; }, 3000);
+	}
+	signal.addEventListener('abort', () => clearTimeout(completionTimer), { once: true });
 	const previous = { x: motion.x, y: motion.y, z: motion.z };
 	const attitudeStick = bind_Joystick(query('#stick-move'), signal);
 	const throttleStick = bind_Joystick(query('#stick-view'), signal);
 	const leftIndicator = query('#indicator-left i');
 	const rightIndicator = query('#indicator-right i');
-	bind_Preferences(signal, fov => { camera.fov = fov; camera.updateProjectionMatrix(); });
+	bind_Preferences(signal, fov => { camera.fov = fov; camera.updateProjectionMatrix(); }, chase ? 'chase' : 'fpv');
 	const flightInputs = bind_FlightInputs(attitudeStick, throttleStick, {
 		action: perform_Action, toggleMap: toggle_Map, restart: request_Restart,
 		menu: () => { if (!resetting) toggle_StageMenu(); },
@@ -308,7 +320,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	function perform_Action() {
 		if (resetting || stage_OverlayOpen()) return;
 		if (raceFinish !== null || landed) {
-			queueMicrotask(() => { if (!signal.aborted) query('#complete-submit').click(); });
+			if (!freeMode) queueMicrotask(() => { if (!signal.aborted) query('#complete-submit').click(); });
 			return;
 		}
 		if (signalLost) return;
@@ -359,7 +371,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		if (beach && distance(base) > padRadius) return show_Message(copy.badLand, 'warn');
 		if (motion.height > profile.landHeight) return show_Message(copy.lower, 'warn');
 		landing = true;
-		show_Message(copy.landing, 'success');
+		show_Message(beach ? copy.landing : copy.descending, 'success');
 	}
 
 	const on_Ground = () => motion.height <= groundHeight + .001;
@@ -400,11 +412,11 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		if (!stabilized) {
 			impact = acro.update(delta, motion, axes, Number(filter.value), groundAt, damage, powered);
 			if (powered) battery = acro.power(delta * profile.drain, acro.throttle);
-			upright = 1 - 2 * (acro.attitude.x ** 2 + acro.attitude.z ** 2);
+			upright = impact > 0 ? acro.impactUpright : 1 - 2 * (acro.attitude.x ** 2 + acro.attitude.z ** 2);
 		} else {
 			const maxSpeed = kit.maxSpeed ?? 15;
 			const stick = Math.max(1, Math.hypot(axes.x, axes.z));
-			motion.heading -= axes.yaw * delta * 1.48 * (kit.agility ?? 1);
+			if (!wasOnGround) motion.heading -= axes.yaw * delta * 1.48 * (kit.agility ?? 1);
 			const sine = Math.sin(motion.heading);
 			const cosine = Math.cos(motion.heading);
 			const blend = 1 - Math.exp(-(kit.motorResponse ?? 14) * .48 * delta);
@@ -485,7 +497,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			raceFinish = Math.max(.01, flightSeconds - raceStart);
 			flightControls.hidden = true;
 		}
-		show_CompletePrompt(race ? text.free.raceDone : text.free.fieldDone);
+		announce_Completion(race ? text.free.raceDone : text.free.fieldDone);
 	}
 
 	function lose_Signal() {
@@ -496,33 +508,38 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		landButton.hidden = true;
 		frame.classList.add('signal-lost');
 		set_Status(copy.signalLost, 'warn');
-		lossTimer = setTimeout(() => request_Restart(copy.newAttempt), 1450);
+		if (!completion) lossTimer = setTimeout(() => request_Restart(copy.newAttempt), 1450);
 	}
 
 	function register_Touchdown(safePad) {
+		const landingWasActive = landing;
 		landing = false;
 		if (safePad) logAction('returned');
-		if (!damage.disabled && battery > 0 && feedback <= 0) {
+		if (!damage.disabled && battery > 0 && (landingWasActive || feedback <= 0)) {
 			sound.play('land');
 			show_Message(safePad ? copy.padRest : copy.touchdown, 'success');
 		}
 		if (landed || !beach || !safePad || !hasLifted || scanned.size !== sectors.length) return;
 		landed = true;
 		button.hidden = true;
-		show_CompletePrompt(freeMode ? text.free.beachDone : copy.completeNotice);
+		announce_Completion(freeMode ? text.free.beachDone : copy.completeNotice);
 	}
 
 	const raceScore = () => raceFinish === null ? Math.round(nextGate / sectors.length * 65)
 		: Math.max(30, Math.min(100, Math.round(100 - Math.max(0, raceFinish - 29) * 1.08 - errors * 4)));
 	const fieldScore = () => Math.max(0, Math.round(nextGate / sectors.length * 100) - errors * 4);
+	function score_Flight() {
+		if (beach) return Math.max(0, scanned.size * 25 + (hasLifted ? 10 : 0) + (landed ? 15 : 0) - errors * 5 - retryPenalty * Math.max(0, attempts - 1));
+		return race ? raceScore() : fieldScore();
+	}
 	const lapStamp = value => {
 		const hundredths = Math.round(value * 100);
 		return `${Math.floor(hundredths / 6000)}:${((hundredths % 6000) / 100).toFixed(2).padStart(5, '0')}`;
 	};
 	return { scene, camera, focus, motion, damage, points, limits, restart: request_Restart,
-		score: () => beach ? Math.max(0, scanned.size * 25 + (hasLifted ? 10 : 0) + (landed ? 15 : 0) - errors * 5 - retryPenalty * Math.max(0, attempts - 1))
-			: race ? raceScore() : fieldScore(),
-		duration: () => race ? raceFinish : null,
+		completed: () => completion !== null,
+		score: () => completion?.score ?? score_Flight(),
+		duration: () => completion?.duration ?? null,
 		summary: () => beach ? `${copy.attempts} · ${attempts} · ${copy.summarySectors} ${scanned.size} / ${sectors.length}`
 			: `${text.free.gates} ${nextGate} / ${sectors.length}${raceFinish === null ? '' : ` · ${text.free.timed} ${lapStamp(raceFinish)}`}`,
 		render(time) {
@@ -557,24 +574,26 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			const backZ = Math.cos(heading);
 			fieldDrone.drone.visible = chase;
 			fieldDrone.drone.position.set(x, y - .66, z);
-			if (stabilized) fieldDrone.drone.rotation.set(armed ? -Math.hypot(motion.vx, motion.vz) * .013 : 0, heading, damage.rollBias * .3);
+			const grounded = on_Ground();
+			if (stabilized) {
+				const forwardSpeed = -(motion.vx * backX + motion.vz * backZ);
+				const sideSpeed = motion.vx * backZ - motion.vz * backX;
+				fieldDrone.drone.rotation.set(grounded ? 0 : -forwardSpeed * .013, heading,
+					grounded ? 0 : -sideSpeed * .013 + damage.rollBias * .3, 'YXZ');
+			}
 			else fieldDrone.drone.quaternion.copy(acro.attitude);
 			if (fieldDrone.body) fieldDrone.body.rotation.z = (1 - damage.hull) * .32;
 			if (chase) {
-				fieldDrone.drone.localToWorld(chaseTarget.copy(droneCenter));
-				camera.position.copy(chaseTarget).addScaledVector(camera.up, chaseDistance * .42);
-				camera.position.x += backX * chaseDistance;
-				camera.position.z += backZ * chaseDistance;
-				camera.lookAt(chaseTarget);
+				updateChase(camera);
 			} else if (!stabilized) {
 				camera.position.set(x, y + .20, z);
 				camera.quaternion.copy(acro.attitude);
 				camera.rotateX(THREE.MathUtils.degToRad(kit.cameraTilt));
-				if (!reduceMotion.matches && armed && damage.thrust < .99) camera.rotateX(Math.sin(time * 97) * (1 - damage.thrust) * .028);
+				if (!grounded && !reduceMotion.matches && armed && damage.thrust < .99) camera.rotateX(Math.sin(time * 97) * (1 - damage.thrust) * .028);
 			} else {
 				camera.position.set(x, y + .20, z);
 				camera.lookAt(x - backX * 20, y - 3.6, z - backZ * 20);
-				if (!reduceMotion.matches) camera.rotateZ(-(motion.vx * backZ - motion.vz * backX) * .009);
+				if (!grounded && !reduceMotion.matches) camera.rotateZ(-(motion.vx * backZ - motion.vz * backX) * .009);
 			}
 			const course = Math.round((360 - THREE.MathUtils.radToDeg(heading) % 360) % 360) % 360;
 			videoLoss = signal_AtEdge(x, z, limits);

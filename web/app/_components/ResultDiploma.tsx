@@ -1,28 +1,30 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import type { LevelResult } from "@/core/contract/types";
+import type { LevelResult, PracticeActivity } from "@/core/contract/types";
 import { ratingForPercent } from "@/core/diplomas";
 import { scorePercent } from "@/core/achievements/rules";
-import { readPlayerName } from "@/core/progress";
+import { maxPlayerNameLength, normalizePlayerName, readPlayerName } from "@/core/progress";
 import { diplomasTexts } from "@/texts/diplomas";
 import styles from "./LevelRunner.module.css";
 
 const copy = diplomasTexts.result;
 
-export function ResultDiploma({ result, gameTitle, levelTitle, difficulty }: {
+export function ResultDiploma({ result, gameTitle, levelTitle, difficulty, activity }: {
 	result: LevelResult;
 	gameTitle: string;
 	levelTitle: string;
 	difficulty: string;
+	activity?: PracticeActivity;
 }) {
-	const [name, setName] = useState(() => readPlayerName().slice(0, 120));
+	const [profileName] = useState(readPlayerName);
+	const [name, setName] = useState("");
 	const [link, setLink] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
 	const [issuedAt] = useState(() => new Date().toISOString());
 	const generation = useRef<AbortController | null>(null);
-	const filename = `diplom-${result.gameId}.pdf`;
+	const filename = `diplom-${result.gameId}${activity ? `-${activity}` : ""}.pdf`;
 	const rating = ratingForPercent(scorePercent(result));
 
 	useEffect(() => () => generation.current?.abort(), []);
@@ -32,7 +34,7 @@ export function ResultDiploma({ result, gameTitle, levelTitle, difficulty }: {
 
 	async function prepare(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
-		const fullName = name.trim().replace(/\s+/g, " ").normalize("NFC");
+		const fullName = profileName || normalizePlayerName(name);
 		if (generation.current) return;
 		if (!fullName) {
 			setError(copy.nameRequired);
@@ -66,9 +68,13 @@ export function ResultDiploma({ result, gameTitle, levelTitle, difficulty }: {
 		<section className={styles.diploma} aria-labelledby="result-diploma-title">
 			<h2 id="result-diploma-title">{copy.heading} <span data-rating={rating}>{diplomasTexts.ratings[rating]}</span></h2>
 			<form className={styles.diplomaForm} onSubmit={prepare}>
-				<label htmlFor="diploma-name">{copy.name}</label>
-				<input id="diploma-name" autoComplete="name" required maxLength={120} value={name}
-					onChange={(event) => { setName(event.target.value); setLink(""); setError(""); }} disabled={busy} />
+				{profileName ? <p>{copy.recipient} <strong>{profileName}</strong></p> : (
+					<>
+						<label htmlFor="diploma-name">{copy.name}</label>
+						<input id="diploma-name" autoComplete="name" required maxLength={maxPlayerNameLength} value={name}
+							onChange={(event) => { setName(event.target.value); setLink(""); setError(""); }} disabled={busy} />
+					</>
+				)}
 				{link ? <a href={link} download={filename} className="button-primary">{copy.download}</a>
 					: <button type="submit" className="button-primary" disabled={busy}>{busy ? copy.preparing : copy.download}</button>}
 			</form>

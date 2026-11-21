@@ -3,7 +3,7 @@ import { query } from './ui.js';
 
 const defaults = { menu: 'KeyP', restart: 'KeyR', map: 'KeyM', action: 'Space' };
 const allowed = ['KeyP', 'KeyR', 'KeyM', 'Space', 'KeyE', 'KeyQ', 'KeyF', 'KeyG', 'KeyH', 'KeyT', 'KeyU', 'KeyX', 'KeyZ', 'Enter'];
-export const flightPreferences = { indicators: true, fov: 60, filter: '6', feed: '1', bindings: { ...defaults } };
+export const flightPreferences = { indicators: true, fov: 60, filter: '6', feeds: { fpv: '1', chase: '0' }, bindings: { ...defaults } };
 const copy = text.flight;
 
 function keyLabel(code) {
@@ -24,7 +24,7 @@ export function preference_Markup() {
 		</details>`;
 }
 
-export function bind_Preferences(signal, setFov) {
+export function bind_Preferences(signal, setFov, cameraMode) {
 	const checkbox = query('#show-indicators');
 	const fov = query('#camera-fov');
 	const fovValue = query('#camera-fov-value');
@@ -59,9 +59,9 @@ export function bind_Preferences(signal, setFov) {
 	};
 	fov.addEventListener('input', syncFov, { signal });
 	filter.value = flightPreferences.filter;
-	feed.value = flightPreferences.feed;
+	feed.value = flightPreferences.feeds[cameraMode];
 	filter.addEventListener('change', () => { flightPreferences.filter = filter.value; }, { signal });
-	feed.addEventListener('change', () => { flightPreferences.feed = feed.value; }, { signal });
+	feed.addEventListener('change', () => { flightPreferences.feeds[cameraMode] = feed.value; }, { signal });
 	syncFov();
 	sync();
 }

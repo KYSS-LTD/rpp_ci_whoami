@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { gameRegistry } from "@/core/registry";
-import { readGameProgress, recordLevelResult, saveGameProgress } from "@/core/progress";
+import { readGameProgress, recordLevelResult, recordPracticeResult, saveGameProgress } from "@/core/progress";
 import type { LevelResult } from "@/core/contract/types";
 import { achievementDefinitions, type AwardedAchievement } from "@/core/achievements";
 import { commonTexts } from "@/texts/common";
+import { profileTexts } from "@/texts/profile";
 import type { PracticeResult } from "@/core/bridge/protocol";
 import { uavTexts } from "@/games/uav-operator/texts";
 import { IframeLevel } from "./IframeLevel";
@@ -66,9 +67,12 @@ export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
 	}
 
 	function handlePractice(result: PracticeResult) {
+		const { activity, difficulty, score, completed, durationSec } = result;
+		const outcome = recordPracticeResult({ gameId, activity, difficulty, score, completed, durationSec });
+		setIsSaveFailed(!outcome.writeResult.ok);
+		setNewlyAwarded(outcome.newlyAwarded);
 		setPractice(result);
-		setLastResult({ gameId, levelId: result.difficulty ?? "easy", score: result.score,
-			maxScore: 100, completed: result.completed, durationSec: result.durationSec });
+		setLastResult({ gameId, levelId: difficulty ?? "easy", score, maxScore: 100, completed, durationSec });
 	}
 
 	if (hasExitedWithoutResult) {
@@ -138,7 +142,8 @@ export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
 						<span className={styles.statValue}>{lastResult.durationSec}</span>
 					</p>
 				</div>
-				{lastResult.completed && practice?.activity !== "race" && practice?.activity !== "field" ? <ResultDiploma result={lastResult} gameTitle={game.manifest.title}
+				{lastResult.completed ? <ResultDiploma result={lastResult} gameTitle={game.manifest.title}
+					activity={practice?.activity}
 					levelTitle={practice ? uavTexts.practice[practice.activity] : level.title}
 					difficulty={practice ? game.manifest.levels.find((definition) => definition.id === practice.difficulty)?.title ?? uavTexts.freeDifficulty : level.title} /> : null}
 				{isSaveFailed ? (
@@ -163,10 +168,12 @@ export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
 							setLastResult(null);
 							setPractice(null);
 							setNewlyAwarded([]);
+							setIsSaveFailed(false);
 						}}
 					>
 						{isFree ? uavTexts.freeBack : commonTexts.levelRetry}
 					</button>{" "}
+					{lastResult.completed ? <Link href="/me" className="button-secondary">{profileTexts.title}</Link> : null}
 					<Link href="/games" className="button-primary">
 						{commonTexts.backToGames}
 					</Link>

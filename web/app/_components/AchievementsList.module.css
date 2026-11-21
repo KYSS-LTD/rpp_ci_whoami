@@ -64,11 +64,29 @@
 
 /* Замок у закрытой ачивки: дужка рисуется рамкой, корпус фоном */
 .item[data-awarded="false"]::before {
-	grid-row: auto;
 	background:
 		linear-gradient(var(--color-text-muted), var(--color-text-muted)) center 62% / 18px 13px no-repeat,
 		radial-gradient(circle at 50% 42%, transparent 0 5px, var(--color-text-muted) 5.5px 8px, transparent 8.5px) center 28% / 22px 22px no-repeat,
 		var(--color-surface-muted);
 	box-shadow: none;
 	opacity: 0.8;
+}
+
+.item[data-illustrated="true"]::before {
+	content: none;
+}
+
+.icon {
+	grid-row: 1 / span 3;
+	align-self: start;
+	object-fit: contain;
+}
+
+.item[data-awarded="false"] .icon {
+	filter: saturate(.65);
+}
+
+.locked {
+	color: var(--color-text-muted);
+	font-size: .8rem;
 }

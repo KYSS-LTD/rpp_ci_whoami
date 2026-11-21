@@ -1,5 +1,5 @@
 // Правила выдачи ачивок. Функции чистые: они не обращаются к LocalStorage.
-import type { LevelResult } from "../contract/types";
+import type { LevelResult, PracticeAttempt } from "../contract/types";
 import type { AchievementCondition, AchievementDefinition } from "./config";
 
 // Сохраненная выдача ачивки с датой.
@@ -18,7 +18,7 @@ export function scorePercent(result: LevelResult): number {
 
 // Проверяет, что результат удовлетворяет условию ачивки. Незавершенный уровень условия не выполняет.
 export function matchesCondition(result: LevelResult, condition: AchievementCondition): boolean {
-	if (!result.completed) {
+	if (!result.completed || condition.practiceActivity !== undefined) {
 		return false;
 	}
 	if (condition.gameId !== undefined && condition.gameId !== result.gameId) {
@@ -34,8 +34,19 @@ export function matchesCondition(result: LevelResult, condition: AchievementCond
 }
 
 // Возвращает идентификаторы ачивок, которые выполняет результат уровня.
-export function evaluateAchievements(result: LevelResult, definitions: AchievementDefinition[]): string[] {
-	return definitions.filter((definition) => matchesCondition(result, definition.condition)).map((definition) => definition.id);
+export function evaluateAchievements(result: LevelResult, definitions: AchievementDefinition[], history = [result]): string[] {
+	const completedGames = new Set(history.filter((attempt) => attempt.completed).map((attempt) => attempt.gameId)).size;
+	return definitions.filter(({ condition }) => matchesCondition(result, condition)
+		&& completedGames >= (condition.minCompletedGames ?? 0)).map(({ id }) => id);
+}
+
+export function evaluatePracticeAchievements(result: PracticeAttempt, definitions: AchievementDefinition[], history: PracticeAttempt[]): string[] {
+	if (!result.completed) return [];
+	const finishes = history.filter((attempt) => attempt.completed && attempt.gameId === result.gameId && attempt.activity === result.activity).length;
+	return definitions.filter(({ condition }) => condition.practiceActivity === result.activity
+		&& (condition.gameId === undefined || condition.gameId === result.gameId)
+		&& result.score >= (condition.minScorePercent ?? 0)
+		&& finishes >= (condition.minPracticeFinishes ?? 1)).map(({ id }) => id);
 }
 
 // Добавляет только новые ачивки. Уже выданные не меняются, поэтому повтор не создает дубликатов.

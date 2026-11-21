@@ -23,8 +23,12 @@ export function create_Acro(angleMode = false, kit = fpvKit) {
 	let remaining = 0;
 	let charge = kit.capacity;
 	const shape = value => .72 * value + .28 * value ** 3;
+	function update_Heading(motion) {
+		forward.set(0, 0, -1).applyQuaternion(attitude);
+		if (Math.hypot(forward.x, forward.z) > .05) motion.heading = Math.atan2(-forward.x, -forward.z);
+	}
 	return {
-		attitude, velocity, throttle: 0, voltage: kit.cells * 4.2, used: 0,
+		attitude, velocity, throttle: 0, voltage: kit.cells * 4.2, used: 0, impactUpright: 1,
 		reset(heading) {
 			attitude.setFromEuler(localRotation.set(0, heading, 0));
 			velocity.set(0, 0, 0);
@@ -37,9 +41,21 @@ export function create_Acro(angleMode = false, kit = fpvKit) {
 			const baseThrottle = THREE.MathUtils.clamp(hover + axes.y * (axes.y > 0 ? .235 : .32), 0, 1);
 			inputs.set(shape(axes.z) * 2.05 * agility, -shape(axes.yaw) * 1.65 * agility, -shape(axes.x) * 2.35 * agility);
 			let hit = 0;
+			this.impactUpright = 1;
 			remaining += delta;
 			while (remaining >= step) {
 				remaining -= step;
+				const grounded = motion.height <= .7201;
+				if (grounded) {
+					motor = THREE.MathUtils.damp(motor, powered ? baseThrottle : 0, kit.motorResponse ?? 14, step);
+					const lift = kit.maxThrust * motor ** 2 * damage.thrust / kit.mass - gravity;
+					if (axes.y > 0 && lift > 0) {
+						velocity.y = lift * step;
+						motion.y += velocity.y * step;
+						motion.height += velocity.y * step;
+					}
+					continue;
+				}
 				let targetThrottle = baseThrottle;
 				if (angleMode) {
 					tilt.setFromQuaternion(attitude);
@@ -79,19 +95,24 @@ export function create_Acro(angleMode = false, kit = fpvKit) {
 					velocity.y = Math.min(0, velocity.y);
 				}
 				const onGround = y <= floor;
-				if (onGround && motion.height > .7201) hit = Math.max(hit, Math.hypot(velocity.y, velocity.x * .5, velocity.z * .5));
-				if (onGround) {
-					velocity.x *= .78;
-					velocity.z *= .78;
-				}
 				motion.x = x;
 				motion.z = z;
 				motion.y = Math.max(floor, y);
 				motion.height = motion.y - floor + .72;
-				if (onGround && velocity.y < 0) velocity.y = 0;
+				if (onGround) {
+					const impact = Math.hypot(velocity.y, velocity.x * .5, velocity.z * .5);
+					if (impact > hit) {
+						hit = impact;
+						this.impactUpright = 1 - 2 * (attitude.x ** 2 + attitude.z ** 2);
+					}
+					update_Heading(motion);
+					attitude.setFromEuler(localRotation.set(0, motion.heading, 0));
+					rates.set(0, 0, 0);
+					filtered.set(0, 0, 0);
+					velocity.set(0, 0, 0);
+				}
 			}
-			forward.set(0, 0, -1).applyQuaternion(attitude);
-			motion.heading = Math.atan2(-forward.x, -forward.z);
+			update_Heading(motion);
 			motion.vx = velocity.x;
 			motion.vz = velocity.z;
 			this.throttle = motor;

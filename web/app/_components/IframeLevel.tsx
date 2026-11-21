@@ -78,13 +78,14 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 	}
 	const [phase, setPhase] = useState<LevelPhase>("loading");
 	// Номер попытки: повтор после сбоя пересоздаёт фрейм через key.
-	const [attempt, setAttempt] = useState(0);
+	const [attempt, setAttempt] = useState({ number: 0, automatic: false });
 
 	// Обработчик сообщений читает свежие значения через ref, чтобы не переподписываться на каждое изменение.
 	const phaseRef = useRef<LevelPhase>("loading");
 	const startedAtRef = useRef(0);
 	const hasResultRef = useRef(false);
 	const freeMode = Boolean(onPracticeFinish);
+	const frameUrl = `${buildLevelUrl(runtime.entry, level.id)}${freeMode ? "&mode=free" : ""}${attempt.number ? `&retry=${attempt.number}` : ""}`;
 	const callbacksRef = useRef({ onFinish, onPracticeFinish, onExitWithoutResult, onSaveProgress });
 	useEffect(() => {
 		callbacksRef.current = { onFinish, onPracticeFinish, onExitWithoutResult, onSaveProgress };
@@ -159,8 +160,11 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 		}
 
 		window.addEventListener("message", handleMessage);
+		// Быстрая сборка может отправить ready сразу после загрузки. Сначала подключаем обработчик.
+		const frame = frameRef.current;
+		if (frame && frame.getAttribute("src") !== frameUrl) frame.setAttribute("src", frameUrl);
 		return () => window.removeEventListener("message", handleMessage);
-	}, [gameId, level.id, attempt, freeMode, progress, onSaveProgress]);
+	}, [gameId, level.id, frameUrl, freeMode, progress, onSaveProgress]);
 
 	// Разрешение Gamepad для изолированного iframe различается между браузерами.
 	// В таком случае портал передаёт игре только значения органов управления, без данных об устройстве.
@@ -198,7 +202,13 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 		}
 		const timeoutMs = (runtime.readyTimeoutSec ?? defaultReadyTimeoutSec) * 1000;
 		const timerId = window.setTimeout(() => {
+			if (phaseRef.current !== "loading") return;
 			debugLog("bridge", `игра не прислала ready за ${timeoutMs} мс`);
+			if (!attempt.automatic) {
+				phaseRef.current = "failed";
+				setAttempt({ number: attempt.number + 1, automatic: true });
+				return;
+			}
 			phaseRef.current = "failed";
 			setPhase("failed");
 			setExpanded(false);
@@ -211,7 +221,7 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 			<LevelFallback
 				onRetry={() => {
 					changePhase("loading");
-					setAttempt((number) => number + 1);
+					setAttempt({ number: attempt.number + 1, automatic: false });
 				}}
 			/>
 		);
@@ -238,10 +248,9 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 			</div>
 			<div className={styles.stage} data-phase={phase}>
 				<iframe
-					key={attempt}
+					key={attempt.number}
 					ref={frameRef}
 					className={styles.frame}
-					src={`${buildLevelUrl(runtime.entry, level.id)}${freeMode ? "&mode=free" : ""}`}
 					title={gameTitle}
 					sandbox={gameId === "uav-operator" ? "allow-scripts allow-popups allow-popups-to-escape-sandbox" : "allow-scripts"}
 					allow="autoplay; gamepad *"
@@ -249,7 +258,7 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 				{phase === "loading" ? (
 					<div className={styles.loading} role="status">
 						<span className={styles.spinner} aria-hidden="true" />
-						{commonTexts.levelLoading}
+						{attempt.automatic ? commonTexts.levelRetrying : commonTexts.levelLoading}
 					</div>
 				) : null}
 			</div>

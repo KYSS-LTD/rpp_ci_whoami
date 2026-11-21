@@ -1,4 +1,15 @@
-import { MathUtils } from 'three';
+import { MathUtils, Matrix4, Quaternion, Vector3 } from 'three';
+
+export function create_ChaseCamera(drone, center, distance) {
+	const mountPosition = new Vector3(0, .25, 1).setLength(distance).add(center);
+	const mountRotation = new Quaternion().setFromRotationMatrix(
+		new Matrix4().lookAt(mountPosition, center, new Vector3(0, 1, 0)),
+	);
+	return (camera) => {
+		drone.localToWorld(camera.position.copy(mountPosition));
+		drone.getWorldQuaternion(camera.quaternion).multiply(mountRotation);
+	};
+}
 
 export function signal_AtEdge(x, z, bounds) {
 	const clearance = Math.min(x - bounds.minX, bounds.maxX - x, z - bounds.minZ, bounds.maxZ - z);

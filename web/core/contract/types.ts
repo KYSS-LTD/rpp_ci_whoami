@@ -83,6 +83,17 @@ export interface LevelResult {
 	durationSec: number;
 }
 
+export type PracticeActivity = "assembly" | "survey" | "beach" | "field" | "race";
+
+export interface PracticeAttempt {
+	gameId: string;
+	activity: PracticeActivity;
+	difficulty: LevelId | null;
+	score: number;
+	completed: boolean;
+	durationSec: number;
+}
+
 // Пропсы компонента уровня. Игра отдает результат через onFinish и не хранит состояние платформы.
 export interface LevelComponentProps {
 	level: LevelDefinition;
