@@ -108,9 +108,10 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 	});
 
 	// Запуск уровня: симуляция, ввод, сцена, HUD, цикл кадров.
-	function runLevel(level: LevelConfig, initialProgress: GameProgress): void {
-		const campaignDay = getCampaignDay(initialProgress, level.id);
-		level = { ...level, params: { ...level.params, menu: getCampaignMenu(campaignDay) } };
+	function runLevel(baseLevel: LevelConfig, initialProgress: GameProgress): void {
+		const campaignDay = getCampaignDay(initialProgress, baseLevel.id);
+		const level: LevelConfig = { ...baseLevel, params: { ...baseLevel.params, menu: getCampaignMenu(campaignDay) } };
+		handle.paused = false;
 		documentRef.title = systemTexts.documentTitle;
 		const simulation = modules.createSimulation({ level, seed: pickVerifiedSeed(level, random) });
 		handle.simulation = simulation;
@@ -133,24 +134,69 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 		let hud: Hud | null = null;
 		let loop: ReturnType<typeof createFrameLoop> | null = null;
 		let removeVisibilityListener: () => void = () => undefined;
+		// Экран завершённого дня показан: итог порталу не уходит, пока игрок проходит неделю дальше.
+		let dayCompleteShown = false;
 
-		// Очистка снимает всё, что успело создаться (в том числе при сбое посреди запуска): цикл, подписку, ввод, HUD, сцену.
-		handle.cleanup = () => {
-			if (handle.closed) {
+		// Снимает всё, что успело создаться (в том числе при сбое посреди запуска): цикл, подписку, ввод, HUD, сцену. Повторный вызов ничего не делает.
+		let tornDown = false;
+		function teardown(): void {
+			if (tornDown) {
 				return;
 			}
-			handle.closed = true;
+			tornDown = true;
 			loop?.stop();
 			removeVisibilityListener();
 			input.dispose();
 			hud?.dispose();
 			scene?.dispose();
+		}
+		// Полная очистка: игра закрывается.
+		handle.cleanup = () => {
+			if (handle.closed) {
+				return;
+			}
+			handle.closed = true;
+			teardown();
 		};
 
+		// Следующий рабочий день: смена этого дня снимается, в том же фрейме запускается новая с обновлённым прогрессом.
+		function startNextDay(): void {
+			if (handle.closed || !dayCompleteShown) {
+				return;
+			}
+			teardown();
+			try {
+				runLevel(baseLevel, progress);
+			} catch (error) {
+				debugLog("game", "ошибка запуска следующего дня", error);
+				handle.cleanup();
+				bridge.reportError(systemTexts.unexpectedError);
+			}
+		}
+
 		// Итог или выход отправлены: цикл останавливается, обработчики и ресурсы снимаются.
-		const reporter: ResultReporter = modules.createResultReporter(bridge, () => {
+		const baseReporter: ResultReporter = modules.createResultReporter(bridge, () => {
 			handle.cleanup();
 		});
+		// Повтор уже пройденной недели: порталу уходят очки одного дня, а не сумма прошлой недели.
+		const isReplay = initialProgress.completedDays[level.id] >= 5;
+		// Порталу уходят общие очки за все дни недели. Завершённый день уже добавлен в прогресс, незавершённый добавляется здесь.
+		const reporter: ResultReporter = {
+			get isClosed() {
+				return baseReporter.isClosed;
+			},
+			reportResult(result) {
+				if (isReplay) {
+					return baseReporter.reportResult(result);
+				}
+				const week = progress.weekScores[level.id];
+				const total = result.completed
+					? { score: week.score, maxScore: week.maxScore }
+					: { score: (campaignDay === 1 ? 0 : week.score) + result.score, maxScore: (campaignDay === 1 ? 0 : week.maxScore) + result.maxScore };
+				return baseReporter.reportResult({ ...result, ...total });
+			},
+			reportExit: () => baseReporter.reportExit(),
+		};
 
 		const activeScene: SceneRenderer = modules.createSceneRenderer({ container: root, level, debug }, loadedAssets);
 		scene = activeScene;
@@ -199,6 +245,7 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 				},
 				onPauseRequested: pauseGame,
 				onResumeRequested: resumeGame,
+				onNextDayRequested: startNextDay,
 			},
 			reporter,
 			dishIcons: icons,
@@ -241,23 +288,31 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 				const snapshot: GameSnapshot = simulation.getSnapshot();
 				lastPhase = snapshot.phase;
 				syncInput();
-				// Смена завершена успешно или по времени: результат уходит порталу один раз, дальше игра закрывается.
+				// Смена завершена успешно или по времени. Успешный день, после которого неделя не закончена, показывает экран
+				// "Следующий день" в самой игре. Иначе результат уходит порталу один раз, дальше игра закрывается.
 				if (snapshot.phase === "finished" && snapshot.result) {
 					if (snapshot.result.completed && !campaignDaySaved) {
 						campaignDaySaved = true;
-						const updated = markCampaignDayCompleted(progress, level.id);
+						const updated = markCampaignDayCompleted(progress, level.id, { score: snapshot.result.score, maxScore: snapshot.result.maxScore });
 						if (updated) {
 							progress = updated;
 							bridge.saveProgress(updated);
 						}
 					}
-					const isSent = reporter.reportResult(snapshot.result);
-					if (!isSent && !handle.closed) {
-						// Мост отклонил результат (неверные числа): повторять каждый кадр бессмысленно, сообщаем об ошибке один раз.
-						failFatally(new Error("мост отклонил итог смены"));
-					}
-					if (handle.closed) {
-						return;
+					if (snapshot.result.completed && progress.completedDays[level.id] < 5) {
+						if (!dayCompleteShown) {
+							dayCompleteShown = true;
+							hud?.showDayComplete({ day: campaignDay, score: snapshot.result.score, maxScore: snapshot.result.maxScore });
+						}
+					} else {
+						const isSent = reporter.reportResult(snapshot.result);
+						if (!isSent && !handle.closed) {
+							// Мост отклонил результат (неверные числа): повторять каждый кадр бессмысленно, сообщаем об ошибке один раз.
+							failFatally(new Error("мост отклонил итог смены"));
+						}
+						if (handle.closed) {
+							return;
+						}
 					}
 				}
 				const events = simulation.drainEvents();

@@ -1,10 +1,14 @@
 // Прогресс игры cooking: какие блюда игрок уже готовил своими руками (design D23, D24). Блок данных хранит портал, игра читает
 // его из сообщения старта и отправляет обновление через мост. Здесь только чистые функции без DOM и моста. Владелец: Opus-агент.
-import { DISH_IDS, GAME_PROGRESS_VERSION, LEVEL_IDS, MAX_GAME_PROGRESS_BYTES, type DishId, type GameProgress, type LevelId } from "./contracts";
+import { DISH_IDS, GAME_PROGRESS_VERSION, LEVEL_IDS, MAX_GAME_PROGRESS_BYTES, type DishId, type GameProgress, type LevelId, type WeekScore } from "./contracts";
+
+function createEmptyWeekScores(): GameProgress["weekScores"] {
+	return { easy: { score: 0, maxScore: 0 }, medium: { score: 0, maxScore: 0 }, hard: { score: 0, maxScore: 0 } };
+}
 
 // Пустой прогресс: игрок ничего не готовил.
 export function createEmptyProgress(): GameProgress {
-	return { version: GAME_PROGRESS_VERSION, cookedDishes: [], completedDays: { easy: 0, medium: 0, hard: 0 } };
+	return { version: GAME_PROGRESS_VERSION, cookedDishes: [], completedDays: { easy: 0, medium: 0, hard: 0 }, weekScores: createEmptyWeekScores() };
 }
 
 // Разбирает блок данных из сообщения старта. Неизвестная версия, битая форма или не объект дают пустой прогресс;
@@ -30,7 +34,17 @@ export function parseGameProgress(raw: unknown): GameProgress {
 			if (typeof value === "number" && Number.isInteger(value)) completedDays[levelId] = Math.max(0, Math.min(5, value));
 		}
 	}
-	return { version: GAME_PROGRESS_VERSION, cookedDishes, completedDays };
+	// Очки недели: старый блок без поля читается как нулевые очки. Неверные числа отбрасываются.
+	const weekScores = createEmptyWeekScores();
+	if (record.weekScores !== null && typeof record.weekScores === "object" && !Array.isArray(record.weekScores)) {
+		for (const levelId of LEVEL_IDS) {
+			const value = (record.weekScores as Record<string, unknown>)[levelId] as Partial<WeekScore> | null | undefined;
+			if (value && Number.isFinite(value.score) && Number.isFinite(value.maxScore) && value.score! >= 0 && value.score! <= value.maxScore!) {
+				weekScores[levelId] = { score: value.score!, maxScore: value.maxScore! };
+			}
+		}
+	}
+	return { version: GAME_PROGRESS_VERSION, cookedDishes, completedDays, weekScores };
 }
 
 // Отмечает блюдо приготовленным. Возвращает новый прогресс или null, если блюдо уже было отмечено.
@@ -45,10 +59,16 @@ export function getCampaignDay(progress: GameProgress, levelId: LevelId): number
 	return Math.min(5, progress.completedDays[levelId] + 1);
 }
 
-export function markCampaignDayCompleted(progress: GameProgress, levelId: LevelId): GameProgress | null {
+// Отмечает день завершённым и прибавляет его очки к очкам недели. Первый день недели начинает сумму заново.
+export function markCampaignDayCompleted(progress: GameProgress, levelId: LevelId, dayScore: WeekScore): GameProgress | null {
 	const completed = progress.completedDays[levelId];
 	if (completed >= 5) return null;
-	return { ...progress, completedDays: { ...progress.completedDays, [levelId]: completed + 1 } };
+	const previous = completed === 0 ? { score: 0, maxScore: 0 } : progress.weekScores[levelId];
+	return {
+		...progress,
+		completedDays: { ...progress.completedDays, [levelId]: completed + 1 },
+		weekScores: { ...progress.weekScores, [levelId]: { score: previous.score + dayScore.score, maxScore: previous.maxScore + dayScore.maxScore } },
+	};
 }
 
 export function getCampaignMenu(day: number): DishId[] {

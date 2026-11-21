@@ -41,6 +41,7 @@ export interface Screens {
 	update(snapshot: GameSnapshot): void;
 	setInputMode(mode: InputMode): void;
 	setPaused(paused: boolean): void;
+	showDayComplete(info: { day: number; score: number; maxScore: number }): void;
 	// Пересчитывает ориентацию (вызывается при resize и смене режима).
 	dispose(): void;
 }
@@ -198,7 +199,15 @@ export function createScreens(deps: ScreensDeps): Screens {
 	failureButton.setAttribute("autofocus", "");
 	failure.dialog.append(failureReason, failureScore, failureButton);
 
-	root.append(start.dialog, tutorial.dialog, pause.dialog, failure.dialog);
+	// --- Конец рабочего дня ---
+	const dayComplete = createDialog("day-complete", "", { dismissible: false });
+	const dayCompleteLead = createElement("p", { className: "hud-failure__reason", text: hudTexts.dayComplete.lead });
+	const dayCompleteScore = createElement("p", { className: "hud-failure__score" });
+	const dayCompleteButton = createButton(hudTexts.dayComplete.nextButton, "hud-button--primary");
+	dayCompleteButton.setAttribute("autofocus", "");
+	dayComplete.dialog.append(dayCompleteLead, dayCompleteScore, dayCompleteButton);
+
+	root.append(start.dialog, tutorial.dialog, pause.dialog, failure.dialog, dayComplete.dialog);
 	renderControls();
 
 	// Итог для кнопки "Продолжить": результат смены из снимка или собранный по набранным очкам.
@@ -240,6 +249,11 @@ export function createScreens(deps: ScreensDeps): Screens {
 		if (reporter.reportResult(result)) {
 			failureButton.disabled = true;
 		}
+	}
+
+	function handleNextDay(): void {
+		dayCompleteButton.disabled = true;
+		callbacks.onNextDayRequested?.();
 	}
 
 	function handleExit(): void {
@@ -299,11 +313,12 @@ export function createScreens(deps: ScreensDeps): Screens {
 		finishTutorials();
 	});
 	failureButton.addEventListener("click", handleFailureContinue);
+	dayCompleteButton.addEventListener("click", handleNextDay);
 	exitButton.addEventListener("click", handleExit);
 	resumeButton.addEventListener("click", handleResume);
 	pauseButton.addEventListener("click", handlePauseButton);
 	pause.dialog.addEventListener("cancel", handlePauseCancel);
-	for (const dialog of [start.dialog, failure.dialog]) {
+	for (const dialog of [start.dialog, failure.dialog, dayComplete.dialog]) {
 		dialog.addEventListener("cancel", preventCancel);
 	}
 	ownerWindow.addEventListener("keydown", handleKeyDown);
@@ -349,9 +364,15 @@ export function createScreens(deps: ScreensDeps): Screens {
 				closeModal(pause.dialog);
 			}
 		},
+		showDayComplete(info) {
+			setText(dayComplete.title, hudTexts.dayComplete.title(info.day));
+			setText(dayCompleteScore, hudTexts.failure.scoreSummary(info.score, info.maxScore));
+			dayCompleteButton.disabled = false;
+			openModal(dayComplete.dialog);
+		},
 		dispose() {
 			ownerWindow.removeEventListener("keydown", handleKeyDown);
-			for (const dialog of [start.dialog, tutorial.dialog, pause.dialog, failure.dialog]) {
+			for (const dialog of [start.dialog, tutorial.dialog, pause.dialog, failure.dialog, dayComplete.dialog]) {
 				closeModal(dialog);
 				dialog.remove();
 			}

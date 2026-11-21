@@ -12,7 +12,7 @@ import { LEVEL_IDS, SIM_STEP_SEC, type LevelConfig, type LevelId, type Rect } fr
 import { createBot } from "../../bot/bot";
 import { collectObstacles } from "../../config/levels/validate";
 import { getLevelConfig } from "../../config/levels";
-import { collectDoorwayJambs, DOORWAY_MODEL, DOORWAY_OPENING_WIDTH } from "../geometry";
+import { collectDoorwayJambs, DOORWAY_OPENING_WIDTH, isDoorwayModel } from "../geometry";
 import { createSimulation } from "../simulation";
 import { describeViolation, createNpcCollisionMonitor } from "./npcCollisionMonitor";
 
@@ -38,7 +38,7 @@ describe.each(LEVEL_IDS)("NPC не проходят сквозь препятс�
 	it("у каждого проёма двери середина свободна, а стойки заблокированы в сетках коллизий и навигации", () => {
 		const level = getLevelConfig(levelId);
 		const geometry = createSimulation({ level, seed: seeds[0] }).geometry;
-		const doorways = level.props.filter((prop) => !prop.blocking && prop.model === DOORWAY_MODEL);
+		const doorways = level.props.filter((prop) => !prop.blocking && isDoorwayModel(prop.model));
 		expect(doorways.length).toBeGreaterThan(0);
 		for (const doorway of doorways) {
 			const alongX = doorway.rect.width >= doorway.rect.depth;

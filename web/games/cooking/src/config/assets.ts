@@ -62,9 +62,12 @@ export const coreModelNames = [
 	"floor_kitchen_small",
 	"wall",
 	"wall_doorway",
+	"wall_low",
+	"wall_doorway_low",
 	"wall_orderwindow",
 	"door_A",
 	// Столы и стулья зала.
+	"kitchentable_B",
 	"table_round_A",
 	"table_round_A_small",
 	"chair_A",
@@ -79,7 +82,6 @@ export const reserveModelNames = [
 	"kitchencounter_straight_A_backsplash",
 	"kitchentable_A",
 	"kitchentable_A_large",
-	"kitchentable_B",
 	"stove_multi",
 	"pan_B",
 	"pot_B",
@@ -182,10 +184,19 @@ export function getItemModelName(spec: ItemSpec): AssetModelName | null {
 export const dishModelNames: Readonly<Record<DishId, AssetModelName>> = {
 	burger: "food_burger",
 	ham: "food_dinner",
-	steak: "food_dinner",
+	// Стейк: модель тарелки; жареный стейк кладётся сверху при построении (см. dishToppings), «ужин» с окороком не подходит.
+	steak: "plate",
 	veggieBurger: "food_vegetableburger",
 	stew: "food_stew",
 };
+
+// Блюда, которые собираются на модели тарелки из ингредиента сверху (у стейка своей модели «на тарелке» в паке нет).
+export const dishToppings: Readonly<Partial<Record<DishId, ItemSpec>>> = {
+	steak: { kind: "friedSteak", state: "cooked" },
+};
+
+// Доля размера модели ингредиента, с которой он лежит на тарелке: целый стейк чуть меньше тарелки.
+export const dishToppingScale = 0.78;
 
 // Модель ящика по ингредиенту. Виды без своего ящика (котлеты, рагу) берут общий.
 export const crateModelNames: Readonly<Record<IngredientKind, AssetModelName>> = {

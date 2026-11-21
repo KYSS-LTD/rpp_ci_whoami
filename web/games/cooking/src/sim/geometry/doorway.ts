@@ -9,6 +9,13 @@ import { MODEL_SCALE, type LevelConfig, type Rect } from "../../contracts";
 // Имя модели проёма (KayKit Restaurant Bits).
 export const DOORWAY_MODEL = "wall_doorway";
 
+// Низкая версия проёма (та же рама, срезанная сверху): размеры в плане те же, стойки те же.
+export const LOW_DOORWAY_MODEL = "wall_doorway_low";
+
+export function isDoorwayModel(model: string | null): boolean {
+	return model === DOORWAY_MODEL || model === LOW_DOORWAY_MODEL;
+}
+
 // Ширина проёма в мире: в модели проём от -1 до 1 (ширина 2 в единицах модели), масштаб MODEL_SCALE.
 export const DOORWAY_OPENING_WIDTH = 2 * MODEL_SCALE;
 
@@ -18,7 +25,7 @@ export const DOORWAY_OPENING_WIDTH = 2 * MODEL_SCALE;
 export function collectDoorwayJambs(level: LevelConfig): Rect[] {
 	const jambs: Rect[] = [];
 	for (const prop of level.props) {
-		if (prop.blocking || prop.model !== DOORWAY_MODEL) {
+		if (prop.blocking || !isDoorwayModel(prop.model)) {
 			continue;
 		}
 		const { rect } = prop;

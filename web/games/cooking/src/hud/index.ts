@@ -114,6 +114,9 @@ export function createHud(options: HudOptions): Hud {
 		setPaused(paused) {
 			screens.setPaused(paused);
 		},
+		showDayComplete(info) {
+			screens.showDayComplete(info);
+		},
 		dispose() {
 			ownerWindow.removeEventListener("resize", relayout);
 			ownerWindow.removeEventListener("orientationchange", relayout);

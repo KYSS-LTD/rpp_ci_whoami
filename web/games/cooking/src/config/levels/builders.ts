@@ -3,11 +3,10 @@
 // Все размеры в мире (прилавок 1 x 1, клетка 0.5). Стены собираются из модели wall длиной 2 с точкой отсчёта в центре.
 import type { FloorConfig, PropConfig, QueueConfig, Rect, Rotation, SeatConfig, ServingWindowConfig, StationConfig, StationKind, TableConfig, Vec2 } from "../../contracts";
 
-// Высота низкой передней стены относительно полной (чтобы не закрывать обзор камеры).
-export const FRONT_WALL_HEIGHT_SCALE = 0.35;
-
-// Высота кусков разделяющей стены южнее окна выдачи (в долях полной): низкая стена не закрывает от камеры блюда в окне.
-export const DIVIDER_LOW_HEIGHT_SCALE = 0.4;
+// Низкие стены (передняя стена и куски разделителя южнее окна выдачи) не закрывают от камеры блюда и зал. Это не сжатые по
+// высоте высокие стены, а отдельные модели: копии wall и wall_doorway с отрезанной верхней частью (tools/make_low_walls.py).
+export const LOW_WALL_MODEL = "wall_low";
+export const LOW_DOORWAY_MODEL = "wall_doorway_low";
 
 // Толщина стен в мире.
 export const WALL_THICKNESS = 0.5;
@@ -30,14 +29,14 @@ export function point(x: number, z: number): Vec2 {
 // (место станции окна выдачи, которая сама является куском стены).
 export type WallPieceKind = "wall" | "doorway" | "skip";
 
-// heightScale: один множитель высоты на все куски или функция по номеру куска (undefined: полная высота).
+// low: true делает все куски низкими (модели wall_low / wall_doorway_low), функция решает по номеру куска.
 export function createWallRun(
 	idPrefix: string,
 	startX: number,
 	startZ: number,
 	axis: "x" | "z",
 	kinds: readonly WallPieceKind[],
-	heightScale?: number | ((pieceIndex: number) => number | undefined),
+	low: boolean | ((pieceIndex: number) => boolean) = false,
 ): PropConfig[] {
 	const props: PropConfig[] = [];
 	kinds.forEach((kind, pieceIndex) => {
@@ -46,18 +45,15 @@ export function createWallRun(
 		}
 		const offset = pieceIndex * WALL_PIECE_LENGTH;
 		const pieceRect = axis === "x" ? rect(startX + offset, startZ, WALL_PIECE_LENGTH, WALL_THICKNESS) : rect(startX, startZ + offset, WALL_THICKNESS, WALL_PIECE_LENGTH);
-		const prop: PropConfig = {
+		const isLow = typeof low === "function" ? low(pieceIndex) : low;
+		const model = kind === "doorway" ? (isLow ? LOW_DOORWAY_MODEL : "wall_doorway") : isLow ? LOW_WALL_MODEL : "wall";
+		props.push({
 			id: `${idPrefix}-${pieceIndex}`,
-			model: kind === "doorway" ? "wall_doorway" : "wall",
+			model,
 			rect: pieceRect,
 			rotationDeg: axis === "x" ? 0 : 90,
 			blocking: kind === "wall",
-		};
-		const pieceScale = typeof heightScale === "function" ? heightScale(pieceIndex) : heightScale;
-		if (pieceScale !== undefined) {
-			prop.heightScale = pieceScale;
-		}
-		props.push(prop);
+		});
 	});
 	return props;
 }
@@ -112,9 +108,9 @@ export function createShell(spec: ShellSpec): ShellResult {
 		...createWallRun("wall-north", 0, 0, "x", Array.from({ length: northPieces }, () => "wall" as const)),
 		...createWallRun("wall-west", 0, interiorStartZ, "z", Array.from({ length: sidePieces }, () => "wall" as const)),
 		...createWallRun("wall-east", spec.width - WALL_THICKNESS, interiorStartZ, "z", Array.from({ length: sidePieces }, () => "wall" as const)),
-		...createWallRun("wall-front", 0, frontWallZ, "x", frontKinds, FRONT_WALL_HEIGHT_SCALE),
+		...createWallRun("wall-front", 0, frontWallZ, "x", frontKinds, true),
 		// Куски южнее окна выдачи низкие: иначе стена закрывает от камеры блюда, стоящие в окне.
-		...createWallRun("wall-divider", spec.dividerX, interiorStartZ, "z", spec.dividerKinds, (pieceIndex) => (pieceIndex > windowPieceIndex ? DIVIDER_LOW_HEIGHT_SCALE : undefined)),
+		...createWallRun("wall-divider", spec.dividerX, interiorStartZ, "z", spec.dividerKinds, (pieceIndex) => pieceIndex > windowPieceIndex),
 	];
 	return {
 		props,
@@ -164,14 +160,17 @@ function useSharedApproach(seats: SeatConfig[], approachX: number | undefined): 
 	});
 }
 
-// Стол на 2 места: столешница 1 x 1 с углом (x, z), стулья слева и справа (0.5 x 1). Места: 0 слева, 1 справа.
+// Все столы зала квадратные: одна модель kitchentable_B (1 x 1). У стола на 4 места рендер растягивает её по плану до 1.5 x 1.5.
+export const SQUARE_TABLE_MODEL = "kitchentable_B";
+
+// Стол на 2 места: квадратная столешница 1 x 1 с углом (x, z), стулья слева и справа (0.5 x 1). Места: 0 слева, 1 справа.
 export function createTwoTop(id: string, number: number, x: number, z: number, sharedApproachX?: number): TableConfig {
 	const centerZ = z + 0.5;
 	return {
 		id,
 		number,
 		rect: rect(x, z, 1, 1),
-		model: "table_round_A_small",
+		model: SQUARE_TABLE_MODEL,
 		rotationDeg: 0,
 		seats: useSharedApproach([
 			createSeat(rect(x - 0.5, z, 0.5, 1), "chair_stool", 90, point(x - 1, centerZ), point(x + 0.3, centerZ)),
@@ -180,7 +179,7 @@ export function createTwoTop(id: string, number: number, x: number, z: number, s
 	};
 }
 
-// Стол на 4 места: столешница 1.5 x 1.5 с углом (x, z), стулья 0.5 x 0.5 с четырёх сторон. Места: 0 север, 1 восток, 2 юг, 3 запад.
+// Стол на 4 места: квадратная столешница 1.5 x 1.5 с углом (x, z), стулья 0.5 x 0.5 с четырёх сторон. Места: 0 север, 1 восток, 2 юг, 3 запад.
 export function createFourTop(id: string, number: number, x: number, z: number, sharedApproachX?: number): TableConfig {
 	const centerX = x + 0.75;
 	const centerZ = z + 0.75;
@@ -188,7 +187,7 @@ export function createFourTop(id: string, number: number, x: number, z: number, 
 		id,
 		number,
 		rect: rect(x, z, 1.5, 1.5),
-		model: "table_round_A",
+		model: SQUARE_TABLE_MODEL,
 		rotationDeg: 0,
 		seats: useSharedApproach([
 			createSeat(rect(x + 0.5, z - 0.5, 0.5, 0.5), "chair_A", 0, point(centerX, z - 1), point(centerX, z + 0.35)),

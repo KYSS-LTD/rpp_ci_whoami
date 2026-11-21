@@ -7,7 +7,7 @@ import { buildCollisionGrid, buildNavGrid } from "./grid";
 
 export { buildCollisionGrid, buildNavGrid } from "./grid";
 export { maxPenetration, moveCircle, resolveCircle, type CollisionWorld } from "./collision";
-export { collectDoorwayJambs, DOORWAY_MODEL, DOORWAY_OPENING_WIDTH } from "./doorway";
+export { collectDoorwayJambs, DOORWAY_MODEL, DOORWAY_OPENING_WIDTH, isDoorwayModel, LOW_DOORWAY_MODEL } from "./doorway";
 
 // Строит геометрию уровня. Препятствия: те же, что считает validateLevelConfig (collectObstacles: блокирующие props, colliders,
 // станции, столешницы и стулья), и стойки проёмов wall_doorway (collectDoorwayJambs). Сам проём (его середина) проходим.

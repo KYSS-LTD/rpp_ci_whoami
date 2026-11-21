@@ -1,7 +1,7 @@
 // Расстановка статичных объектов по данным уровня (задача 6.2): пол по зонам, стены и мебель (props), столы и стулья.
 // Станции расставляет stations.ts. Все объекты ставятся в те же координаты, что использует игровая логика: центр модели
 // в центре прямоугольника, поворот rotationDeg по yaw, масштаб MODEL_SCALE (по Y дополнительно heightScale).
-import { BoxGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, Object3D, Quaternion, SphereGeometry, Vector3 } from "three";
+import { Box3, BoxGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, Object3D, Quaternion, SphereGeometry, Vector3 } from "three";
 import { MODEL_SCALE, type FloorConfig, type LevelConfig, type PropConfig, type Rect, type Rotation, type ZoneKind } from "../contracts";
 import { rectCenter } from "../common/math";
 import type { LoadedAssets } from "./assets";
@@ -19,6 +19,9 @@ const floorTileModels: Readonly<Record<ZoneKind, string | null>> = {
 	hall: null,
 	street: null,
 };
+
+// Доля прямоугольника стола, которую занимает видимая столешница (коллизия и места считаются по полному прямоугольнику).
+const tableVisualFill = 0.84;
 
 // Реестр объектов конфига на сцене: идентификатор из LevelConfig -> корневой объект. Нужен тестам и подсветке.
 export type PlacedRegistry = Map<string, Object3D>;
@@ -164,7 +167,15 @@ export function buildStaticLayout(level: LevelConfig, assets: LoadedAssets): Sta
 
 	for (const table of level.tables) {
 		const tableWrapper = new Group();
-		tableWrapper.add(assets.cloneModel(table.model));
+		const tableModel = assets.cloneModel(table.model);
+		// Одна квадратная модель стола на все размеры: растягиваем её по плану (x, z) до прямоугольника стола, высоту не трогаем.
+		const modelBox = new Box3().setFromObject(tableModel);
+		if (!modelBox.isEmpty()) {
+			// Столешница чуть меньше прямоугольника стола: между вплотную стоящими столами остаётся видимая щель.
+			const footprintScale = (table.rect.width * tableVisualFill) / ((modelBox.max.x - modelBox.min.x) * MODEL_SCALE);
+			tableModel.scale.set(footprintScale, 1, footprintScale);
+		}
+		tableWrapper.add(tableModel);
 		addPlaced(table.id, placeAtRect(tableWrapper, table.rect, table.rotationDeg));
 		table.seats.forEach((seat, seatIndex) => {
 			const chairWrapper = new Group();

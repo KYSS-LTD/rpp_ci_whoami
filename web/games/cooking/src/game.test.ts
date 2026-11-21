@@ -37,7 +37,7 @@ function createFakeModules(overrides: Partial<GameModules> = {}) {
 		simulationSeed: null as number | null,
 	};
 	const scene = { render: vi.fn(), handleEvents: vi.fn(), setDebugInfo: vi.fn(), resize: vi.fn(), dispose: vi.fn() };
-	const hud = { update: vi.fn(), handleEvents: vi.fn(), setInputMode: vi.fn(), setPaused: vi.fn(), dispose: vi.fn() };
+	const hud = { update: vi.fn(), handleEvents: vi.fn(), setInputMode: vi.fn(), setPaused: vi.fn(), showDayComplete: vi.fn(), dispose: vi.fn() };
 	const input = {
 		read: vi.fn(() => EMPTY_INPUT),
 		reset: vi.fn(),
@@ -117,6 +117,9 @@ function createScriptedSimulation(initialPhase: ShiftPhase = "ready") {
 		emit: (event: unknown) => listeners.forEach((listener) => listener(event)),
 	};
 }
+
+// Прогресс перед последним днём недели: завершение дня уже уходит порталу итогом.
+const FINAL = { version: 2, cookedDishes: [], completedDays: { easy: 4, medium: 0, hard: 0 }, weekScores: { easy: { score: 120, maxScore: 160 }, medium: { score: 0, maxScore: 0 }, hard: { score: 0, maxScore: 0 } } };
 
 // Запускает игру до подписки на старт и присылает старт уровня.
 async function launch(levelId: string, overrides: Partial<GameModules> = {}, progress: unknown = null) {
@@ -215,16 +218,38 @@ describe("запуск по сообщению портала", () => {
 });
 
 describe("результат и выход", () => {
-	it("сценарий 'Результат передан один раз': успешное завершение отправляется ровно один раз, затем всё останавливается", async () => {
+	it("сценарий 'Следующий день': успешный день не последний, итог порталу не уходит, игра показывает экран дня и по кнопке запускает следующий", async () => {
 		const scripted = createScriptedSimulation();
 		const game = await launch("easy", { createSimulation: vi.fn(() => scripted.simulation) as unknown as GameModules["createSimulation"] });
+		game.state.hudOptions?.callbacks.onStartPressed();
+		game.state.onFrame?.(1 / 60, 0);
+		scripted.setPhase("finished", { completed: true, score: 40, maxScore: 50, reason: "allServed" });
+		game.state.onFrame?.(1 / 60, 16);
+		game.state.onFrame?.(1 / 60, 32);
+		expect(game.hud.showDayComplete).toHaveBeenCalledTimes(1);
+		expect(game.hud.showDayComplete).toHaveBeenCalledWith({ day: 1, score: 40, maxScore: 50 });
+		expect(game.bridge.finish).not.toHaveBeenCalled();
+		expect(game.bridge.saveProgress).toHaveBeenLastCalledWith(expect.objectContaining({ weekScores: expect.objectContaining({ easy: { score: 40, maxScore: 50 } }) }));
+		expect(game.handle?.isClosed()).toBe(false);
+		const firstHud = game.state.hudOptions;
+		firstHud?.callbacks.onNextDayRequested?.();
+		expect(game.hud.dispose).toHaveBeenCalledTimes(1);
+		expect(game.scene.dispose).toHaveBeenCalledTimes(1);
+		expect(game.state.hudOptions).not.toBe(firstHud);
+		expect(game.state.hudOptions?.campaignDay).toBe(2);
+		expect(game.handle?.isClosed()).toBe(false);
+	});
+
+	it("сценарий 'Результат передан один раз': успешное завершение последнего дня отправляется ровно один раз с общими очками недели (120 + 40 из 160 + 50), затем всё останавливается", async () => {
+		const scripted = createScriptedSimulation();
+		const game = await launch("easy", { createSimulation: vi.fn(() => scripted.simulation) as unknown as GameModules["createSimulation"] }, FINAL);
 		game.state.hudOptions?.callbacks.onStartPressed();
 		game.state.onFrame?.(1 / 60, 0);
 		expect(scripted.simulation.advance).toHaveBeenCalledTimes(1);
 		scripted.setPhase("finished", { completed: true, score: 40, maxScore: 50, reason: "allServed" });
 		game.state.onFrame?.(1 / 60, 16);
 		expect(game.bridge.finish).toHaveBeenCalledTimes(1);
-		expect(game.bridge.finish).toHaveBeenCalledWith({ score: 40, maxScore: 50, completed: true });
+		expect(game.bridge.finish).toHaveBeenCalledWith({ score: 160, maxScore: 210, completed: true });
 		expect(game.loop.stop).toHaveBeenCalledTimes(1);
 		expect(game.input.dispose).toHaveBeenCalledTimes(1);
 		expect(game.hud.dispose).toHaveBeenCalledTimes(1);
@@ -337,7 +362,7 @@ describe("прогресс блюд и подсказки", () => {
 describe("сбои во время игры", () => {
 	it("мост отклонил итог: порталу уходит одна ошибка, игра закрывается и больше не зовёт finish", async () => {
 		const scripted = createScriptedSimulation();
-		const game = await launch("easy", { createSimulation: vi.fn(() => scripted.simulation) as unknown as GameModules["createSimulation"] });
+		const game = await launch("easy", { createSimulation: vi.fn(() => scripted.simulation) as unknown as GameModules["createSimulation"] }, FINAL);
 		game.bridge.finish.mockReturnValue(false);
 		game.state.hudOptions?.callbacks.onStartPressed();
 		game.state.onFrame?.(1 / 60, 0);

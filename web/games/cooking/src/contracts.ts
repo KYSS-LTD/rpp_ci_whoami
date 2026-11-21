@@ -1344,6 +1344,14 @@ export interface GameProgress {
 	cookedDishes: DishId[];
 	// Количество успешно завершённых рабочих дней по сложности (easy/medium/hard), от 0 до 5.
 	completedDays: Record<LevelId, number>;
+	// Сумма очков за завершённые дни текущей недели по сложности: порталу уходят общие баллы за все дни.
+	weekScores: Record<LevelId, WeekScore>;
+}
+
+// Очки за завершённые дни недели: набрано и возможный максимум.
+export interface WeekScore {
+	score: number;
+	maxScore: number;
 }
 
 // Один этап подсказки: анимация и ключ подписи. Подпись лежит в texts/hud.ts по id этапа.
@@ -1477,6 +1485,8 @@ export interface HudCallbacks {
 	onPauseRequested(): void;
 	// Игрок выбрал "Продолжить" в меню паузы или нажал Escape на паузе. Main возобновляет время и вызывает HUD.setPaused(false).
 	onResumeRequested(): void;
+	// Игрок нажал "Следующий день" на экране завершённого дня (не последнего). Main запускает смену следующего дня в том же фрейме.
+	onNextDayRequested?(): void;
 }
 
 // Параметры HUD.
@@ -1511,6 +1521,8 @@ export interface Hud {
 	setInputMode(mode: InputMode): void;
 	// Показать или скрыть меню паузы.
 	setPaused(paused: boolean): void;
+	// Показать экран завершённого рабочего дня (не последнего) с кнопкой "Следующий день".
+	showDayComplete(info: { day: number; score: number; maxScore: number }): void;
 	// Снимает обработчики и убирает DOM.
 	dispose(): void;
 }
