@@ -343,6 +343,20 @@ export function create_Bench({ parts, preinstalled }) {
 		rotate() { angle += Math.PI / 4; lastAngle = null; },
 		// Ищет объект под указателем. Если луч не попал в подходящий объект, берём ближайший на экране:
 		// так на телефоне легче попасть пальцем по мелким винтам и разъёмам.
+		nearest_Screw(x, y, radiusX, radiusY) {
+			let best = null;
+			let closest = 1;
+			for (const [index, entry] of screws.entries()) {
+				const control = `screw-${index}`;
+				if (!this.highlight.has(control)) continue;
+				projected.copy(entry.screw.position).project(camera);
+				const distance = Math.hypot((projected.x - x) / radiusX, (projected.y - y) / radiusY);
+				if (distance > closest) continue;
+				best = control;
+				closest = distance;
+			}
+			return best;
+		},
 		pick(x, y, accept, tolerance) {
 			ray.setFromCamera({ x, y }, camera);
 			const hit = ray.intersectObjects(selectable, false).find(entry => entry.object.visible);

@@ -26,7 +26,7 @@ function best_Match(selection, items) {
 	return items.map(item => ({ item, quality: match_Quality(selection, item) })).sort((first, second) => second.quality - first.quality)[0] ?? { item: null, quality: 0 };
 }
 
-export function start_Survey({ mount, signal, settings, invalidate, sound }) {
+export function start_Survey({ mount, signal, settings, invalidate, sound, logAction }) {
 	const { photos: layoutIds, kinds, decoys: withDecoys } = settings.survey;
 	const copy = text.survey;
 	const totalTargets = layoutIds.reduce((sum, id) => sum + count_Targets(id, kinds), 0);
@@ -208,6 +208,7 @@ export function start_Survey({ mount, signal, settings, invalidate, sound }) {
 		if (!hint.hidden || photoDone()) return;
 		const target = photo.targets.find(item => !found.has(item));
 		hints++;
+		logAction('hint');
 		hint.hidden = false;
 		place_Box(hint, { x: target.x + target.w / 2 - .052, y: target.y + target.h / 2 - .083, w: .104, h: .166 });
 		set_Status(copy.hintShown);
@@ -219,12 +220,14 @@ export function start_Survey({ mount, signal, settings, invalidate, sound }) {
 		const decoy = best_Match(selection, photo.decoys);
 		// Рамка точнее легла на обманку, чем на мусор: подсказываем, что это за предмет.
 		if (decoy.item && decoy.quality >= .2 && decoy.quality > best.quality) {
+			logAction('decoy');
 			errors++;
 			vibrate_Device([20, 40, 20]);
 			feedback.textContent = `${copy.decoy} ${copy.decoys[decoy.item.kind]}. ${copy.decoyTail}`;
 			return;
 		}
 		if (best.quality < .20 || found.has(best.item) || best.item.kind !== category.value) {
+			logAction(best.quality < .20 ? 'outside' : found.has(best.item) ? 'duplicate' : 'category');
 			errors++;
 			vibrate_Device([20, 40, 20]);
 			feedback.textContent = best.quality < .20 ? copy.miss : found.has(best.item) ? copy.duplicate : copy.wrong;
@@ -232,6 +235,7 @@ export function start_Survey({ mount, signal, settings, invalidate, sound }) {
 		}
 		found.add(best.item);
 		foundTotal++;
+		logAction('marked');
 		accuracy += best.quality;
 		sound.play('mark');
 		vibrate_Device(15);

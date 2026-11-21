@@ -334,8 +334,19 @@ function create_Station(scene) {
 	const station = group(scene, stationSite.x, terraceHeight, stationSite.z);
 	box(station, 0xd7b189, 7.8, .54, 6.2, 0, .2, 0);
 	box(station, 0xf2d9a6, 6.6, 2.65, 4.8, 0, 1.6);
-	const roof = box(station, 0x426a64, 7.36, .27, 5.6, 0, 3, 0);
-	roof.rotation.z = .10;
+	// Нижняя грань цельной двускатной крыши лежит на верхней плоскости стен.
+	const roofProfile = new THREE.Shape();
+	roofProfile.moveTo(-3.68, 0);
+	roofProfile.lineTo(3.68, 0);
+	roofProfile.lineTo(3.68, .14);
+	roofProfile.lineTo(0, 1.02);
+	roofProfile.lineTo(-3.68, .14);
+	roofProfile.closePath();
+	const roof = new THREE.Mesh(new THREE.ExtrudeGeometry(roofProfile, { depth: 5.6, bevelEnabled: false }),
+		new THREE.MeshStandardMaterial({ color: 0x426a64, roughness: .84 }));
+	roof.position.set(0, 1.6 + 2.65 / 2, -2.8);
+	roof.castShadow = roof.receiveShadow = true;
+	station.add(roof);
 	box(station, 0x736052, .86, 2.19, .14, 1.9, 1.29, -2.41);
 	box(station, 0x48757c, 2.4, .98, .13, -.91, 1.81, -2.43);
 	box(station, 0xf0e7ca, .09, 1.08, .15, -.91, 1.81, -2.45);

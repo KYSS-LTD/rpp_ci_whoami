@@ -1,4 +1,5 @@
 import { defaultDifficulty, difficultyIds } from './difficulty.js';
+import { read_Record } from './report.js';
 import { text } from './text.js';
 
 const storageKey = 'aerolab:uav-operator:v2';
@@ -12,13 +13,14 @@ export function debug_Message(message, error) {
 
 // Проверяет сохранённый прогресс одного уровня сложности: очки этапов и рекорд.
 function read_Run(value) {
-	const run = { scores: [], best: 0, attempts: 0 };
+	const run = { scores: [], best: 0, attempts: 0, records: [null, null, null] };
 	if (!value || !Array.isArray(value.scores)) return run;
 	for (const score of value.scores.slice(0, text.stages.length)) {
 		if (!Number.isInteger(score) || score < 0 || score > 100) break;
 		run.scores.push(score);
 	}
 	run.attempts = Number.isSafeInteger(value.attempts) && value.attempts >= 0 ? value.attempts : Number(run.scores.length >= 2);
+	run.records = text.stages.map((_, index) => read_Record(value.records?.[index], index));
 	run.best = Number.isInteger(value.best) && value.best >= 0 && value.best <= 300 ? value.best : 0;
 	return run;
 }

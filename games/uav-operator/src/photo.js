@@ -4,45 +4,36 @@ import { box, cylinder, group, palette, ring } from './models.js';
 
 export const photoSize = { width: 28, height: 17.5 };
 
-// Раскладки учебных снимков. targets - мусор, который нужно отметить; kind 'tire' показывается
-// только на уровнях с четырьмя категориями. decoys - похожие на мусор предметы для сложного уровня.
-const layouts = {
-	bay: {
-		seed: 219, textureOffset: [0, 0],
-		targets: [
-			{ kind: 'bottle', x: -8.1, z: -3.5, angle: -.67 }, { kind: 'bag', x: .7, z: 3.45, angle: .53 },
-			{ kind: 'can', x: 7.3, z: -2.85, angle: -.22 }, { kind: 'bottle', x: 9.6, z: 4.75, angle: 1.09 },
-			{ kind: 'tire', x: -4.6, z: 1.9, angle: 0 },
-		],
-		decoys: [
-			{ kind: 'stone', x: 3.6, z: -1, angle: .4 }, { kind: 'jelly', x: -10.6, z: 2.6, angle: 0 },
-			{ kind: 'crab', x: 10.8, z: -4.4, angle: .7 }, { kind: 'firepit', x: 4.8, z: 5.9, angle: 0 },
-			{ kind: 'stick', x: -6.4, z: -6.6, angle: -.25 },
-		],
-		logs: [[-8.6, 4.8, .31], [4, -5.5, -.53], [13.1, -.21, .43], [-2.8, -2.6, 1.05]],
-		parasols: [[-12, -6.1, 0xda775b], [-3.9, 6.7, 0x569791], [11.7, -7.1, 0x9b834d]],
-		towels: [], boardwalk: false,
-	},
-	pier: {
-		seed: 731, textureOffset: [.37, .21],
-		targets: [
-			{ kind: 'can', x: -9.4, z: -1.8, angle: .9 }, { kind: 'bottle', x: -2.2, z: 4.6, angle: -.3 },
-			{ kind: 'bag', x: 5.4, z: -2.6, angle: -.4 }, { kind: 'tire', x: 10.2, z: 3.4, angle: 0 },
-			{ kind: 'can', x: 1.6, z: -.4, angle: 1.4 },
-		],
-		decoys: [
-			{ kind: 'jelly', x: -5.6, z: -4.6, angle: 0 }, { kind: 'crab', x: -11.4, z: 4.2, angle: -.5 },
-			{ kind: 'stone', x: 8.4, z: -5.2, angle: 1.2 }, { kind: 'firepit', x: -4.6, z: 1.2, angle: 0 },
-			{ kind: 'stick', x: 3.4, z: 5.9, angle: .3 },
-		],
-		logs: [[-7.4, 6.6, .7], [12.6, -1.6, -.3]],
-		parasols: [[7.6, 6.6, 0x569791], [-12.4, -5.2, 0xda775b]],
-		towels: [[5.6, 3.9, .25, 0xd8574a], [-8.2, 1.9, -.15, 0x4c86b8]], boardwalk: true,
-	},
-};
+// Каждая ячейка достаётся одному объекту. Запас между центрами учитывает длину бревна и края настила.
+const targetKinds = { bay: ['bottle', 'bag', 'can', 'bottle', 'tire'], pier: ['can', 'bag', 'bottle', 'can', 'tire'] };
+const decoyKinds = ['stone', 'jelly', 'crab', 'firepit', 'stick'];
 
 export function count_Targets(layoutId, kinds) {
-	return layouts[layoutId].targets.filter(item => kinds.includes(item.kind)).length;
+	return targetKinds[layoutId].filter(kind => kinds.includes(kind)).length;
+}
+
+export function generate_Layout(layoutId, kinds, withDecoys, seed = crypto.getRandomValues(new Uint32Array(1))[0]) {
+	const random = seeded_Random(seed);
+	const boardwalk = layoutId === 'pier';
+	const cells = [];
+	for (let row = 0; row < 4; row++) {
+		for (let column = 0; column < 6; column++) {
+			const x = -11.4 + column * 4.56 + (random() - .5) * .72;
+			const z = (boardwalk ? -4.62 + row * 3.65 : -6.2 + row * 4.1) + (random() - .5) * .56;
+			cells.push({ x, z, angle: random() * Math.PI * 2 });
+		}
+	}
+	for (let index = cells.length - 1; index > 0; index--) {
+		const other = Math.floor(random() * (index + 1));
+		[cells[index], cells[other]] = [cells[other], cells[index]];
+	}
+	const place = kind => ({ kind, ...cells.pop() });
+	const targets = targetKinds[layoutId].filter(kind => kinds.includes(kind)).map(place);
+	const decoys = withDecoys ? decoyKinds.map(place) : [];
+	const logs = Array.from({ length: boardwalk ? 2 : 4 }, () => cells.pop());
+	const parasols = Array.from({ length: 3 }, () => ({ ...cells.pop(), color: random() < .5 ? 0xda775b : 0x569791 }));
+	const towels = boardwalk ? [0xd8574a, 0x4c86b8].map(color => ({ ...cells.pop(), color })) : [];
+	return { seed, boardwalk, targets, decoys, logs, parasols, towels, textureOffset: [random(), random()] };
 }
 
 function create_Litter(holder, kind) {
@@ -137,8 +128,9 @@ function bounds_Of(holder) {
 	};
 }
 
-function create_Scenery(scene, layout, occupied) {
+function create_Scenery(scene, layout) {
 	const random = seeded_Random(layout.seed);
+	const occupied = [...layout.targets, ...layout.decoys, ...layout.logs, ...layout.parasols, ...layout.towels];
 	const rockGeometry = new THREE.DodecahedronGeometry(1, 0);
 	for (let index = 0; index < 51; index++) {
 		const x = random() * 28 - 14;
@@ -152,15 +144,15 @@ function create_Scenery(scene, layout, occupied) {
 		rock.castShadow = true;
 		scene.add(rock);
 	}
-	for (const [x, z, angle] of layout.logs) box(scene, 0xa47e59, .34, .20, 3.16, x, .108, z).rotation.y = angle;
-	for (const [x, z, color] of layout.parasols) {
+	for (const { x, z, angle } of layout.logs) box(scene, 0xa47e59, .34, .20, 3.16, x, .108, z).rotation.y = angle;
+	for (const { x, z, color } of layout.parasols) {
 		const parasol = group(scene, x, 0, z);
 		cylinder(parasol, palette.dark, .06, .06, 1.37, 0, .68, 0);
 		cylinder(parasol, color, .05, .88, .42, 0, 1.32, 0, 8);
 		cylinder(parasol, palette.shell, .23, .41, .095, 0, 1.38, 0, 8);
 	}
 	// Полосатые полотенца отдыхающих: тоже не мусор.
-	for (const [x, z, angle, color] of layout.towels) {
+	for (const { x, z, angle, color } of layout.towels) {
 		const towel = group(scene, x, 0, z);
 		towel.rotation.y = angle;
 		for (let index = 0; index < 5; index++) box(towel, index % 2 ? 0xf1ead6 : color, 1.2, .02, .44, 0, .02, -.88 + index * .44);
@@ -172,7 +164,7 @@ function create_Scenery(scene, layout, occupied) {
 }
 
 export function create_Photo(layoutId, kinds, withDecoys) {
-	const layout = layouts[layoutId];
+	const layout = generate_Layout(layoutId, kinds, withDecoys);
 	const scene = new THREE.Scene();
 	const sun = create_Lighting(scene, 19);
 	sun.position.set(-25, 29, -31);
@@ -186,17 +178,15 @@ export function create_Photo(layoutId, kinds, withDecoys) {
 	sand.rotation.x = -Math.PI / 2;
 	sand.receiveShadow = true;
 	scene.add(sand);
-	const items = layout.targets.filter(item => kinds.includes(item.kind));
-	const decoyItems = withDecoys ? layout.decoys : [];
-	create_Scenery(scene, layout, [...items, ...decoyItems]);
+	create_Scenery(scene, layout);
 	const place = (item, build) => {
 		const holder = group(scene, item.x, 0, item.z);
 		holder.rotation.y = item.angle;
 		build(holder, item.kind);
 		return { kind: item.kind, ...bounds_Of(holder) };
 	};
-	const targets = items.map(item => place(item, create_Litter));
-	const decoys = decoyItems.map(item => place(item, create_Decoy));
+	const targets = layout.targets.map(item => place(item, create_Litter));
+	const decoys = layout.decoys.map(item => place(item, create_Decoy));
 	return { scene, camera, targets, decoys,
 		// Статичный снимок нужно перерисовать, когда фототекстура песка декодируется.
 		ready: () => Boolean(sand.material.map.image?.complete),
