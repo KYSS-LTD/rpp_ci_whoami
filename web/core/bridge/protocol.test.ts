@@ -51,6 +51,7 @@ describe("сообщения портала", () => {
 			type: "start",
 			gameId: "city-builder",
 			levelId: "medium",
+			progress: null,
 		});
 	});
 

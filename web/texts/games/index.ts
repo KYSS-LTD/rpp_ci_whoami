@@ -2,7 +2,7 @@
 
 export const gamesTexts = {
 	title: "Библиотека игр",
-	intro: "Мини-игры разных форматов: викторины, 2D и 3D. Выберите игру, посмотрите, как она выглядит, и начните с удобной сложности.",
+	intro: "Выберите игру, посмотрите, как она выглядит, и начните с удобной сложности.",
 	emptyTitle: "Игр пока нет",
 	emptyBody: "Как только игра будет подключена в реестр, она появится здесь.",
 	levelDone: "Пройден",
@@ -10,7 +10,7 @@ export const gamesTexts = {
 	playLevel: "Играть",
 	ratingTitle: "Оцените игру от 1 до 5",
 	ratingSaved: "Оценка сохранена",
-	ratingUnavailable: "Оценить можно после прохождения хотя бы одного уровня",
+	ratingUnavailable: "Оценить можно после завершения уровня или упражнения",
 	// Фильтр ленты по формату игры.
 	filterLabel: "Формат игры",
 	filterAll: "Все",
@@ -27,6 +27,8 @@ export const gamesTexts = {
 	sheetClose: "Закрыть",
 	previewAlt: "Кадр из игры",
 	previewFrameLabel: "Кадр",
+	playPreview: "Включить анимацию",
+	pausePreview: "Приостановить анимацию",
 	minutesPrefix: "Уровень около",
 	minutesSuffix: "мин",
 	levelsCount: "3 уровня сложности",

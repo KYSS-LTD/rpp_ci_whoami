@@ -56,10 +56,8 @@ describe("регистрация игры «Закрытие квартала»"
 			{ professionId: "accountant", weight: 1.0 },
 			{ professionId: "analyst", weight: 0.4 },
 		]);
-		expect(accountantManifest.preview?.frames).toEqual([
-			"/game-previews/accountant-1c/frame-1.svg",
-			"/game-previews/accountant-1c/frame-2.svg",
-		]);
+		expect(accountantManifest.preview?.frames).toEqual(["/game-previews/accountant-1c/poster.webp"]);
+		expect(accountantManifest.preview?.animation).toBe("/game-previews/accountant-1c/play.webp");
 		expect(accountantManifest.estimatedMinutes).toBeGreaterThan(0);
 		expect(accountantManifest.summary).toBeTruthy();
 		expect(accountantManifest.inDevelopment).toBeUndefined();

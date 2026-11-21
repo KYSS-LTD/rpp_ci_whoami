@@ -87,7 +87,7 @@ export function GamesList({ games }: GamesListProps) {
 							<article className={styles.card} data-in-development={game.inDevelopment ? "true" : "false"}>
 								{/* Клик по обложке тоже открывает карточку игры; с клавиатуры для этого есть кнопка "Играть" */}
 								<div className={styles.cover} onClick={() => setOpenGameId(game.gameId)}>
-									<GamePreview frames={game.preview?.frames ?? []} title={game.title} variant="card" priority={gameIndex < 2} />
+									<GamePreview animation={game.preview?.animation} frames={game.preview?.frames ?? []} title={game.title} variant="card" priority={gameIndex < 2} />
 								</div>
 								<div className={styles.info}>
 									<div className={styles.badges}>

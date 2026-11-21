@@ -1,0 +1,18 @@
+<!doctype html>
+<!--
+	Съёмка GIF-подсказок рецептов из 3D-моделей игры (только разработка: Vite собирает один index.html, эту страницу отдаёт dev-сервер).
+	Адрес: /tutorial-capture.html?dish=burger&step=1 (показ сцены), добавьте &save для записи GIF и PNG в public/tutorial.
+-->
+<html lang="ru">
+	<head>
+		<meta charset="utf-8" />
+		<title>Съёмка подсказок</title>
+		<style>
+			body { margin: 0; background: #222; color: #ddd; font: 14px sans-serif; }
+			canvas { display: block; margin: 8px; }
+		</style>
+	</head>
+	<body>
+		<script type="module" src="./src/render/tutorialCapture.ts"></script>
+	</body>
+</html>

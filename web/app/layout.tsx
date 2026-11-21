@@ -13,7 +13,7 @@ const mainFont = Manrope({
 });
 
 export const metadata: Metadata = {
-	title: commonTexts.documentTitle,
+	title: commonTexts.siteName,
 	description: commonTexts.documentDescription,
 };
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { achievementDefinitions } from "@/core/achievements";
 import { readAwardedAchievements } from "@/core/progress";
 import { commonTexts } from "@/texts/common";
@@ -22,16 +23,15 @@ export function AchievementsList() {
 				{achievementDefinitions.map((definition) => {
 					const awardedItem = awarded.find((item) => item.id === definition.id);
 					return (
-						<li key={definition.id} className={styles.item} data-awarded={awardedItem ? "true" : "false"}>
-							<h2>{awardedItem ? definition.title : commonTexts.achievementLocked}</h2>
+						<li key={definition.id} className={styles.item} data-awarded={Boolean(awardedItem)} data-illustrated={Boolean(definition.icon)}>
+							{definition.icon ? <Image src={definition.icon} className={styles.icon} alt="" width={56} height={56} unoptimized /> : null}
+							<h2>{definition.title}</h2>
+							<p className={styles.description}>{definition.description}</p>
 							{awardedItem ? (
-								<>
-									<p className={styles.description}>{definition.description}</p>
-									<p className={styles.date}>
-										{commonTexts.achievementAwardedOn}: {new Date(awardedItem.awardedAt).toLocaleDateString("ru-RU")}
-									</p>
-								</>
-							) : null}
+								<p className={styles.date}>
+									{commonTexts.achievementAwardedOn}: {new Date(awardedItem.awardedAt).toLocaleDateString("ru-RU")}
+								</p>
+							) : <p className={styles.locked}>{commonTexts.achievementLocked}</p>}
 						</li>
 					);
 				})}

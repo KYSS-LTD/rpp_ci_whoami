@@ -1,6 +1,6 @@
 # Аудит покрытия: cooking-waiter и cooking-player-control
 
-Аудитор: SONNET-3 (scene-hud), свежий взгляд на код SONNET-2 (sim/waiter, sim/nav, sim/player, sim/geometry, input/, texts/controls.ts). Режим: только чтение, код не правился. Пути от `web/game-src/cooking/src/`, номера строк на момент аудита.
+Аудитор: SONNET-3 (scene-hud), свежий взгляд на код SONNET-2 (sim/waiter, sim/nav, sim/player, sim/geometry, input/, texts/controls.ts). Режим: только чтение, код не правился. Пути от `web/games/cooking/src/`, номера строк на момент аудита.
 
 ## Итог
 

@@ -14,9 +14,11 @@ export const currentSchemaVersion = 1;
 export const storageKeys = {
 	playerName: "playerName",
 	levelResults: "levelResults",
+	practiceResults: "practiceResults",
 	achievements: "achievements",
 	diplomas: "diplomas",
 	gameRatings: "gameRatings",
+	gameProgress: "gameProgress",
 } as const;
 
 export type StorageKeyName = (typeof storageKeys)[keyof typeof storageKeys];

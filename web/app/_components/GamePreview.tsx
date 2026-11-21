@@ -8,6 +8,7 @@ import styles from "./GamePreview.module.css";
 interface GamePreviewProps {
 	// Кадры из манифеста игры. Пустой список рисует обложку-заглушку.
 	frames: string[];
+	animation?: string;
 	// Подпись для экранных дикторов, обычно название игры.
 	title: string;
 	// card - обложка в ленте (первый кадр), stage - большое превью в карточке игры (кадры листаются).
@@ -25,9 +26,10 @@ function prefersReducedMotion(): boolean {
 }
 
 // Превью игры. В режиме stage кадры сменяются с плавным приближением, а точки внизу переключают кадр вручную.
-export function GamePreview({ frames, title, variant, priority = false }: GamePreviewProps) {
+export function GamePreview({ frames, animation, title, variant, priority = false }: GamePreviewProps) {
 	const [activeIndex, setActiveIndex] = useState(0);
-	const isSlideshow = variant === "stage" && frames.length > 1;
+	const [motionStopped, setMotionStopped] = useState(false);
+	const isSlideshow = !animation && variant === "stage" && frames.length > 1;
 
 	useEffect(() => {
 		if (!isSlideshow || prefersReducedMotion()) {
@@ -44,9 +46,12 @@ export function GamePreview({ frames, title, variant, priority = false }: GamePr
 	const visibleFrames = variant === "card" ? frames.slice(0, 1) : frames;
 
 	return (
-		<div className={`${styles.preview} ${styles[variant]}`}>
+		<div className={`${styles.preview} ${styles[variant]}`} data-animation={Boolean(animation)}>
 			{visibleFrames.map((frame, index) => (
-				<div key={frame} className={styles.frame} data-active={index === activeIndex ? "true" : "false"}>
+				<picture key={frame} className={styles.frame} data-active={index === activeIndex ? "true" : "false"}>
+					{index === 0 && animation && !motionStopped ? (
+						<source media="(prefers-reduced-motion: no-preference)" srcSet={animation} />
+					) : null}
 					<Image
 						src={frame}
 						alt={`${gamesTexts.previewAlt}: ${title}`}
@@ -54,7 +59,7 @@ export function GamePreview({ frames, title, variant, priority = false }: GamePr
 						sizes={variant === "card" ? "(max-width: 700px) 100vw, 420px" : "(max-width: 900px) 100vw, 880px"}
 						loading={priority ? "eager" : "lazy"}
 					/>
-				</div>
+				</picture>
 			))}
 			{isSlideshow ? (
 				<div className={styles.dots}>
@@ -70,6 +75,11 @@ export function GamePreview({ frames, title, variant, priority = false }: GamePr
 					))}
 				</div>
 			) : null}
+			{animation ? <button type="button" className={styles.motionToggle}
+				aria-label={motionStopped ? gamesTexts.playPreview : gamesTexts.pausePreview}
+				onClick={(event) => { event.stopPropagation(); setMotionStopped((stopped) => !stopped); }}>
+				<span aria-hidden="true">{motionStopped ? "▶" : "Ⅱ"}</span>
+			</button> : null}
 		</div>
 	);
 }

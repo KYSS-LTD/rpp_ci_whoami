@@ -26,6 +26,7 @@
 	var startPayload = null;
 	var isReadySent = false;
 	var isFinished = false;
+	var savedProgress = null;
 
 	// Уровень из адреса сборки. Портал всегда передаёт его в параметре level.
 	function readLevelFromUrl() {
@@ -65,13 +66,25 @@
 			return;
 		}
 		if (data.type === "start" && !startPayload) {
-			startPayload = { gameId: String(data.gameId), levelId: String(data.levelId) };
+			startPayload = { gameId: String(data.gameId), levelId: String(data.levelId), progress: data.progress && typeof data.progress === "object" ? data.progress : null };
+			savedProgress = startPayload.progress;
 			deliverStart();
 		}
 	});
 
 	function isFiniteNumber(value) {
 		return typeof value === "number" && isFinite(value);
+	}
+
+	function validProgress(data) {
+		if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+		try {
+			var json = JSON.stringify(data);
+			if (typeof json !== "string" || new TextEncoder().encode(json).length > 4096) return null;
+			return json;
+		} catch (error) {
+			return null;
+		}
 	}
 
 	win.PortalBridge = {
@@ -89,7 +102,7 @@
 		onStart: function (callback) {
 			startCallback = callback;
 			if (!isEmbedded && !startPayload) {
-				startPayload = { gameId: "standalone", levelId: readLevelFromUrl() };
+				startPayload = { gameId: "standalone", levelId: readLevelFromUrl(), progress: null };
 			}
 			if (!isReadySent) {
 				isReadySent = true;
@@ -97,6 +110,18 @@
 			}
 			deliverStart();
 		},
+
+		// Сохраняет сериализуемый объект игры (максимум 4096 байт UTF-8) в прогрессе портала.
+		saveProgress: function (data) {
+			var json = validProgress(data);
+			if (json === null) return false;
+			savedProgress = JSON.parse(json);
+			send("progress", { data: savedProgress });
+			return true;
+		},
+
+		// Текущий блок также доступен в автономном режиме для отладки.
+		getProgress: function () { return savedProgress; },
 
 		// Итог уровня: { score, maxScore, completed }. completed по умолчанию true.
 		// Возвращает false, если результат уже отправлен или числа неверные (результат тогда не отправляется).

@@ -184,3 +184,31 @@
 		transform: translateY(6px);
 	}
 }
+.diploma {
+	width: 100%;
+	max-width: 34rem;
+	padding: clamp(1rem, 4vw, 1.6rem);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius);
+	background: var(--color-surface-muted);
+	text-align: start;
+}
+
+.diploma h2 { font-size: 1.15rem; margin-bottom: .85rem; }
+.diploma h2 span { display: inline-block; margin-inline-start: .35rem; color: #834621; }
+.diploma h2 span[data-rating="gold"] { color: #785200; }
+.diploma h2 span[data-rating="silver"] { color: #4e5e70; }
+.diplomaForm { display: grid; gap: .45rem; }
+.diplomaForm p { overflow-wrap: anywhere; }
+.diplomaForm input {
+	min-width: 0;
+	min-height: 44px;
+	font: inherit;
+	font-size: 1rem;
+	color: var(--color-text);
+	padding: .65rem .8rem;
+	border: 1px solid var(--color-border-strong);
+	border-radius: var(--radius-small);
+	background: var(--color-surface);
+}
+.diplomaForm :is(button, a) { margin-block-start: .35rem; justify-self: start; min-height: 44px; }

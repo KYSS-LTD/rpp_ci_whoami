@@ -7,12 +7,20 @@ const gameBuildHeaders = [
 	{ key: "Access-Control-Allow-Origin", value: "*" },
 	{ key: "Content-Security-Policy", value: "sandbox allow-scripts" },
 ];
+const uavBuildHeaders = [
+	gameBuildHeaders[0],
+	{ key: "Content-Security-Policy", value: "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox" },
+];
 
 const nextConfig: NextConfig = {
+	output: process.env.DOCKER_STANDALONE === "1" ? "standalone" : undefined,
 	cacheComponents: true,
 	partialPrefetching: true,
 	async headers() {
-		return [{ source: "/game-builds/:path*", headers: gameBuildHeaders }];
+		return [
+			{ source: "/game-builds/:path*", headers: gameBuildHeaders },
+			{ source: "/game-builds/uav-operator/:path*", headers: uavBuildHeaders },
+		];
 	},
 };
 

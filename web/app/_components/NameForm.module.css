@@ -1,4 +1,4 @@
-/* Форма имени перед первым уровнем: карточка по центру. */
+/* Форма имени в профиле. */
 
 .wrapper {
 	display: flex;
@@ -6,26 +6,23 @@
 	gap: 10px;
 	width: 100%;
 	max-width: 480px;
-	margin: 24px auto 0;
-}
-
-.wrapper > p {
-	color: var(--color-text-muted);
+	margin: 0;
 }
 
 .form {
 	display: flex;
 	flex-direction: column;
-	gap: 14px;
-	margin-top: 8px;
+	gap: 8px;
 }
 
 .label {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
 	font-size: 0.92rem;
 	font-weight: 600;
+}
+
+.hint {
+	color: var(--color-text-muted);
+	font-size: .88rem;
 }
 
 .error {
@@ -37,11 +34,7 @@
 }
 
 .submit {
-	min-height: 46px;
-}
-
-@media (max-width: 600px) {
-	.wrapper {
-		margin-top: 8px;
-	}
+	align-self: flex-start;
+	margin-top: 4px;
+	min-height: 44px;
 }

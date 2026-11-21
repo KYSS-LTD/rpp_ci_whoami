@@ -30,15 +30,10 @@
 	color: #ffffff;
 }
 
-/* Значок-логотип, как в шапке */
-.brand::before {
-	content: "";
+.brand img {
 	width: 24px;
 	height: 24px;
-	border-radius: 8px;
-	background:
-		radial-gradient(circle at 70% 30%, var(--color-highlight) 0 22%, transparent 23%),
-		linear-gradient(135deg, #4aa86c, #2a8c55);
+	object-fit: contain;
 }
 
 .about p {

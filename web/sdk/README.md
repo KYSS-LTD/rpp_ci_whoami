@@ -29,8 +29,15 @@ const levelId = PortalBridge.getLevelId(); // "easy" | "medium" | "hard"
 
 PortalBridge.onStart((start) => {
 	// start.levelId - уровень, который выбрал игрок
+	// start.progress - сохранённый объект игры либо null
 	startLevel(start.levelId);
 });
+```
+
+Сохраняйте собственный сериализуемый объект не больше 4096 байт UTF-8. Портал передаст последний блок при следующем запуске игры:
+
+```js
+PortalBridge.saveProgress({ version: 1, completed: ["intro"] });
 ```
 
 3. В конце уровня отправьте результат. Портал сам добавит игру, уровень и время, проверит числа и выдаст ачивки и диплом:
@@ -51,6 +58,7 @@ PortalBridge.reportError("WebGL недоступен"); // игра не мож�
 
 - `onStart` вызывайте один раз, когда игра готова принять уровень: первый вызов сообщает порталу о готовности. Если не вызвать его за время ожидания (30 секунд или `runtime.readyTimeoutSec` из манифеста), портал покажет экран ошибки.
 - `finish` принимается один раз за запуск. Нужно `0 <= score <= maxScore` и `maxScore > 0`, иначе `finish` вернёт `false` и ничего не отправит.
+- `saveProgress` принимает только JSON-объект до 4096 байт UTF-8; при автономном запуске блок остаётся в памяти SDK.
 - Без портала (сборка открыта напрямую) SDK работает автономно: старт приходит сразу с уровнем из адреса `?level=medium`, сообщения пишутся в консоль.
 
 ## Unity WebGL
@@ -79,6 +87,7 @@ public class LevelBootstrap : MonoBehaviour
 	private void StartLevel(string levelId)
 	{
 		// загрузить сцену или настройки уровня levelId
+		// Восстановить состояние из PortalBridge.Instance.GetProgressJson()
 	}
 
 	private void OnLevelCompleted(int score, int maxScore)
@@ -87,6 +96,8 @@ public class LevelBootstrap : MonoBehaviour
 	}
 }
 ```
+
+Unity-игра может сохранить JSON-блок методом `PortalBridge.Instance.SaveProgressJson(json)`.
 
 5. Соберите WebGL в папку `public/game-builds/<gameId>/` портала. Стартовая страница `index.html` и есть `runtime.entry` в манифесте.
 

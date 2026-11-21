@@ -63,6 +63,9 @@ function collectPresentationReasons(manifest: Partial<GameManifest>): string[] {
 	}
 	if (manifest.preview !== undefined) {
 		const frames = (manifest.preview as { frames?: unknown } | null)?.frames;
+		if (manifest.preview?.animation !== undefined && !isNonEmptyString(manifest.preview.animation)) {
+			reasons.push("поле preview.animation должно содержать путь к анимации");
+		}
 		if (!Array.isArray(frames) || frames.length === 0 || !frames.every(isNonEmptyString)) {
 			reasons.push("поле preview.frames должно быть непустым списком путей к кадрам");
 		}

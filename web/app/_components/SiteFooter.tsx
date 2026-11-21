@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { commonTexts } from "@/texts/common";
 import styles from "./SiteFooter.module.css";
@@ -5,7 +6,6 @@ import styles from "./SiteFooter.module.css";
 // Ссылки в подвале повторяют основные разделы шапки.
 const footerLinks = [
 	{ href: "/games", label: commonTexts.navGames },
-	{ href: "/diplomas", label: commonTexts.navDiplomas },
 	{ href: "/achievements", label: commonTexts.navAchievements },
 	{ href: "/me", label: commonTexts.navProfile },
 ];
@@ -17,6 +17,7 @@ export function SiteFooter() {
 			<div className={styles.inner}>
 				<div className={styles.about}>
 					<Link href="/" className={styles.brand}>
+						<Image unoptimized src="/brand/logo.png" alt="" width={24} height={24} />
 						{commonTexts.siteName}
 					</Link>
 					<p>{commonTexts.footerTagline}</p>

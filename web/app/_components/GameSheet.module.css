@@ -4,11 +4,28 @@
 	position: fixed;
 	inset: 0;
 	z-index: 100;
+	width: 100%;
+	height: 100%;
+	max-width: none;
+	max-height: none;
+	margin: 0;
+	border: 0;
+	color: inherit;
+	overscroll-behavior: contain;
+	background: transparent;
+}
+
+.backdrop[open] {
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	padding: 24px;
+}
+
+.backdrop::backdrop {
 	background: rgb(8 20 14 / 0.6);
+	overflow: hidden;
+	overscroll-behavior: contain;
 	backdrop-filter: blur(3px);
 	-webkit-backdrop-filter: blur(3px);
 	animation: fadeIn 0.2s ease-out;
@@ -47,9 +64,9 @@
 	z-index: 3;
 	top: 14px;
 	right: 14px;
-	width: 40px;
+	width: 44px;
 	min-width: 0;
-	height: 40px;
+	height: 44px;
 	padding: 0;
 	color: #ffffff;
 	background: rgb(0 0 0 / 0.4);
@@ -300,11 +317,17 @@
 	grid-area: actions;
 	display: flex;
 	align-self: start;
+	gap: .5rem;
+	flex-wrap: wrap;
+}
+
+.actions a {
+	flex: 1;
+	min-height: 52px;
+	text-align: center;
 }
 
 .start {
-	flex: 1;
-	min-height: 52px;
 	font-size: 1.05rem;
 	border-radius: var(--radius);
 }
@@ -342,7 +365,7 @@
 }
 
 @media (max-width: 700px) {
-	.backdrop {
+	.backdrop[open] {
 		align-items: flex-end;
 		padding: 0;
 	}

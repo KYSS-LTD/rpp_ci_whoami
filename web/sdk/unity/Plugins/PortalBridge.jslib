@@ -18,6 +18,7 @@ mergeInto(LibraryManager.library, {
 			function deliverStart() {
 				if (window.portalUnityInstance) {
 					window.portalUnityInstance.SendMessage(objectName, "HandlePortalStart", start.levelId);
+					window.portalUnityInstance.SendMessage(objectName, "HandlePortalProgress", JSON.stringify(start.progress || null));
 				} else {
 					setTimeout(deliverStart, 50);
 				}
@@ -33,6 +34,25 @@ mergeInto(LibraryManager.library, {
 		var buffer = _malloc(size);
 		stringToUTF8(levelId, buffer, size);
 		return buffer;
+	},
+
+	// Возвращает текущий JSON блока прогресса игры.
+	PortalBridge_GetProgressJson: function () {
+		var json = typeof window.PortalBridge === "undefined" ? "null" : JSON.stringify(window.PortalBridge.getProgress());
+		var size = lengthBytesUTF8(json) + 1;
+		var buffer = _malloc(size);
+		stringToUTF8(json, buffer, size);
+		return buffer;
+	},
+
+	// Отправляет сериализуемый JSON-блок в портал. Лимит 4096 байт повторно проверяет веб-SDK.
+	PortalBridge_SaveProgressJson: function (jsonPtr) {
+		if (typeof window.PortalBridge === "undefined") return 0;
+		try {
+			return window.PortalBridge.saveProgress(JSON.parse(UTF8ToString(jsonPtr))) ? 1 : 0;
+		} catch (error) {
+			return 0;
+		}
 	},
 
 	// Итог уровня. Возвращает 1, если результат отправлен, и 0, если он неверный или уже был отправлен.

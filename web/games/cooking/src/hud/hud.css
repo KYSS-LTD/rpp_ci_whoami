@@ -1,0 +1,806 @@
+/*
+ * Стили HUD игры cooking (задачи 7.1-7.7). Слои экрана снизу вверх: canvas, слой касаний (z-index 1, input/touch.ts),
+ * HUD (z-index 10, pointer-events: none везде, кроме кнопок и диалогов), модальные диалоги (top layer браузера).
+ * HUD занимает только верхние зоны: слева сверху пауза и очередь, по центру сверху таймер, справа сверху карточки заказов.
+ * Нижняя часть свободна для стика (слева) и кнопок "Взять" и "Резать" (справа) на сенсорных устройствах.
+ * Только дефис, длинное и среднее тире запрещены.
+ */
+
+.cooking-hud {
+	--hud-bg: rgb(21 30 36 / 0.84);
+	--hud-bg-strong: rgb(21 30 36 / 0.94);
+	--hud-fg: #f6f8fa;
+	--hud-muted: #b7c3cc;
+	--hud-accent: #ffd23f;
+	--hud-danger: #ff5a4d;
+	/* Зазор и ширину центрального блока задаёт код (hud/index.ts) по размеру окна: те же числа использует расчёт раскладки карточек. */
+	--hud-gap: 8px;
+	--hud-center-width: auto;
+
+	position: absolute;
+	inset: 0;
+	z-index: 10;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) var(--hud-center-width) minmax(0, 1fr);
+	align-items: start;
+	gap: var(--hud-gap);
+	padding-block: max(0.5rem, env(safe-area-inset-top, 0px)) 0.5rem;
+	padding-inline: max(0.5rem, env(safe-area-inset-left, 0px)) max(0.5rem, env(safe-area-inset-right, 0px));
+	box-sizing: border-box;
+	color: var(--hud-fg);
+	font: 500 clamp(0.8125rem, 0.6rem + 0.55vw, 1rem) / 1.25 system-ui, "Segoe UI", Roboto, sans-serif;
+	/* Игровой холст под HUD принимает ввод: сам слой HUD события пропускает, а кнопки и диалоги включают их обратно. */
+	pointer-events: none;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+/* Атрибут hidden не должен перебиваться display из стилей компонентов. */
+.cooking-hud [hidden] {
+	display: none !important;
+}
+
+/* --- Карточки заказов (справа сверху) --- */
+
+/*
+ * Блок карточек: сетка, заполняемая по колонкам сверху вниз (самый срочный стол первым). Число строк и вид карточек
+ * (data-density: full или compact) выбирает код по размеру зоны (hud/ordersLayout.ts), так что блок целиком помещается в зону
+ * между краем экрана, таймером и запасом под стик. Содержимое не обрезается: overflow не скрывается.
+ */
+.hud-orders {
+	grid-column: 3;
+	justify-self: end;
+	display: grid;
+	grid-auto-flow: column;
+	grid-template-rows: repeat(var(--hud-orders-rows, 1), auto);
+	grid-auto-columns: var(--hud-full-card-width, 13rem);
+	align-content: start;
+	align-items: start;
+	gap: var(--hud-orders-gap, 8px);
+}
+
+.hud-card {
+	box-sizing: border-box;
+	padding: 0.35rem 0.5rem 0.45rem;
+	border-radius: 0.6rem;
+	background: var(--hud-bg);
+	border-inline-start: 0.25rem solid #4cd964;
+}
+
+.hud-card[data-urgent="true"] {
+	border-inline-start-color: var(--hud-danger);
+}
+
+.hud-card[data-state="served"] {
+	border-inline-start-color: #4cd964;
+}
+
+.hud-card__header {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 0.5rem;
+}
+
+.hud-card__title {
+	margin: 0;
+	font-size: 1em;
+	font-weight: 800;
+}
+
+.hud-card__state {
+	font-size: 0.8em;
+	color: #8be29c;
+	font-weight: 700;
+}
+
+.hud-card__orders {
+	margin: 0.2rem 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.hud-order {
+	position: relative;
+	display: grid;
+	grid-template-columns: 2rem minmax(0, 1fr) auto;
+	grid-template-areas:
+		"icon name status"
+		"bar bar bar";
+	align-items: center;
+	gap: 0.1rem 0.4rem;
+	padding: 0.2rem 0.25rem;
+	border-radius: 0.4rem;
+}
+
+.hud-order__icon {
+	grid-area: icon;
+	inline-size: 2rem;
+	block-size: 2rem;
+	object-fit: contain;
+}
+
+.hud-order__icon--text {
+	display: grid;
+	place-items: center;
+	border-radius: 50%;
+	background: rgb(255 255 255 / 0.16);
+	font-weight: 800;
+}
+
+.hud-order__name {
+	grid-area: name;
+	overflow-wrap: break-word;
+	font-weight: 700;
+}
+
+.hud-order__status {
+	grid-area: status;
+	padding: 0.05rem 0.45rem;
+	border-radius: 999px;
+	background: rgb(255 255 255 / 0.16);
+	font-size: 0.78em;
+	white-space: nowrap;
+}
+
+.hud-order[data-status="delivering"] .hud-order__status {
+	background: #ffcc4d;
+	color: #231a00;
+	font-weight: 700;
+}
+
+.hud-order[data-status="served"] .hud-order__status {
+	background: #1f7a3a;
+	color: #fff;
+}
+
+.hud-order[data-status="served"] {
+	opacity: 0.8;
+}
+
+/* Индикатор терпения: цвет от зелёного к красному по оттенку --patience-hue (120 - полное терпение, 0 - нет терпения). */
+.hud-order__patience {
+	grid-area: bar;
+	appearance: none;
+	border: 0 solid;
+	overflow: clip;
+	inline-size: 100%;
+	block-size: 0.45rem;
+	border-radius: 999px;
+	background: rgb(255 255 255 / 0.18);
+}
+
+.hud-order__patience::-webkit-progress-bar {
+	background: transparent;
+}
+
+.hud-order__patience::-webkit-progress-value {
+	background: hsl(var(--patience-hue, 120) 78% 46%);
+	border-radius: 999px;
+	transition: inline-size 0.25s;
+}
+
+.hud-order__patience::-moz-progress-bar {
+	background: hsl(var(--patience-hue, 120) 78% 46%);
+	border-radius: 999px;
+}
+
+/* Терпение на исходе (менее четверти): красная подложка пульсирует. Без анимации при reduced motion: подложка и рамка остаются. */
+.hud-order[data-urgent="true"]::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: 0.4rem;
+	background: var(--hud-danger);
+	opacity: 0.22;
+	outline: 2px solid var(--hud-danger);
+	outline-offset: -2px;
+	pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.hud-order[data-urgent="true"]::after {
+		animation: hud-pulse 1.1s ease-in-out infinite;
+	}
+}
+
+@keyframes hud-pulse {
+	0%,
+	100% {
+		opacity: 0.1;
+	}
+	50% {
+		opacity: 0.45;
+	}
+}
+
+/* --- Верхняя панель (по центру сверху) --- */
+
+.hud-stats {
+	grid-column: 2;
+	min-inline-size: 0;
+	display: grid;
+	justify-items: center;
+	gap: 0.25rem;
+	text-align: center;
+}
+
+.hud-timer {
+	margin: 0;
+	min-inline-size: 5.5rem;
+	padding: 0.05rem 0.9rem;
+	border-radius: 0.75rem;
+	background: var(--hud-bg-strong);
+	font-size: clamp(1.5rem, 1rem + 1.6vw, 2.25rem);
+	font-weight: 800;
+	font-variant-numeric: tabular-nums;
+}
+
+.hud-timer[data-low="true"] {
+	color: #ffd0cb;
+	box-shadow: inset 0 0 0 2px var(--hud-danger);
+}
+
+.hud-counters {
+	margin: 0;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.4rem;
+}
+
+.hud-counter {
+	display: inline-flex;
+	gap: 0.4rem;
+	padding: 0.1rem 0.6rem;
+	border-radius: 0.5rem;
+	background: var(--hud-bg);
+	white-space: nowrap;
+}
+
+.hud-counter__label {
+	color: var(--hud-muted);
+}
+
+.hud-counter__value {
+	font-weight: 800;
+	font-variant-numeric: tabular-nums;
+}
+
+.hud-banner,
+.hud-hint {
+	margin: 0;
+	padding: 0.3rem 0.8rem;
+	border-radius: 0.5rem;
+	box-sizing: border-box;
+	max-inline-size: 100%;
+	text-wrap: balance;
+}
+
+.hud-banner {
+	background: #ffcc4d;
+	color: #231a00;
+	font-weight: 700;
+}
+
+.hud-hint {
+	background: var(--hud-bg-strong);
+}
+
+.hud-banner:empty,
+.hud-hint:empty {
+	display: none;
+}
+
+/* --- Пауза и очередь (слева сверху) --- */
+
+.hud-left {
+	grid-column: 1;
+	justify-self: start;
+	display: flex;
+	align-items: flex-start;
+	gap: var(--hud-gap);
+}
+
+.hud-queue {
+	display: grid;
+	grid-template-columns: auto auto;
+	align-items: center;
+	gap: 0.1rem 0.4rem;
+	padding: 0.2rem 0.6rem;
+	border-radius: 0.5rem;
+	background: var(--hud-bg);
+}
+
+.hud-queue[data-empty="true"] .hud-queue__patience {
+	visibility: hidden;
+}
+
+.hud-queue__label {
+	color: var(--hud-muted);
+}
+
+.hud-queue__value {
+	font-weight: 800;
+	font-variant-numeric: tabular-nums;
+	text-align: end;
+}
+
+.hud-queue__patience {
+	grid-column: 1 / -1;
+	inline-size: 100%;
+}
+
+.hud-queue[data-urgent="true"] {
+	outline: 2px solid var(--hud-danger);
+}
+
+.hud-pause-button {
+	pointer-events: auto;
+	display: grid;
+	place-items: center;
+	min-inline-size: 44px;
+	min-block-size: 44px;
+	padding: 0;
+	border: 0;
+	border-radius: 0.6rem;
+	background: var(--hud-bg-strong);
+	color: inherit;
+	cursor: pointer;
+}
+
+.hud-pause-button__icon {
+	box-sizing: border-box;
+	inline-size: 1rem;
+	block-size: 1rem;
+	border-inline: 0.3rem solid currentColor;
+}
+
+/* --- Диалоги: старт, пауза, провал, поворот экрана --- */
+
+.hud-dialog {
+	pointer-events: auto;
+	box-sizing: border-box;
+	inline-size: min(34rem, calc(100vw - 1.5rem));
+	max-block-size: calc(100dvh - 1.5rem);
+	padding: 1.25rem 1.5rem;
+	border: 0;
+	border-radius: 1rem;
+	overflow: auto;
+	background: var(--hud-bg-strong);
+	color: var(--hud-fg);
+	box-shadow: 0 1rem 3rem rgb(0 0 0 / 0.5);
+	-webkit-user-select: text;
+	user-select: text;
+}
+
+/* Без этих правил прокрутка внутри диалога или над подложкой прокручивает страницу под ним. */
+.hud-dialog:modal {
+	overscroll-behavior: contain;
+}
+
+.hud-dialog::backdrop {
+	overflow: hidden;
+	overscroll-behavior: contain;
+	background: rgb(8 12 16 / 0.72);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.hud-dialog[open] {
+		animation: hud-dialog-in 0.18s ease-out;
+	}
+}
+
+@keyframes hud-dialog-in {
+	from {
+		opacity: 0;
+		transform: translateY(0.5rem);
+	}
+}
+
+.hud-dialog__title {
+	margin: 0 0 0.5rem;
+	font-size: 1.5em;
+	text-wrap: balance;
+}
+
+.hud-day-label {
+	margin: 0 0 0.35rem;
+	color: var(--hud-accent);
+	font-size: 0.82em;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.hud-tutorial__picture {
+	display: block;
+	inline-size: min(100%, 30rem);
+	margin-inline: auto;
+	border-radius: 0.75rem;
+	background: #f3eadb;
+	overflow: hidden;
+}
+
+.hud-tutorial__image {
+	display: block;
+	inline-size: 100%;
+	 aspect-ratio: 8 / 5;
+	object-fit: contain;
+}
+
+.hud-dialog--tutorial {
+	inline-size: min(34rem, calc(100vw - 1.5rem));
+}
+
+.hud-dialog--tutorial .hud-dialog__actions {
+	justify-content: space-between;
+}
+
+.hud-dialog__lead {
+	margin: 0 0 0.75rem;
+	text-wrap: pretty;
+}
+
+.hud-dialog__note {
+	margin: 0.5rem 0;
+	color: var(--hud-muted);
+	font-size: 0.9em;
+	text-wrap: pretty;
+}
+
+.hud-dialog__note:empty {
+	display: none;
+}
+
+.hud-dialog__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.6rem;
+	margin-block: 0.75rem;
+}
+
+.hud-start-actions {
+	position: sticky;
+	bottom: 0;
+	display: flex;
+	justify-content: flex-end;
+	padding-block: .45rem;
+	background: var(--hud-bg-strong);
+}
+
+.hud-icon-button { font-size: 1.35rem; min-inline-size: 44px; }
+
+.hud-rules {
+	margin: 0 0 0.75rem;
+	padding-inline-start: 1.2rem;
+}
+
+.hud-rules li {
+	margin-block: 0.2rem;
+	text-wrap: pretty;
+}
+
+.hud-controls {
+	margin-block: 0.75rem;
+}
+
+.hud-controls__title {
+	margin: 0 0 0.35rem;
+	font-size: 1.05em;
+	color: var(--hud-accent);
+}
+
+.hud-controls__list {
+	display: grid;
+	gap: 0.25rem;
+	margin: 0;
+}
+
+.hud-controls__item {
+	display: grid;
+	grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+	gap: 0.5rem;
+	padding: 0.2rem 0.5rem;
+	border-radius: 0.4rem;
+	background: rgb(255 255 255 / 0.08);
+}
+
+.hud-controls__item dt {
+	font-weight: 700;
+}
+
+.hud-controls__item dd {
+	margin: 0;
+	color: var(--hud-muted);
+}
+
+.hud-controls__pause-hint {
+	margin: 0.4rem 0 0;
+	color: var(--hud-muted);
+	font-size: 0.9em;
+}
+
+.hud-failure__reason {
+	margin: 0 0 0.5rem;
+	font-size: 1.1em;
+	text-wrap: pretty;
+}
+
+.hud-failure__score {
+	margin: 0 0 1rem;
+	color: var(--hud-muted);
+}
+
+.hud-button {
+	min-inline-size: 44px;
+	min-block-size: 44px;
+	padding: 0.5rem 1.25rem;
+	border: 0;
+	border-radius: 0.7rem;
+	font: inherit;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.hud-button--primary {
+	background: var(--hud-accent);
+	color: #231a00;
+}
+
+.hud-button--secondary {
+	background: rgb(255 255 255 / 0.14);
+	color: var(--hud-fg);
+}
+
+.hud-button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.hud-button:focus-visible,
+.hud-pause-button:focus-visible {
+	outline: 3px solid #fff;
+	outline-offset: 2px;
+}
+
+/* Просьба повернуть экран: значок телефона, который поворачивается. */
+.hud-dialog--orientation {
+	text-align: center;
+}
+
+.hud-orientation__icon {
+	display: block;
+	box-sizing: border-box;
+	inline-size: 2.4rem;
+	block-size: 4rem;
+	margin: 0 auto 0.75rem;
+	border: 0.25rem solid var(--hud-fg);
+	border-radius: 0.5rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.hud-orientation__icon {
+		animation: hud-rotate-hint 2.4s ease-in-out infinite;
+	}
+}
+
+@keyframes hud-rotate-hint {
+	0%,
+	25% {
+		transform: rotate(0deg);
+	}
+	65%,
+	100% {
+		transform: rotate(-90deg);
+	}
+}
+
+/* --- Компактные карточки: одна строка на стол (номер и ряд значков блюд, под каждым значком полоса терпения) --- */
+
+.hud-orders[data-density="compact"] {
+	grid-auto-columns: max-content;
+}
+
+.hud-orders[data-density="compact"] .hud-card {
+	display: flex;
+	align-items: center;
+	gap: var(--hud-compact-inner-gap, 4px);
+	block-size: var(--hud-compact-card-height, 32px);
+	padding: 0 var(--hud-compact-pad-x, 4px);
+	border-radius: 0.45rem;
+	/* Цветная полоска слева рисуется тенью, а не рамкой: рамка добавила бы ширину, которой нет в расчёте раскладки. */
+	border-inline-start: 0;
+	box-shadow: inset 3px 0 0 #4cd964;
+}
+
+.hud-orders[data-density="compact"] .hud-card[data-urgent="true"] {
+	box-shadow: inset 3px 0 0 var(--hud-danger);
+}
+
+.hud-orders[data-density="compact"] .hud-card__header {
+	display: contents;
+}
+
+.hud-orders[data-density="compact"] .hud-card__title {
+	margin: 0;
+	flex: none;
+}
+
+.hud-orders[data-density="compact"] .hud-card__title-number {
+	display: grid;
+	place-items: center;
+	inline-size: var(--hud-compact-badge, 18px);
+	block-size: var(--hud-compact-badge, 18px);
+	border-radius: 50%;
+	background: rgb(255 255 255 / 0.2);
+	font-size: 0.7rem;
+	font-weight: 800;
+	font-variant-numeric: tabular-nums;
+}
+
+.hud-orders[data-density="compact"] .hud-card[data-state="served"] .hud-card__title-number {
+	background: #1f7a3a;
+}
+
+/* Слово "Стол", название блюда и надпись "Стол обслужен" на компактной карточке не видны, но остаются для вспомогательных технологий. */
+.hud-orders[data-density="compact"] .hud-card__title-word,
+.hud-orders[data-density="compact"] .hud-card__state,
+.hud-orders[data-density="compact"] .hud-order__name {
+	position: absolute;
+	inline-size: 1px;
+	block-size: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.hud-orders[data-density="compact"] .hud-card__orders {
+	display: flex;
+	gap: var(--hud-compact-icon-gap, 3px);
+	margin: 0;
+}
+
+.hud-orders[data-density="compact"] .hud-order {
+	display: block;
+	inline-size: var(--hud-compact-icon, 20px);
+	padding: 0;
+}
+
+.hud-orders[data-density="compact"] .hud-order__icon {
+	display: block;
+	inline-size: var(--hud-compact-icon, 20px);
+	block-size: var(--hud-compact-icon, 20px);
+	font-size: 0.65rem;
+}
+
+.hud-orders[data-density="compact"] .hud-order__patience {
+	display: block;
+	inline-size: 100%;
+	block-size: 3px;
+	margin-top: 2px;
+}
+
+/* Статус заказа значком в углу значка блюда: цвет и знак показывают состояние, текст остаётся для вспомогательных технологий. */
+.hud-orders[data-density="compact"] .hud-order__status {
+	position: absolute;
+	inset-block-start: -3px;
+	inset-inline-end: -4px;
+	display: grid;
+	place-items: center;
+	inline-size: 11px;
+	block-size: 11px;
+	padding: 0;
+	border-radius: 50%;
+	background: rgb(0 0 0 / 0.75);
+	color: #fff;
+	font-size: 0;
+}
+
+.hud-orders[data-density="compact"] .hud-order__status::before {
+	font-size: 8px;
+	font-weight: 800;
+	line-height: 1;
+	content: "\2026";
+}
+
+.hud-orders[data-density="compact"] .hud-order[data-status="delivering"] .hud-order__status {
+	background: #ffcc4d;
+	color: #231a00;
+}
+
+.hud-orders[data-density="compact"] .hud-order[data-status="delivering"] .hud-order__status::before {
+	content: "\2192";
+}
+
+.hud-orders[data-density="compact"] .hud-order[data-status="served"] .hud-order__status {
+	background: #1f7a3a;
+}
+
+.hud-orders[data-density="compact"] .hud-order[data-status="served"] .hud-order__status::before {
+	content: "\2713";
+}
+
+/* --- Низкий экран (телефон в альбомной ориентации): компактный центральный блок --- */
+
+.cooking-hud[data-screen="low"] .hud-timer {
+	min-inline-size: 0;
+	padding: 0.05rem 0.7rem;
+	font-size: 1.4rem;
+}
+
+.cooking-hud[data-screen="low"] .hud-counters {
+	flex-wrap: nowrap;
+	gap: 0.25rem;
+}
+
+.cooking-hud[data-screen="low"] .hud-counter {
+	flex-direction: column;
+	align-items: center;
+	gap: 0;
+	padding: 0.05rem 0.4rem;
+	line-height: 1.1;
+}
+
+.cooking-hud[data-screen="low"] .hud-counter__label {
+	font-size: 0.62em;
+}
+
+.cooking-hud[data-screen="low"] .hud-counter__value {
+	font-size: 0.85em;
+}
+
+/* Диалоги на низком экране тесные: отступы и заголовок меньше. */
+@media (max-height: 520px) {
+	.hud-dialog {
+		padding: 0.75rem 1rem;
+	}
+
+	.hud-dialog__title {
+		font-size: 1.25em;
+	}
+
+	.hud-tutorial__image {
+		max-block-size: 30dvh;
+	}
+}
+
+/* Низкий широкий экран: стартовый экран в две колонки, чтобы вся информация и кнопка помещались без прокрутки. */
+@media (orientation: landscape) and (max-height: 520px) {
+	.hud-dialog--start {
+		inline-size: min(46rem, calc(100vw - 1.5rem));
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		column-gap: 1.25rem;
+	}
+
+	/* display задаётся только открытому диалогу: иначе закрытый диалог останется на экране. */
+	.hud-dialog--start[open] {
+		display: grid;
+	}
+
+	.hud-dialog--start .hud-dialog__title,
+	.hud-dialog--start .hud-dialog__lead,
+	.hud-dialog--start .hud-start-actions {
+		grid-column: 1 / -1;
+	}
+
+	.hud-dialog--start .hud-button {
+		justify-self: center;
+	}
+}
+
+@media (max-width: 580px) and (orientation: portrait) {
+	.cooking-hud {
+		grid-template-columns: minmax(0, 1fr) auto;
+		grid-template-rows: auto minmax(0, 1fr);
+	}
+	.cooking-hud [data-zone="top-center"] { grid-column: 1; grid-row: 1; justify-self: start; }
+	.hud-right { grid-column: 2; grid-row: 1; }
+	.hud-orders {
+		grid-column: 1 / -1; grid-row: 2; inline-size: 100%;
+		flex-flow: row wrap; max-block-size: min(23dvh, 10rem); overflow: auto;
+		pointer-events: auto; touch-action: pan-y;
+	}
+	.hud-orders:not(:has(.hud-card)) { pointer-events: none; }
+	.hud-card { inline-size: calc((100% - var(--hud-gap)) / 2); min-inline-size: 0; }
+}

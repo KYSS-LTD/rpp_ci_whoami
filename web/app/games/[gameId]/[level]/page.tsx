@@ -9,9 +9,12 @@ interface LevelPageProps {
 
 // Все пары игра-уровень из реестра известны при сборке, поэтому страницы уровней собираются заранее.
 export function generateStaticParams(): { gameId: string; level: string }[] {
-	return gameRegistry.games.flatMap((game) =>
-		game.manifest.levels.map((level) => ({ gameId: game.manifest.gameId, level: level.id })),
-	);
+	return gameRegistry.games.flatMap(({ manifest }) => {
+		const gameId = manifest.gameId;
+		const levels: string[] = manifest.levels.map((level) => level.id);
+		if (gameId === "uav-operator") levels.push("free");
+		return levels.map((level) => ({ gameId, level }));
+	});
 }
 
 // Читает параметры маршрута внутри Suspense: так Next.js не блокирует предварительную отрисовку страницы.

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Suspense, useState } from "react";
 import { resetProgress } from "@/core/progress";
@@ -11,7 +12,6 @@ import styles from "./SiteHeader.module.css";
 const navigationLinks = [
 	{ href: "/", label: commonTexts.navHome },
 	{ href: "/games", label: commonTexts.navGames },
-	{ href: "/diplomas", label: commonTexts.navDiplomas },
 	{ href: "/achievements", label: commonTexts.navAchievements },
 	{ href: "/me", label: commonTexts.navProfile },
 ];
@@ -61,6 +61,7 @@ export function SiteHeader() {
 			<header className={styles.header}>
 				<div className={styles.inner}>
 					<Link href="/" className={styles.brand}>
+						<Image unoptimized src="/brand/logo.png" alt="" width={36} height={36} />
 						{commonTexts.siteName}
 					</Link>
 					<nav aria-label="Основная навигация" className={styles.nav}>

@@ -1,18 +1,22 @@
 // Загрузчик конфигурации ачивок. Список хранится в achievements.json, отдельно от кода игр.
 import rawAchievements from "./achievements.json";
-import type { LevelId } from "../contract/types";
+import type { LevelId, PracticeActivity } from "../contract/types";
 
 // Условие выдачи. Незаданное поле означает "любое значение".
 export interface AchievementCondition {
 	gameId?: string;
 	levelId?: LevelId;
 	minScorePercent?: number;
+	minCompletedGames?: number;
+	practiceActivity?: PracticeActivity;
+	minPracticeFinishes?: number;
 }
 
 export interface AchievementDefinition {
 	id: string;
 	title: string;
 	description: string;
+	icon?: string;
 	condition: AchievementCondition;
 }
 
@@ -38,6 +42,7 @@ export function loadAchievements(rawList: unknown[]): AchievementDefinition[] {
 			id: definition.id,
 			title: definition.title,
 			description: definition.description,
+			...(definition.icon ? { icon: definition.icon } : {}),
 			condition: definition.condition ?? {},
 		};
 	});

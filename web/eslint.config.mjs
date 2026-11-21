@@ -14,8 +14,9 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Сторонние библиотеки внутри сборок iframe-игр (например, three.js) не проверяются.
     "public/game-builds/**/vendor/**",
-    // Результат сборки игры cooking (Vite) создаётся сборщиком и не проверяется: исходники лежат в game-src/cooking.
+    // Результат сборки игры cooking (Vite) создаётся сборщиком и не проверяется: исходники лежат в games/cooking.
     "public/game-builds/cooking/**",
+    "public/game-builds/uav-operator/**",
   ]),
 ]);
 

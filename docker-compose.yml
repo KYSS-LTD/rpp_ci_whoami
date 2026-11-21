@@ -1,0 +1,28 @@
+services:
+  portal:
+    build: .
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  proxy:
+    image: caddy:2-alpine
+    depends_on:
+      portal:
+        condition: service_healthy
+    environment:
+      SITE_DOMAIN: "${SITE_DOMAIN:-:80}"
+    ports:
+      - "${HTTP_PORT:-${PORT:-3000}}:80"
+      - "${HTTPS_PORT:-3443}:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    restart: unless-stopped
+
+volumes:
+  caddy_data:

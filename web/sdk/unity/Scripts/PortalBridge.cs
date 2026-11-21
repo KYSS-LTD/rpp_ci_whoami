@@ -24,12 +24,17 @@ public class PortalBridge : MonoBehaviour
 	// Уровень, который прислал портал. Пусто, пока старта не было.
 	public string LevelId { get; private set; } = "";
 
+	// Сохранённый JSON-блок игры. null, если портал ещё не прислал прогресс.
+	public string ProgressJson { get; private set; } = "null";
+
 	[Tooltip("Уровень для запуска в редакторе и вне портала: easy, medium или hard")]
 	[SerializeField] private string editorLevelId = "easy";
 
 #if UNITY_WEBGL && !UNITY_EDITOR
 	[DllImport("__Internal")] private static extern void PortalBridge_Init(string objectName);
 	[DllImport("__Internal")] private static extern string PortalBridge_GetLevelId();
+	[DllImport("__Internal")] private static extern string PortalBridge_GetProgressJson();
+	[DllImport("__Internal")] private static extern int PortalBridge_SaveProgressJson(string json);
 	[DllImport("__Internal")] private static extern int PortalBridge_Finish(double score, double maxScore, int completed);
 	[DllImport("__Internal")] private static extern void PortalBridge_Exit();
 	[DllImport("__Internal")] private static extern void PortalBridge_ReportError(string message);
@@ -71,6 +76,33 @@ public class PortalBridge : MonoBehaviour
 	{
 		LevelId = levelId;
 		OnStart?.Invoke(levelId);
+	}
+
+	// Вызывается из JavaScript при старте. Игровой код может разобрать ProgressJson и восстановить своё состояние.
+	public void HandlePortalProgress(string json)
+	{
+		ProgressJson = string.IsNullOrEmpty(json) ? "null" : json;
+	}
+
+	// Прочитать последний блок прогресса через веб-SDK.
+	public string GetProgressJson()
+	{
+#if UNITY_WEBGL && !UNITY_EDITOR
+		ProgressJson = PortalBridge_GetProgressJson();
+#endif
+		return string.IsNullOrEmpty(ProgressJson) ? "null" : ProgressJson;
+	}
+
+	// Сохранить JSON-блок игры (объект до 4096 байт UTF-8). Возвращает false, если данные неверны или мост недоступен.
+	public bool SaveProgressJson(string json)
+	{
+#if UNITY_WEBGL && !UNITY_EDITOR
+		return PortalBridge_SaveProgressJson(json ?? "null") == 1;
+#else
+		ProgressJson = json ?? "null";
+		Debug.Log("[PortalBridge] прогресс: " + ProgressJson);
+		return true;
+#endif
 	}
 
 	// Итог уровня. Нужно 0 <= score <= maxScore и maxScore > 0. Возвращает false, если результат не отправлен.

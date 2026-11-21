@@ -30,5 +30,6 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  // Cooking подключён готовой сборкой и собирается отдельно от портала.
+  "exclude": ["node_modules", "games/*/node_modules", "games/cooking/src", "games/cooking/vite.config.ts"]
 }
