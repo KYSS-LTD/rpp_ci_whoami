@@ -345,14 +345,12 @@
 }
 
 .stampTray {
-	position: absolute;
-	bottom: 0;
-	left: 12px;
+	position: relative;
+	grid-column: 1 / -1;
 	z-index: 800;
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
-	width: min(800px, calc(100% - 260px));
 	padding: 6px 10px 10px;
 	background: linear-gradient(#3a2d25, #2a201b);
 	border: 3px solid #15100c;
@@ -741,12 +739,12 @@
 
 /* ---------- Узкие экраны ---------- */
 
-@container desk (width <= 1120px) or (height < 620px) {
+@container desk (width > 1120px) and (height >= 620px) {
 	.stampTray {
-		position: relative;
-		left: auto;
-		width: 100%;
-		grid-column: 1 / -1;
+		position: absolute;
+		bottom: 0;
+		left: 12px;
+		width: min(800px, calc(100% - 260px));
 	}
 }
 

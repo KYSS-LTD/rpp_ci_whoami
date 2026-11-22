@@ -29,6 +29,7 @@ interface AppWindowProps {
 	activeSection: WindowSectionId;
 	formTitle: string | null;
 	messages: WindowMessage[];
+	feedback?: ReactNode;
 	open: boolean;
 	launcherRef: RefObject<HTMLButtonElement | null>;
 	returnFocusRef: RefObject<HTMLButtonElement | null>;
@@ -69,7 +70,7 @@ export function DirectorNotices({ notifications, hidden, onClose }: { notificati
 	);
 }
 
-export function AppWindow({ activeSection, formTitle, messages, open, launcherRef, returnFocusRef, onClose, children }: AppWindowProps) {
+export function AppWindow({ activeSection, formTitle, messages, feedback, open, launcherRef, returnFocusRef, onClose, children }: AppWindowProps) {
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
 	const [isMessagesOpen, setIsMessagesOpen] = useState(false);
 	const windowRef = useRef<HTMLElement>(null);
@@ -138,6 +139,7 @@ export function AppWindow({ activeSection, formTitle, messages, open, launcherRe
 							{formTitle ? <span className={`${styles.tab} ${styles.tabActive}`}>{formTitle}</span> : null}
 						</div>
 						<div className={styles.form}>{children}</div>
+						{feedback}
 
 						<section className={styles.messages} data-open={isMessagesOpen ? "true" : "false"} aria-label={windowTexts.messagesTitle}>
 							<button

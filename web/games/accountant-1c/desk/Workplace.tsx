@@ -51,13 +51,13 @@ function WorkClock({ startedAtMs }: { startedAtMs: number }) {
 
 // ---------- Замечания главбуха ----------
 
-function SlipStack() {
+function SlipStack({ inApp = false }: { inApp?: boolean }) {
 	const chrome = useLevelChrome();
 	const texts = accountantTexts.slips;
 	// Показываем последние три листка: старые уходят под низ стопки.
-	const visibleSlips = chrome.slips.slice(-3);
+	const visibleSlips = chrome.slips.slice(inApp ? -1 : -3);
 	return (
-		<aside className={styles.slips} aria-label={texts.regionLabel} hidden={visibleSlips.length === 0}>
+		<aside className={inApp ? styles.appSlips : styles.slips} aria-label={texts.regionLabel} hidden={visibleSlips.length === 0}>
 			<ul>
 				{visibleSlips.map((slip, index) => (
 					<li key={slip.id} className={styles.slip} style={{ "--slip-index": visibleSlips.length - 1 - index } as React.CSSProperties}>
@@ -160,7 +160,8 @@ export function Workplace({ booth, monitorSection, monitorTitle, monitor, desk, 
 
 						<div className={styles.monitorFrame}>
 							<AppWindow activeSection={monitorSection} formTitle={monitorTitle} messages={chrome.messages}
-								open={isAppOpen} launcherRef={launcherRef} returnFocusRef={returnFocusRef} onClose={() => setIsAppOpen(false)}>
+								open={isAppOpen} launcherRef={launcherRef} returnFocusRef={returnFocusRef} onClose={() => setIsAppOpen(false)}
+								feedback={isAppOpen ? <SlipStack inApp /> : null}>
 								{monitor}
 							</AppWindow>
 							<button ref={launcherRef} type="button" className={styles.monitorLauncher} data-tutorial-id="monitor" data-tutorial-switch
@@ -176,7 +177,7 @@ export function Workplace({ booth, monitorSection, monitorTitle, monitor, desk, 
 								{desk}
 								{rulebookTab ? <Rulebook defaultPosition={{ x: 850, y: 374 }} initialTab={rulebookTab} /> : null}
 								<Calculator defaultPosition={{ x: 830, y: 16 }} />
-								<SlipStack />
+								{!isAppOpen ? <SlipStack /> : null}
 							</div>
 						</DeskLayoutProvider>
 					</div>

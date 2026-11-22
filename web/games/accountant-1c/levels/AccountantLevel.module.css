@@ -35,10 +35,10 @@
 	color: var(--acc-accent);
 }
 
-.finalReport { max-block-size: calc(100% - 24px); overflow: auto; }
+.finalReport { grid-column: 1 / -1; }
 
-@container desk (width <= 1120px) or (height < 620px) {
-	.finalReport { grid-column: 1 / -1; max-block-size: none; overflow: visible; }
+@container desk (width > 1120px) and (height >= 620px) {
+	.finalReport { grid-column: auto; max-block-size: calc(100% - 24px); overflow: auto; }
 }
 
 .taskList {

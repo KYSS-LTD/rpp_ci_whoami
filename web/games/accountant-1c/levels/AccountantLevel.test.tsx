@@ -204,9 +204,15 @@ describe("рабочее место уровня", () => {
 		expect(slipText.indexOf(explanation.reason)).toBeLessThan(slipText.indexOf(explanation.joke));
 		fireEvent.click(within(slips).getByRole("button", { name: accountantTexts.slips.removeLabel }));
 		expect(within(slips).queryByText(/Правильно/)).toBeNull();
+		clickButton("fake-mistake");
 		clickButton(accountantTexts.window.open);
+		const appSlips = within(screen.getByTestId("accounting-window")).getByRole("complementary", { name: accountantTexts.slips.regionLabel });
+		const remove = within(appSlips).getByRole("button", { name: accountantTexts.slips.removeLabel });
+		expect(remove.closest("[inert]")).toBeNull();
+		fireEvent.click(remove);
+		expect(within(appSlips).queryByText(/Правильно/)).toBeNull();
 		const messages = screen.getByRole("region", { name: accountantTexts.window.messagesTitle });
-		expect(within(messages).getByText(/Правильно: Дт 60 Кт 51 на 18 000/)).toBeTruthy();
+		expect(within(messages).getAllByText(/Правильно: Дт 60 Кт 51 на 18 000/)).toHaveLength(2);
 	});
 
 	it("уведомления директора появляются, закрываются кнопкой и сами", () => {

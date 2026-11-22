@@ -308,10 +308,9 @@
 /* ---------- Бумага ---------- */
 
 .paper {
-	position: absolute;
-	top: clamp(var(--paper-edge), var(--y), calc(100% - var(--paper-height, 0px) - var(--paper-bottom)));
-	left: clamp(var(--paper-edge), var(--x), calc(100% - var(--paper-width, 240px) - var(--paper-edge)));
-	width: var(--paper-width, 240px);
+	position: relative;
+	width: 100%;
+	min-width: 0;
 	font-family: var(--mono);
 	font-size: 0.8rem;
 	line-height: 1.35;
@@ -321,7 +320,6 @@
 	box-shadow:
 		0 1px 0 var(--paper-shade),
 		4px 6px 0 rgb(0 0 0 / 0.28);
-	transform: rotate(var(--tilt, 0deg));
 	transition: box-shadow 0.15s;
 }
 
@@ -642,11 +640,11 @@
 /* ---------- Замечания ---------- */
 
 .slips {
-	position: absolute;
 	top: 0;
 	right: 240px;
 	z-index: 900;
-	width: 260px;
+	grid-column: 1 / -1;
+	grid-row: 1;
 	pointer-events: none;
 }
 
@@ -655,10 +653,8 @@
 }
 
 .slip {
-	position: absolute;
 	top: calc(var(--slip-index) * 14px);
 	left: calc(var(--slip-index) * -10px);
-	width: 260px;
 	padding: 6px 10px 8px;
 	font-family: var(--mono);
 	font-size: 0.78rem;
@@ -674,6 +670,23 @@
 
 .slip:not(:last-child) {
 	filter: brightness(0.92);
+}
+
+.appSlips {
+	flex: none;
+	max-block-size: 35dvh;
+	overflow: auto;
+	overscroll-behavior: contain;
+}
+
+.appSlips .slip {
+	position: static;
+	inline-size: 100%;
+	overflow-wrap: anywhere;
+}
+
+.workplace .appSlips .slipRemove {
+	min-block-size: 44px;
 }
 
 @keyframes slipPrint {
@@ -737,45 +750,22 @@
 
 /* ---------- Узкое рабочее место: всё столбиком ---------- */
 
-@container desk (width <= 1120px) or (height < 620px) {
-	.desk {
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		align-items: start;
-		align-content: start;
-		gap: 12px;
-		height: auto;
-		min-height: min(44dvh, 24rem);
-		padding: 12px;
-	}
-
-	.paper {
-		position: relative;
-		inset: auto;
-		width: 100%;
-		max-width: none;
-		min-width: 0;
-		transform: none;
-	}
-
-	.slips {
-		position: static;
-		grid-column: 1 / -1;
-		grid-row: 1;
-		width: 100%;
-	}
-
-	.slip {
-		position: static;
-		width: 100%;
-	}
-
-	.slip:not(:last-child) {
-		display: none;
-	}
+.desk {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	align-items: start;
+	align-content: start;
+	gap: 12px;
+	height: auto;
+	min-height: min(44dvh, 24rem);
+	padding: 12px;
 }
 
-@container desk (width >= 600px) and ((width <= 1120px) or (height < 620px)) {
+.slips .slip:not(:last-child) {
+	display: none;
+}
+
+@container desk (width >= 600px) {
 	.desk .paper[data-variant="device"] {
 		justify-self: end;
 		max-inline-size: 18rem;
@@ -791,13 +781,35 @@
 @container desk (width > 1120px) and (height >= 620px) {
 	.desk {
 		overflow: clip;
+		display: block;
+		padding: 0;
 	}
 
 	.desk:has(> [data-tutorial-id="stamp-tray"]) {
 		--paper-bottom: 8rem;
 	}
 
-	.paper[data-anchor-right="true"] {
+	.desk .paper {
+		position: absolute;
+		top: clamp(var(--paper-edge), var(--y), calc(100% - var(--paper-height, 0px) - var(--paper-bottom)));
+		left: clamp(var(--paper-edge), var(--x), calc(100% - var(--paper-width, 240px) - var(--paper-edge)));
+		width: var(--paper-width, 240px);
+		max-inline-size: none;
+		transform: rotate(var(--tilt, 0deg));
+	}
+
+	.slips {
+		position: absolute;
+		width: 260px;
+	}
+
+	.slips .slip {
+		display: block;
+		position: absolute;
+		width: 260px;
+	}
+
+	.desk .paper[data-anchor-right="true"] {
 		left: auto;
 		right: 16px;
 	}
