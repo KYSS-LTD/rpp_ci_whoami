@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { storageKeys, platformStorage } from "@/core/storage";
+import { hasCheckpoint, writeCheckpoint } from "@/core/progress/checkpoints";
 import { commonTexts } from "@/texts/common";
 import { gamesTexts } from "@/texts/games";
 import { landingTexts } from "@/texts/landing";
@@ -35,6 +36,12 @@ vi.mock("next/link", () => ({
 	),
 }));
 
+const router = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", async (importOriginal) => ({
+	...await importOriginal<typeof import("next/navigation")>(),
+	useRouter: () => router,
+}));
+
 const demoGame: GameManifest = {
 	gameId: "demo",
 	title: "Демо",
@@ -59,6 +66,7 @@ describe("лендинг", () => {
 describe("экран игр", () => {
 	beforeEach(() => {
 		platformStorage.clearProgress();
+		router.push.mockClear();
 	});
 
 	it("при пустом реестре показывает пустое состояние", () => {
@@ -101,6 +109,24 @@ describe("экран игр", () => {
 		fireEvent.click(screen.getByRole("button", { name: gamesTexts.playLevel }));
 		fireEvent.click(screen.getByRole("button", { name: gamesTexts.sheetClose }));
 		expect(screen.queryByRole("dialog")).toBeNull();
+	});
+
+	it.each(["cancel", "resume", "reset"])("обрабатывает выбор для сохранения: %s", (choice) => {
+		writeCheckpoint("demo", "medium", "run", { step: 3 });
+		writeCheckpoint("demo", "medium", "training", { step: 2 });
+		writeCheckpoint("demo", "hard", "run", { step: 5 });
+		render(<GamesList games={[demoGame]} />);
+		fireEvent.click(screen.getByRole("button", { name: gamesTexts.playLevel }));
+		fireEvent.click(screen.getByRole("button", { name: commonTexts.levelContinue }));
+
+		const dialog = screen.getByRole<HTMLDialogElement>("dialog", { name: commonTexts.savedRunTitle });
+		expect(router.push).not.toHaveBeenCalled();
+		const submitter = dialog.querySelector<HTMLButtonElement>(`button[value="${choice}"]`)!;
+		fireEvent(submitter.form!, new SubmitEvent("submit", { bubbles: true, cancelable: true, submitter }));
+		expect(router.push.mock.calls).toEqual(choice === "cancel" ? [] : [["/games/demo/medium"]]);
+		expect(hasCheckpoint("demo", "medium")).toBe(choice !== "reset");
+		expect(hasCheckpoint("demo", "hard")).toBe(true);
+		expect(screen.getByRole("dialog", { name: "Демо" })).toBeTruthy();
 	});
 
 	it("фильтрует ленту по формату игры", () => {

@@ -1,5 +1,8 @@
 import * as THREE from 'three';
-import { create_BoughGeometry, create_Lighting, pine_Material, seeded_Random } from './coast.js';
+import { create_BoughGeometry, pine_Material, seeded_Random } from './coast.js';
+import { create_FlightAtmosphere } from './atmosphere.js';
+import { create_Landscape } from './landscape.js';
+import { batch_Scenery } from './scenery-batches.js';
 import { box, cylinder, group, ring } from './models.js';
 import { text } from './text.js';
 
@@ -66,6 +69,18 @@ function add_Terrain(scene, waypoints, race) {
 		normalMap: ground_Texture(new URL('./assets/field-grass-normal.webp', import.meta.url).href, 92, THREE.NoColorSpace),
 		normalScale: new THREE.Vector2(.6, .6), vertexColors: true, roughness: .94,
 	}));
+	land.material.onBeforeCompile = shader => {
+		shader.vertexShader = 'varying vec2 meadow;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n meadow = position.xz;');
+		shader.fragmentShader = 'varying vec2 meadow;\n' + shader.fragmentShader.replace('#include <map_fragment>', `
+			#include <map_fragment>
+			float luma = dot(diffuseColor.rgb, vec3(.22,.68,.10));
+			float variation = sin(meadow.x*.27 + sin(meadow.y*.13)) * cos(meadow.y*.21 + meadow.x*.08);
+			diffuseColor.rgb = mix(diffuseColor.rgb, luma * vec3(.78,1.23,.60), .66 + variation*.18);
+			float lane = abs(meadow.x + 36. + 6. * sin(meadow.y*.025));
+			float wheel = 1. - smoothstep(.16,.47,abs(lane - .91) + variation*.08);
+			diffuseColor.rgb = mix(diffuseColor.rgb, (.07+luma*.8)*vec3(1.25,.99,.68), wheel*.88);
+		`);
+	};
 	land.receiveShadow = true;
 	scene.add(land);
 }
@@ -282,7 +297,7 @@ function add_Gate(scene, x, z, height, width, yaw, index, race, finish) {
 	return { x, y, z, height, width, yaw, label: String(index + 1) };
 }
 
-export function gate_Crossing(gate, previous, position) {
+export function gate_Crossing(gate, previous, position, heightOffset = 0) {
 	const sine = Math.sin(gate.yaw);
 	const cosine = Math.cos(gate.yaw);
 	const before = (previous.x - gate.x) * sine + (previous.z - gate.z) * cosine;
@@ -291,21 +306,83 @@ export function gate_Crossing(gate, previous, position) {
 	const t = before / (before - after);
 	const x = THREE.MathUtils.lerp(previous.x, position.x, t) - gate.x;
 	const z = THREE.MathUtils.lerp(previous.z, position.z, t) - gate.z;
-	const y = THREE.MathUtils.lerp(previous.y, position.y, t) - gate.y;
+	const y = THREE.MathUtils.lerp(previous.y, position.y, t) - gate.y + heightOffset;
 	return Math.abs(x * cosine - z * sine) < gate.width / 2 - .15 && y > .4 && y < gate.height - .16;
+}
+
+function add_PracticeLandscape(scene, waypoints, obstacles, race) {
+	const land = create_Landscape(scene, elevation, race ? 3209 : 475);
+	const random = seeded_Random(race ? 542 : 714);
+	const occupied = [];
+	const clear = (x,z,r) => route_Distance(x,z,waypoints) > r + (race ? 4.9 : 5.8)
+		&& Math.hypot(x-home.x,z-home.z) > r + 6
+		&& obstacles.every(o => Math.hypot(o.x-x,o.z-z) > r + (o.radius ?? Math.hypot(o.width,o.depth)))
+		&& occupied.every(o => Math.hypot(o.x-x,o.z-z) > r+o.r);
+	// У изгородей оставлены разрывы. Соседние луга и каменные коридоры доступны из основной трассы.
+	const fences = race ? [
+		[-9,18,-9,-5], [11,17,12,2], [25,-7,38,-28], [45,-37,50,-52], [48,-61,39,-74],
+		[9,-42,0,-55], [-4,-57,-14,-67], [-30,-78,-44,-90], [-48,-99,-49,-122], [0,-160,12,-181],
+		[38,31,69,29], [73,23,71,-4], [-23,45,-58,38], [-65,32,-70,5], [49,-128,78,-144],
+	] : [
+		[-12,15,-14,-1], [-16,-9,-25,-25], [-29,-32,-48,-35], [12,18,15,0], [16,-5,32,-14],
+		[40,-19,61,-25], [68,-29,73,-53], [70,-61,47,-68], [37,-69,24,-64],
+		[-24,36,-55,39], [-62,37,-72,16], [-73,8,-70,-15], [-50,-75,-47,-104],
+		[-43,-112,-21,-130], [23,-98,50,-108], [56,-113,76,-133], [1,-158,30,-161],
+	];
+	for (const [x,z,xx,zz] of fences) {
+		const n = Math.ceil(Math.hypot(xx-x,zz-z)/3);
+		// Проверяем весь пролёт, включая повороты рядом с воротами.
+		const posts = Array.from({length:n+1}, (_,i) => ({x:x+(xx-x)*i/n, z:z+(zz-z)*i/n}));
+		if (posts.some(p => route_Distance(p.x,p.z,waypoints) < 4.8)) continue;
+		land.fence(x,z,xx,zz, race ? 1.42 : 1.64);
+		for (const p of posts) occupied.push({...p,r:.32});
+	}
+	const groves = race ? [
+		[-18,8,12], [20,1,8], [-3,-27,12], [49,-27,9], [54,-55,13], [16,-51,10],
+		[-10,-69,11], [-39,-83,13], [5,-101,14], [-52,-122,13], [-19,-141,11],
+		[11,-124,12], [35,-158,13], [-57,-29,16], [81,-104,15], [-71,39,13], [47,50,17],
+	] : [
+		[-20,5,10], [24,4,9], [5,-21,8], [-29,-35,11], [30,-51,14], [-17,-67,11],
+		[-63,-46,17], [57,11,16], [56,-91,17], [-46,-99,16], [6,-117,16],
+		[-39,-154,18], [35,-160,15], [-55,52,15], [21,47,14], [83,-148,15],
+	];
+	for (const [cx,cz,spread] of groves) {
+		for (let i=0; i<24; i++) {
+			const angle=random()*Math.PI*2, d=Math.sqrt(random())*spread;
+			const x=cx+Math.cos(angle)*d, z=cz+Math.sin(angle)*d;
+			const oak = random() < (race ? .42 : .22), h = (oak ? 6.7 : 6.1) + random()*5;
+			const r = h*(oak ? .34 : .24);
+			if (!clear(x,z,r)) continue;
+			land.tree(x,z,h,oak ? 'oak' : 'birch');
+			occupied.push({x,z,r:r*.70});
+		}
+	}
+	const outcrops = race ? [[-13,1],[8,-26],[45,-39],[1,-64],[-32,-82],[-50,-107],[-10,-134],[37,-156],[-50,44],[51,-96]]
+		: [[17,9],[-22,-14],[21,-36],[-5,-58],[33,-82],[-52,-80],[48,36],[-18,-114],[16,-146]];
+	for (const [cx,cz] of outcrops) {
+		for (let i=0;i<15;i++) {
+			const x=cx+(random()-.5)*13, z=cz+(random()-.5)*11;
+			const w=1.1+random()**2*4.7;
+			if (!clear(x,z,w*.40)) continue;
+			land.rock(x,z,w, w*(.27+random()*.39),w*(.58+random()*.38),random()*6);
+		}
+	}
+	for (const [x,z,xx,zz] of (race ? [[-19,3,-13,-4],[40,-49,46,-53],[-47,-101,-39,-102],[7,-134,13,-139],[-66,11,-58,16]]
+		: [[17,-18,24,-20],[-22,-58,-16,-53],[32,-97,42,-100],[-57,10,-63,18],[-20,-132,-12,-136]])) {
+		land.log(x,z,xx,zz,.32 + random()*.22);
+	}
+	for (let i=0;i<2300;i++) {
+		const x=-100+200*random(), z=-182+246*random();
+		if (route_Distance(x,z,waypoints)<4 || Math.abs(x+36+6*Math.sin(z*.025))<1.6) continue;
+		for (let j=0;j<3;j++) land.grass(x+random()*1.5,z+random()*1.5,.63+random()*.80);
+	}
+	land.finish();
+	return land;
 }
 
 export function create_Field(race) {
 	const scene = new THREE.Scene();
-	scene.background = new THREE.Color(0xadcad8);
-	scene.fog = new THREE.FogExp2(0xafc5c6, .005);
-	const sky = new THREE.TextureLoader().load(new URL('./assets/clouds.jpg', import.meta.url).href);
-	sky.mapping = THREE.EquirectangularReflectionMapping;
-	sky.colorSpace = THREE.SRGBColorSpace;
-	scene.background = sky;
-	const sun = create_Lighting(scene, 88);
-	sun.shadow.autoUpdate = false;
-	sun.shadow.needsUpdate = true;
+	const sun = create_FlightAtmosphere(scene, race ? 'race' : 'field');
 	const course = race ? courses.race : courses.field;
 	const waypoints = [[home.x, home.z], ...course];
 	add_Terrain(scene, waypoints, race);
@@ -319,17 +396,20 @@ export function create_Field(race) {
 		? [[-8, -28], [-10, -28], [30, -57], [28, -57], [5, -88], [7, -88], [-38, -118], [-40, -118]]
 		: [[15, 1], [18, 4], [-18, -17], [-19, -19], [26, -34], [28, -41], [-21, -65], [-25, -62], [6, -81], [4, -83]], obstacles);
 	add_FieldLandmarks(scene, obstacles, waypoints, race);
+	const land = add_PracticeLandscape(scene, waypoints, obstacles, race);
 	const pad = group(scene, home.x, .02, home.z);
 	cylinder(pad, 0x4a5450, padSize, padSize + .06, .14, 0, .03, 0, 36);
 	ring(pad, 0xe6debd, padSize - .22, .045, 0, .105, 0);
 	for (const side of [-1, 1]) box(pad, 0xe6debd, .17, .025, 1.6, side * .49, .105);
 	box(pad, 0xe6debd, .81, .025, .17, 0, .105);
 	const gates = course.map((gate, index) => add_Gate(scene, ...gate, index, race, race && index === course.length - 1));
+	batch_Scenery(scene);
 	const onPad = (x, z) => Math.hypot(x - home.x, z - home.z) <= padSize;
 	return {
 		scene, sun, gates, limits: bounds, base: home, padRadius: padSize, onPad,
 		flightGround: (x, z) => elevation(x, z) + (onPad(x, z) ? .12 : 0),
 		touchesTree(x, y, z) {
+			if (land.touches(x,y,z)) return true;
 			if (obstacles.some(obstacle => {
 				const dx = Math.abs(x - obstacle.x), dz = Math.abs(z - obstacle.z);
 				if (obstacle.radius ? Math.hypot(dx, dz) > obstacle.radius : dx > obstacle.width || dz > obstacle.depth) return false;

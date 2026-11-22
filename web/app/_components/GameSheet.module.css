@@ -321,7 +321,8 @@
 	flex-wrap: wrap;
 }
 
-.actions a {
+.actions > a,
+.actions > button {
 	flex: 1;
 	min-height: 52px;
 	text-align: center;

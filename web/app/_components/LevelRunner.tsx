@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { gameRegistry } from "@/core/registry";
 import { readGameProgress, recordLevelResult, recordPracticeResult, saveGameProgress } from "@/core/progress";
-import { defaultCheckpointSlot, hasCheckpoint, readCheckpoints, writeCheckpoint } from "@/core/progress/checkpoints";
+import { defaultCheckpointSlot, readCheckpoints, writeCheckpoint } from "@/core/progress/checkpoints";
 import type { LevelResult } from "@/core/contract/types";
 import { achievementDefinitions, type AwardedAchievement } from "@/core/achievements";
 import { commonTexts } from "@/texts/common";
@@ -14,6 +14,8 @@ import { uavTexts } from "@/games/uav-operator/texts";
 import { IframeLevel } from "./IframeLevel";
 import { LevelErrorBoundary } from "./LevelErrorBoundary";
 import { ResultDiploma } from "./ResultDiploma";
+import { SavedRunButton } from "./SavedRunButton";
+import { has_SavedRun } from "./savedRun";
 import styles from "./LevelRunner.module.css";
 import ui from "./ui.module.css";
 
@@ -78,7 +80,13 @@ export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
 	}
 
 	if (hasExitedWithoutResult) {
-		const saved = !isSaveFailed && hasCheckpoint(gameId, levelId);
+		const saved = has_SavedRun(gameId, levelId);
+		function relaunch_Level() {
+			setIsSaveFailed(false);
+			setHasExitedWithoutResult(false);
+			setLaunchNumber((number) => number + 1);
+		}
+
 		return (
 			<section className={`${ui.card} ${styles.result}`} data-completed="false">
 				<span className={styles.badge} aria-hidden="true" />
@@ -87,16 +95,9 @@ export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
 					? <p role="alert" className={styles.error}>{commonTexts.levelSaveError}</p>
 					: <p className={styles.message}>{saved ? commonTexts.levelPausedBody : commonTexts.levelExitedBody}</p>}
 				<div className={styles.actions}>
-					<button
-						type="button"
-						onClick={() => {
-							setIsSaveFailed(false);
-							setHasExitedWithoutResult(false);
-							setLaunchNumber((number) => number + 1);
-						}}
-					>
-						{saved ? commonTexts.levelContinue : commonTexts.levelRetry}
-					</button>{" "}
+					{saved
+						? <SavedRunButton gameId={gameId} route={levelId} onLaunch={relaunch_Level} />
+						: <button type="button" onClick={relaunch_Level}>{commonTexts.levelRetry}</button>}
 					<Link href="/games" className="button-primary">
 						{commonTexts.backToGames}
 					</Link>

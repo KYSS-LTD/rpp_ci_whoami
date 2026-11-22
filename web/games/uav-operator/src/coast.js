@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { box, cylinder, group, ring, palette, create_Drone } from './models.js';
+import { create_FlightAtmosphere } from './atmosphere.js';
+import { create_Landscape } from './landscape.js';
+import { batch_Scenery } from './scenery-batches.js';
 
 export const base = { x: -15, z: 37, label: 'H' };
 export const padRadius = 4.4;
@@ -52,12 +55,12 @@ export function beach_Texture(repeatX, repeatY) {
 }
 
 function create_Terrain(scene) {
-	const geometry = new THREE.PlaneGeometry(320, 370, 128, 136);
+	const geometry = new THREE.PlaneGeometry(320, 690, 128, 244);
 	geometry.rotateX(-Math.PI / 2);
 	const position = geometry.attributes.position;
 	const colors = [];
-	const sand = new THREE.Color(0xe8c897);
-	const wet = new THREE.Color(0xcda77b);
+	const sand = new THREE.Color(0xf3dbab);
+	const wet = new THREE.Color(0xc3af96);
 	const scrub = new THREE.Color(0x88a27b);
 	const forest = new THREE.Color(0x4f815d);
 	const random = seeded_Random(21);
@@ -75,12 +78,20 @@ function create_Terrain(scene) {
 	geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 	geometry.computeVertexNormals();
 	const terrain = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, map: beach_Texture(65, 74) }));
+	terrain.material.map.repeat.y = 144;
+	terrain.material.onBeforeCompile = shader => {
+		shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `
+			#include <map_fragment>
+			float grain = dot(diffuseColor.rgb,vec3(.25,.62,.13));
+			diffuseColor.rgb = vec3(.18 + .80 * grain) * vec3(1.05,1.,.94);
+		`);
+	};
 	terrain.receiveShadow = true;
 	scene.add(terrain);
 }
 
 function create_Sea(scene) {
-	const uniforms = { time: { value: 0 } };
+	const uniforms = { time: { value: 0 }, sky: { value: scene.background }, skyTurn: { value: scene.backgroundRotation.y } };
 	const material = new THREE.ShaderMaterial({ uniforms, vertexShader: `
 		varying vec2 world;
 		void main() {
@@ -89,25 +100,33 @@ function create_Sea(scene) {
 			gl_Position = projectionMatrix * viewMatrix * point;
 		}`, fragmentShader: `
 		uniform float time;
+		uniform float skyTurn;
+		uniform sampler2D sky;
 		varying vec2 world;
 		void main() {
 			float shore = 13.0 + 6.0 * cos(world.y * .044) - 6.0 * sin(world.y * .069);
 			float depth = world.x - shore;
 			vec3 view = normalize(cameraPosition - vec3(world.x, 0.0, world.y));
-			float swell = sin(dot(world, vec2(.7, .23)) + time * 1.05);
-			float chop = sin(dot(world, vec2(1.72, -.69)) - time * 1.9 + swell * .44);
-			float ripples = sin(dot(world, vec2(3.19, .82)) + time * 2.2 + chop * .7);
+			float swell = sin(dot(world, vec2(.58, .19)) + time * 1.05 + .9*sin(world.y*.16));
+			float chop = sin(dot(world, vec2(1.72, -.69)) - time * 1.9 + swell * 1.4);
+			float ripples = sin(dot(world, vec2(3.19, .82)) + time * 2.2 + chop * 1.6);
 			float range = distance(world, cameraPosition.xz);
 			float detail = 1.0 - smoothstep(40.0, 185.0, range);
-			vec3 normal = normalize(vec3(.09 * swell + .07 * chop, 1.0, .09 * chop + .046 * ripples));
+			vec3 normal = normalize(vec3((.064 * swell + .047 * chop)*detail, 1.0, (.060 * chop + .036 * ripples)*detail));
 			float fresnel = .07 + .85 * pow(1.0 - clamp(dot(view, normal), 0.0, 1.0), 4.0);
-			vec3 col = mix(vec3(.22, .36, .28), vec3(.013, .095, .115), smoothstep(-1.0, 46.0, depth));
-			vec3 reflected = mix(vec3(.14, .25, .34), vec3(.36, .47, .51), smoothstep(16.0, 240.0, range));
-			col = mix(col, reflected, fresnel) + detail * (.010 * ripples + .016 * chop);
+			float shoal = .5 + .5*sin(world.x*.48 + sin(world.y*.31)*2.)*cos(world.y*.43);
+			vec3 col = mix(mix(vec3(.22,.49,.37),vec3(.17,.40,.30),shoal), vec3(.012,.13,.16), smoothstep(-1.0, 32.0, depth+shoal*3.));
+			vec3 reflectedDir = reflect(-view, normal);
+			vec2 skyUv = vec2(.5 + (atan(reflectedDir.z,reflectedDir.x) + skyTurn)/6.2831853, .5 + asin(clamp(reflectedDir.y,.0,1.))/3.14159);
+			vec3 reflected = texture2D(sky, vec2(fract(skyUv.x),skyUv.y), 2.).rgb;
+			col = mix(col, reflected*.80, fresnel) + detail * (.005 * ripples + .007 * chop);
+			float glint = pow(max(dot(reflect(-normalize(vec3(-.83,.95,-.45)),normal),view),0.),64.);
+			col += vec3(1.,.82,.55) * glint * .8 * detail;
 			float surf = sin(depth * 1.11 + time * 1.35 + .44 * sin(world.y * .48) + .24 * chop);
 			float foam = smoothstep(.84, 1.0, surf) * (1.0 - smoothstep(1.0, 12.0, depth));
 			foam *= smoothstep(-.68, .75, ripples * .55 + swell * .62) * detail;
 			col = mix(col, vec3(.76, .82, .76), clamp(foam * .51 + .48 * exp(-abs(depth - .24 + .17 * chop) * 3.1), 0.0, 1.0));
+			col = mix(col,vec3(.48,.63,.66),smoothstep(150.,420.,range));
 			gl_FragColor = vec4(col, 1.0);
 			#include <tonemapping_fragment>
 			#include <colorspace_fragment>
@@ -219,9 +238,9 @@ function create_Vegetation(scene) {
 	const cells = new Map();
 	const cellSize = 23;
 	const cellId = (x, z) => Math.floor(x / cellSize) + ':' + Math.floor(z / cellSize);
-	for (let index = 0; index < 5800; index++) {
+	for (let index = 0; index < 3400; index++) {
 		const z = random() * 368 - 184;
-		const margin = 18 + Math.cos(z * .071) * 7 + Math.sin(z * .031) * 5;
+		const margin = 43 + Math.cos(z * .071) * 10 + Math.sin(z * .031) * 7;
 		const x = shore(z) - margin - random() ** 1.28 * 138;
 		const launchPath = x > base.x - 2 && Math.abs(z - base.z + (x - base.x) * .55) < 7;
 		if (x < -157 || launchPath || Math.hypot(x - base.x, z - base.z) < 8 || site_Distance(x, z) < 5 ||
@@ -308,6 +327,58 @@ function create_Vegetation(scene) {
 		}
 		return false;
 	};
+}
+
+function add_Dunes(scene) {
+	const land = create_Landscape(scene, terrain_Height, 1459);
+	const random = seeded_Random(837);
+	const safe = (x,z,r) => site_Distance(x,z)>4+r && sectors.every(p=>Math.hypot(x-p.x,z-p.z)>10+r)
+		&& Math.hypot(x-5,z+54)>3+r
+		&& !(x>base.x-1 && Math.abs(z-base.z+(x-base.x)*.55)<4+r)
+		&& !(Math.abs(z-25)<3+r && x>shore(25)-1);
+	const trees = [];
+	for (const [cx,cz,spread] of [[-35,78,12],[-26,59,8],[-35,17,13],[-15,4,10],[-37,-24,12],
+		[-25,-50,10],[-12,-70,10],[-24,-94,12],[-29,-124,12],[-19,-156,10],[-27,99,8]]) {
+		for (let i=0;i<25;i++) {
+			const a=random()*Math.PI*2, d=Math.sqrt(random())*spread;
+			const x=cx+Math.cos(a)*d, z=cz+Math.sin(a)*d;
+			const h=4.8+random()*4.8, r=h*.29;
+			if (!safe(x,z,r) || shore(z)-x<12 || trees.some(t=>Math.hypot(t.x-x,t.z-z)<r+t.r)) continue;
+			land.tree(x,z,h,random()<.52?'birch':'oak');
+			trees.push({x,z,r:r*.7});
+		}
+	}
+	// Изгороди повторяют край дюн. Между секциями есть сквозные проходы с песка в рощи.
+	for (const [start,end,inset] of [[-159,-148,18],[-127,-114,18],[-107,-93,17],[-88,-70,17],
+		[-66,-56,20],[-48,-38,18],[-15,2,18],[7,16,18],[45,58,17],[88,101,18]]) {
+		for (let z=start;z<end;z+=6) {
+			const next=Math.min(z+6,end), x=shore(z)-inset, xx=shore(next)-inset;
+			if (safe(x,z,.5)&&safe(xx,next,.5)&&safe((x+xx)/2,(z+next)/2,.5)) land.fence(x,z,xx,next,1.32);
+		}
+	}
+	for (const [z,inset] of [[-149,1],[-113,6],[-83,-1],[-60,7],[-11,3],[3,0],[54,6],[93,4]]) {
+		const cx=shore(z)-inset;
+		for (let i=0;i<13;i++) {
+			const x=cx+(random()-.5)*10, zz=z+(random()-.5)*13;
+			const w=.6+random()**1.55*3.1;
+			if (safe(x,zz,w*.5)) land.rock(x,zz,w,w*(.21+random()*.34),w*(.63+random()*.5),random()*6);
+		}
+	}
+	for (const z of [-153,-119,-85,-42,-13,12,56,94]) {
+		const x=shore(z)-7.5;
+		if (safe(x,z,2.9)) land.log(x-1.6,z-2.2,x+1.4,z+2.6,.27+random()*.18);
+	}
+	const archX=shore(8)+1;
+	land.rock(archX,4.8,3.7,4.5,4.6,-.12);
+	land.rock(archX,11.4,4.1,4.4,4.2,.25);
+	land.rock(archX,8,3.25,1.24,9.2,0,4.45);
+	for (let i=0;i<1850;i++) {
+		const z=-172+283*random(), x=shore(z)-7-31*random();
+		if (!safe(x,z,.2)) continue;
+		for (let clump=0;clump<3;clump++) land.grass(x+random()*.9,z+random(),.59+random()*1.07);
+	}
+	land.finish();
+	return land;
 }
 
 function create_Lighthouse(scene) {
@@ -411,23 +482,16 @@ export function create_Lighting(scene, span = 42) {
 
 export function create_Coast() {
 	const scene = new THREE.Scene();
-	scene.background = new THREE.Color(0x9accbe);
-	new THREE.TextureLoader().load(new URL('./assets/clouds.jpg', import.meta.url).href, panorama => {
-		panorama.mapping = THREE.EquirectangularReflectionMapping;
-		panorama.colorSpace = THREE.SRGBColorSpace;
-		scene.background = panorama;
-	});
-	scene.fog = new THREE.FogExp2(0xb6caca, .005);
-	const sun = create_Lighting(scene, 69);
-	// Декорации стоят на месте, поэтому карту теней достаточно построить один раз.
-	sun.shadow.autoUpdate = false;
-	sun.shadow.needsUpdate = true;
+	const sun = create_FlightAtmosphere(scene, 'beach');
 	create_Terrain(scene);
 	const seaTime = create_Sea(scene);
-	const touchesTree = create_Vegetation(scene);
+	const pines = create_Vegetation(scene);
+	const dunes = add_Dunes(scene);
+	const touchesTree = (x,y,z) => dunes.touches(x,y,z) || pines(x,y,z);
 	create_Lighthouse(scene);
 	create_Station(scene);
 	create_SectorDetails(scene);
+	batch_Scenery(scene);
 	const fieldDrone = create_Drone(scene);
 	fieldDrone.drone.traverse(object => { object.castShadow = false; });
 	return { scene, fieldDrone, seaTime, touchesTree, sun };

@@ -60,13 +60,14 @@ export function bind_Joystick(root, zone, signal) {
 	return { vector, reset };
 }
 
-export function bind_FlightInputs(attitudeStick, throttleStick, { action, toggleMap, restart, toggleCamera, menu, bindings, blocked, signal, showAxes }) {
+export function bind_FlightInputs(attitudeStick, throttleStick, { action, land, toggleMap, restart, toggleCamera, menu, bindings, blocked, signal, showAxes }) {
 	const keys = new Set();
 	window.addEventListener('keydown', event => {
 		if (event.altKey || event.ctrlKey || event.metaKey) return;
 		if (event.target instanceof Element && event.target.closest('input, select, textarea, [contenteditable="true"]')) return;
 		const hotkey = event.code === bindings.menu ? menu : event.code === bindings.restart ? restart : blocked() ? null
-			: event.code === bindings.map ? toggleMap : event.code === bindings.action ? action : event.code === 'KeyV' ? toggleCamera : null;
+			: event.code === bindings.map ? toggleMap : event.code === bindings.action ? action
+				: event.code === 'KeyV' ? toggleCamera : event.code === 'KeyH' ? land : null;
 		if (hotkey) {
 			if (['Space', 'Enter'].includes(event.code) && event.target instanceof Element && event.target.closest('button, a, summary')) return;
 			event.preventDefault();

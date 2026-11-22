@@ -35,7 +35,11 @@ export function readCheckpoints(gameId: string, route: string, storage: Platform
 }
 
 export function hasCheckpoint(gameId: string, route: string, storage: PlatformStorage = platformStorage): boolean {
-	return storage.list(checkpointPrefix(gameId, route)).length > 0;
+	return Object.keys(readCheckpoints(gameId, route, storage)).length > 0;
+}
+
+export function clear_Checkpoints(gameId: string, route: string, storage: PlatformStorage = platformStorage): boolean {
+	return storage.list(checkpointPrefix(gameId, route)).every((key) => storage.remove(key));
 }
 
 export function writeCheckpoint(gameId: string, route: string, slot: string, data: Checkpoint | null, storage: PlatformStorage = platformStorage): boolean {

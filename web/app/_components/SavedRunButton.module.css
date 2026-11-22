@@ -1,0 +1,39 @@
+.dialog {
+	width: min(440px, calc(100% - 32px));
+	max-height: calc(100% - 32px);
+	margin: auto;
+	padding: 24px;
+	overflow-y: auto;
+	color: var(--color-text);
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-large);
+	box-shadow: var(--shadow-raised);
+}
+
+.dialog:modal {
+	overscroll-behavior: contain;
+}
+
+.dialog::backdrop {
+	overflow: hidden;
+	overscroll-behavior: contain;
+	background: rgb(8 20 14 / 0.6);
+}
+
+.dialog p {
+	margin-top: 12px;
+	color: var(--color-text-muted);
+}
+
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 16px;
+}
+
+.actions button {
+	flex: 1 1 auto;
+	min-height: 44px;
+}

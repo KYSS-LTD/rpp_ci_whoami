@@ -70,7 +70,8 @@ function draw_Map(context, x, z, heading, scanned, { limits, points, beach }) {
 export function start_Flight({ mount, coast, renderer, signal, settings, restart, attempts, onLaunch, sound, restarting, logAction, practice, resetMessage, freeMode, storyCamera, onCameraChange, restoredState }) {
 	const copy = text.flight;
 	const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
-	const beach = !practice || practice.map === 'beach';
+	const story = !practice;
+	const beach = story || practice.map === 'beach';
 	const race = practice?.map === 'race';
 	const field = beach ? null : create_Field(race);
 	const world = field ?? coast;
@@ -103,7 +104,8 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	const stabilized = profile.mode === 'assisted';
 	const trainer = profile.mode === 'angle';
 	const modeLabel = copy.osdModes[profile.mode];
-	const keys = stabilized ? copy.keys : trainer ? copy.angleKeys : copy.acroKeys;
+	const controlKeys = stabilized ? copy.keys : trainer ? copy.angleKeys : copy.acroKeys;
+	const keys = story ? `${controlKeys} ${copy.storyLandKey}` : controlKeys;
 	const sticks = stabilized ? copy.joysticks : trainer ? copy.angleSticks : copy.acroSticks;
 	const acro = create_Acro(trainer, kit);
 	const damage = create_Damage(kit.mass, kit.guards);
@@ -304,7 +306,8 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	frame.dataset.camera = cameraSelect.value;
 	cameraSelect.addEventListener('change', () => select_Camera(cameraSelect.value), { signal });
 	const flightInputs = bind_FlightInputs(attitudeStick, throttleStick, {
-		action: perform_Action, toggleMap: toggle_Map, restart: request_Restart, toggleCamera: () => select_Camera(chase ? 'fpv' : 'chase'),
+		action: perform_Action, land: story ? attempt_Landing : undefined, toggleMap: toggle_Map,
+		restart: request_Restart, toggleCamera: () => select_Camera(chase ? 'fpv' : 'chase'),
 		menu: () => { if (!resetting) toggle_StageMenu(); },
 		bindings: flightPreferences.bindings, blocked: () => resetting || stage_OverlayOpen(), signal,
 		showAxes(axes) {
@@ -413,12 +416,13 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		}
 	}
 	function attempt_Landing() {
-		if (resetting || signalLost || landed || landing || damage.disabled || !armed || on_Ground()) return;
-		if (!stabilized) return show_Message(beach ? copy.manualLand : text.free.gateHint);
-		if (beach && distance(base) > padRadius) return show_Message(copy.badLand, 'warn');
-		if (motion.height > profile.landHeight) return show_Message(copy.lower, 'warn');
+		if (resetting || signalLost || landed || landing || damage.disabled || battery === 0 || !armed || on_Ground()) return;
+		if (!story && !stabilized) return show_Message(beach ? copy.manualLand : text.free.gateHint);
+		if (beach && !onPad(motion.x, motion.z)) return show_Message(copy.badLand, 'warn');
+		if (!story && motion.height > profile.landHeight) return show_Message(copy.lower, 'warn');
+		if (story) acro.reset(motion.heading);
 		landing = true;
-		show_Message(beach ? copy.landing : copy.descending, 'success');
+		show_Message(story ? copy.storyLanding : beach ? copy.landing : copy.descending, 'success');
 	}
 
 	const on_Ground = () => motion.height <= groundHeight + .001;
@@ -453,12 +457,20 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	}, { once: true });
 	viewer.addEventListener('close', flightInputs.reset, { signal });
 	function update_Motion(delta, axes) {
-		if (!armed || signalLost) return;
+		if (!armed || signalLost || (story && landed)) return;
 		const powered = !damage.disabled && battery > 0;
 		const wasOnGround = on_Ground();
 		let impact = 0;
 		let upright = 1;
-		if (!stabilized) {
+		// Над H автоматика гасит инерцию и ведёт дрон вертикально до мягкого касания.
+		if (story && landing && (!powered || !onPad(motion.x, motion.z))) landing = false;
+		if (story && landing) {
+			const descentSpeed = Math.min(2.4, .6 + (motion.height - groundHeight) * .7);
+			motion.vx = motion.vz = motion.vy = 0;
+			motion.height = Math.max(groundHeight, motion.height - descentSpeed * delta);
+			motion.y = groundAt(motion.x, motion.z) + motion.height;
+			battery = acro.power(delta * profile.drain, .48);
+		} else if (!stabilized) {
 			impact = acro.update(delta, motion, axes, Number(filter.value), groundAt, damage, powered);
 			if (powered) battery = acro.power(delta * profile.drain, acro.throttle);
 			upright = impact > 0 ? acro.impactUpright : 1 - 2 * (acro.attitude.x ** 2 + acro.attitude.z ** 2);
@@ -721,7 +733,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 				stateText.textContent = signalLost ? copy.osdFail : damage.disabled ? copy.disabled : !armed ? copy.osdSafe : battery <= 22 ? copy.osdLow
 					: grounded && cameraSettled ? (hasLifted ? copy.osdLanded : copy.osdArmed) : '';
 				disarmButton.hidden = !armed || signalLost || !on_Ground();
-				landButton.hidden = !stabilized || !powered || landing || landed || on_Ground();
+				landButton.hidden = (!story && !stabilized) || !powered || landing || landed || on_Ground();
 				if (!signalLost && (damage.disabled || battery === 0)) set_Action(copy.retry);
 			}
 			flash = Math.max(0, flash - delta);
@@ -731,7 +743,9 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			if (videoLoss > .16) set_Status(copy.edge, 'warn');
 			else if (!stabilized && !hasLifted) set_Status(copy.liftAcro);
 			else if (!beach) set_Status(nextGate < sectors.length ? text.free.gateHint : '');
-			else if (scanned.size === sectors.length) set_Status(distance(base) <= padRadius ? (!stabilized ? copy.manualLand : height <= profile.landHeight ? copy.landNow : copy.lower) : copy.comeback);
+			else if (scanned.size === sectors.length) set_Status(onPad(x, z)
+				? (story ? copy.storyLandNow : !stabilized ? copy.manualLand : height <= profile.landHeight ? copy.landNow : copy.lower)
+				: copy.comeback);
 			else if (battery <= 22) set_Status(copy.low, 'warn');
 			else if (target_InRange()) set_Status(height >= 3 && height <= 12 ? copy.canScan : copy.near, 'success');
 			else set_Status(copy.searching);

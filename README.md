@@ -12,7 +12,11 @@
 | Закрытие квартала | Разобрать первичные документы, поработать с кассой, составить проводки, рассчитать зарплату, сверить выписку банка и собрать баланс. |
 | Повар | Принять заказы, нарезать и пожарить продукты, собрать блюда и передать их в выдачу до того, как гости уйдут. |
 
-В каталоге можно выбрать игру и сложность. Завершённые уровни учитываются в профиле. Оцените понравившиеся игры от 1 до 5, чтобы интерес к задачам тоже повлиял на вклад игры в анализ профессий. Достижения открываются за игровые результаты.
+В каталоге можно выбрать игру и сложность. В карточках «Повара» и «Закрытия квартала» есть короткие записи игрового процесса. Если для выбранной сложности есть сохранение, нажмите «Продолжить игру» и выберите «Продолжить с сохранения» или «Сбросить прогресс». Сброс запускает выбранную сложность с начала. Результаты в профиле, дипломы и достижения сохраняются.
+
+В сюжетном вылете оператора БПЛА вернитесь к площадке H после съёмки. Когда дрон окажется над площадкой, нажмите «Посадить» или клавишу H. Дрон плавно снизится и сядет без повреждений от касания.
+
+Завершённые уровни учитываются в профиле. Оцените понравившиеся игры от 1 до 5, чтобы интерес к задачам тоже повлиял на вклад игры в анализ профессий. Достижения открываются за игровые результаты.
 
 Именной диплом можно скачать на экране завершённого уровня. После заезда или упражнения на поле портал показывает результат без диплома. Профиль, оценки и достижения хранятся в браузере. Диплом формируется по данным браузера, сервер результаты не заверяет.
 
@@ -102,10 +106,10 @@ npm run build
 
 <p align="center"><img src="kyss_flag.png" width="240" alt="Флаг команды KYSS"></p>
 
-| [Syharik3316](https://github.com/Syharik3316) | [danyayok](https://github.com/danyayok) | [ynovka](https://github.com/ynovka) |
-| :---: | :---: | :---: |
-| [<img src="https://avatars.githubusercontent.com/u/156796237?s=128&v=4" width="72" height="72" alt="Аватар Syharik3316">](https://github.com/Syharik3316) | [<img src="https://avatars.githubusercontent.com/u/147042315?s=128&v=4" width="72" height="72" alt="Аватар danyayok">](https://github.com/danyayok) | [<img src="https://avatars.githubusercontent.com/u/31537599?s=128&v=4" width="72" height="72" alt="Аватар ynovka">](https://github.com/ynovka) |
-| Тренажёр БПЛА и интеграция с порталом | Платформа и бухгалтерская игра | Игра «Повар» |
+| [Syharik3316](https://github.com/Syharik3316) | [danyayok](https://github.com/danyayok) | [ynovka](https://github.com/ynovka) | [Rico-and-Kevin](https://github.com/Rico-and-Kevin) | [Claude](https://github.com/apps/claude) |
+| :---: | :---: | :---: | :---: | :---: |
+| [<img src="https://avatars.githubusercontent.com/u/156796237?s=128&v=4" width="72" height="72" alt="Аватар Syharik3316">](https://github.com/Syharik3316) | [<img src="https://avatars.githubusercontent.com/u/147042315?s=128&v=4" width="72" height="72" alt="Аватар danyayok">](https://github.com/danyayok) | [<img src="https://avatars.githubusercontent.com/u/31537599?s=128&v=4" width="72" height="72" alt="Аватар ynovka">](https://github.com/ynovka) | [<img src="https://avatars.githubusercontent.com/u/235640784?s=128&v=4" width="72" height="72" alt="Аватар Rico-and-Kevin">](https://github.com/Rico-and-Kevin) | [<img src="https://avatars.githubusercontent.com/u/209825114?s=128&v=4" width="72" height="72" alt="Аватар Claude">](https://github.com/apps/claude) |
+| Тренажёр БПЛА и интеграция с порталом | Платформа и бухгалтерская игра | Игра «Повар» | Дизайн, тесты и презентация | Внебрачный сотрудник |
 
 ## Лицензия
 

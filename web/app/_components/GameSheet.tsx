@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { GameManifest, LevelId } from "@/core/contract/types";
-import { hasCheckpoint } from "@/core/progress/checkpoints";
-import { commonTexts } from "@/texts/common";
 import { gamesTexts } from "@/texts/games";
 import { professionNames } from "@/texts/professions";
 import { uavTexts } from "@/games/uav-operator/texts";
 import { GamePreview } from "./GamePreview";
+import { SavedRunButton } from "./SavedRunButton";
+import { has_SavedRun } from "./savedRun";
 import styles from "./GameSheet.module.css";
 
 interface GameSheetProps {
@@ -23,10 +24,11 @@ interface GameSheetProps {
 // Карточка игры поверх ленты: превью из игры, краткая сводка и выбор сложности.
 // На телефоне выезжает снизу, на компьютере открывается по центру. Закрывается кнопкой, клавишей Escape и кликом по фону.
 export function GameSheet({ game, completedLevelIds, rating, ratingMessage, onRate, onClose }: GameSheetProps) {
+	const router = useRouter();
 	const dialogRef = useRef<HTMLDialogElement>(null);
 	// По умолчанию выбран первый непройденный уровень: так игрок продолжает с того места, где остановился.
 	const [selectedLevelId, setSelectedLevelId] = useState<LevelId>(
-		() => game.levels.find((level) => hasCheckpoint(game.gameId, level.id))?.id
+		() => game.levels.find((level) => has_SavedRun(game.gameId, level.id))?.id
 			?? game.levels.find((level) => !completedLevelIds.includes(level.id))?.id
 			?? game.levels[0].id,
 	);
@@ -38,10 +40,16 @@ export function GameSheet({ game, completedLevelIds, rating, ratingMessage, onRa
 	}, []);
 
 	const titleId = `game-sheet-title-${game.gameId}`;
+	const levelPath = `/games/${game.gameId}/${selectedLevelId}`;
+	const startClass = `button-primary ${styles.start}`;
 
 	return (
 		<dialog ref={dialogRef} aria-labelledby={titleId} className={styles.backdrop}
-			onCancel={(event) => { event.preventDefault(); onClose(); }}
+			onCancel={(event) => {
+				if (event.target !== event.currentTarget) return;
+				event.preventDefault();
+				onClose();
+			}}
 			onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
 			<div
 				className={styles.sheet}
@@ -114,11 +122,12 @@ export function GameSheet({ game, completedLevelIds, rating, ratingMessage, onRa
 				</div>
 
 				<div className={styles.actions}>
-					<Link href={`/games/${game.gameId}/${selectedLevelId}`} className={`button-primary ${styles.start}`}>
-						{hasCheckpoint(game.gameId, selectedLevelId)
-							? commonTexts.levelContinue
-							: game.gameId === "uav-operator" ? uavTexts.story : gamesTexts.startLevel}
-					</Link>
+					{has_SavedRun(game.gameId, selectedLevelId)
+						? <SavedRunButton gameId={game.gameId} route={selectedLevelId} className={startClass}
+							onLaunch={() => router.push(levelPath)} />
+						: <Link href={levelPath} className={startClass}>
+							{game.gameId === "uav-operator" ? uavTexts.story : gamesTexts.startLevel}
+						</Link>}
 					{game.gameId === "uav-operator" ? <Link href="/games/uav-operator/free" className="button-secondary">
 						<span aria-hidden="true">✣</span> {uavTexts.free}
 					</Link> : null}
