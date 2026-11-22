@@ -310,10 +310,60 @@ export function gate_Crossing(gate, previous, position, heightOffset = 0) {
 	return Math.abs(x * cosine - z * sine) < gate.width / 2 - .15 && y > .4 && y < gate.height - .16;
 }
 
+function add_Lookout(scene, race) {
+	const x = race ? 46 : -50, z = race ? -66 : -39;
+	const frame = group(scene, x, elevation(x,z)-.12, z);
+	const height = race ? 5.5 : 11.3, width = race ? 2.1 : 1.55;
+	const upper = race ? width : .41;
+	const metal = race ? 0x62665e : 0x78807b;
+	function beam(ax,ay,az,bx,by,bz,size) {
+		const direction = new THREE.Vector3(bx-ax,by-ay,bz-az);
+		const strut = box(frame, metal, size,direction.length(),size,(ax+bx)/2,(ay+by)/2,(az+bz)/2);
+		strut.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.normalize());
+	}
+	for (const side of [-1,1]) for (const front of [-1,1]) {
+		beam(width*side,0,width*front, upper*side,height,upper*front,.17);
+		beam(width*side,.4,width*front,-upper*side,height-.3,upper*front,.075);
+		beam(width*side,.4,width*front,upper*side,height-.3,-upper*front,.075);
+	}
+	if (race) {
+		box(frame,0x957753,5.1,.25,4.8,0,height);
+		for (const side of [-1,1]) {
+			for (const front of [-1,1]) box(frame,metal,.12,3.1,.12,side*2.2,height+1.55,front*2.05);
+			for (let row=0; row<3; row++) box(frame,0xb79b72,4.5,.17,.10,0,height+.30+row*.38,side*2.05);
+			box(frame,0x954634,2.8,.14,5.1,side*1.32,height+3.28).rotation.z=-side*.18;
+		}
+		for (let step=0;step<15;step++) box(frame,0x9b8061,1.15,.16,.49,2.96,.30+step*.36,4.7-step*.40);
+	} else {
+		const wheel = group(frame,0,height+.36,.44);
+		for (let blade=0;blade<16;blade++) {
+			const spoke = group(wheel);
+			spoke.rotation.z = blade*Math.PI/8;
+			box(spoke,metal,.058,2.55,.08,0,1.27);
+			const sail=box(spoke,blade%3 ? 0xb8b4a0 : 0x967968,.57,1.37,.065,0,1.95);
+			sail.rotation.y=.34;
+		}
+		cylinder(wheel,0x895944,.34,.34,.23,0,0,.12).rotation.x=Math.PI/2;
+		beam(0,height,0,2.84,height+.39,-1.4,.1);
+		box(frame,0x90523b,1.24,.88,.06,2.6,height+.72,-1.34);
+	}
+	// Проверяем каждый элемент в его локальных осях, чтобы сохранялись просветы под сооружением.
+	frame.updateMatrixWorld(true);
+	const volumes = [];
+	frame.traverse(mesh => {
+		if (!mesh.isMesh) return;
+		mesh.geometry.computeBoundingBox();
+		volumes.push({ inverse: mesh.matrixWorld.clone().invert(), bounds: mesh.geometry.boundingBox.clone().expandByScalar(.09) });
+	});
+	const probe = new THREE.Vector3();
+	return (px,py,pz) => Math.abs(px-x)<6 && Math.abs(pz-z)<6 &&
+		volumes.some(v=>v.bounds.containsPoint(probe.set(px,py,pz).applyMatrix4(v.inverse)));
+}
+
 function add_PracticeLandscape(scene, waypoints, obstacles, race) {
 	const land = create_Landscape(scene, elevation, race ? 3209 : 475);
 	const random = seeded_Random(race ? 542 : 714);
-	const occupied = [];
+	const occupied = [{x:race?46:-50, z:race?-66:-39, r:6}];
 	const clear = (x,z,r) => route_Distance(x,z,waypoints) > r + (race ? 4.9 : 5.8)
 		&& Math.hypot(x-home.x,z-home.z) > r + 6
 		&& obstacles.every(o => Math.hypot(o.x-x,o.z-z) > r + (o.radius ?? Math.hypot(o.width,o.depth)))
@@ -371,6 +421,11 @@ function add_PracticeLandscape(scene, waypoints, obstacles, race) {
 		: [[17,-18,24,-20],[-22,-58,-16,-53],[32,-97,42,-100],[-57,10,-63,18],[-20,-132,-12,-136]])) {
 		land.log(x,z,xx,zz,.32 + random()*.22);
 	}
+	if (race) {
+		land.rock(-19,-20,4.3,3.9,4.6,.2);
+		land.rock(-26,-20,4.7,4.4,4.2,-.3);
+		land.rock(-22.5,-20,10.0,1.32,3.45,0,4.15);
+	}
 	for (let i=0;i<2300;i++) {
 		const x=-100+200*random(), z=-182+246*random();
 		if (route_Distance(x,z,waypoints)<4 || Math.abs(x+36+6*Math.sin(z*.025))<1.6) continue;
@@ -396,6 +451,7 @@ export function create_Field(race) {
 		? [[-8, -28], [-10, -28], [30, -57], [28, -57], [5, -88], [7, -88], [-38, -118], [-40, -118]]
 		: [[15, 1], [18, 4], [-18, -17], [-19, -19], [26, -34], [28, -41], [-21, -65], [-25, -62], [6, -81], [4, -83]], obstacles);
 	add_FieldLandmarks(scene, obstacles, waypoints, race);
+	const touchesLookout = add_Lookout(scene,race);
 	const land = add_PracticeLandscape(scene, waypoints, obstacles, race);
 	const pad = group(scene, home.x, .02, home.z);
 	cylinder(pad, 0x4a5450, padSize, padSize + .06, .14, 0, .03, 0, 36);
@@ -409,7 +465,7 @@ export function create_Field(race) {
 		scene, sun, gates, limits: bounds, base: home, padRadius: padSize, onPad,
 		flightGround: (x, z) => elevation(x, z) + (onPad(x, z) ? .12 : 0),
 		touchesTree(x, y, z) {
-			if (land.touches(x,y,z)) return true;
+			if (land.touches(x,y,z) || touchesLookout(x,y,z)) return true;
 			if (obstacles.some(obstacle => {
 				const dx = Math.abs(x - obstacle.x), dz = Math.abs(z - obstacle.z);
 				if (obstacle.radius ? Math.hypot(dx, dz) > obstacle.radius : dx > obstacle.width || dz > obstacle.depth) return false;

@@ -118,7 +118,8 @@ function create_Sea(scene) {
 			vec3 col = mix(mix(vec3(.22,.49,.37),vec3(.17,.40,.30),shoal), vec3(.012,.13,.16), smoothstep(-1.0, 32.0, depth+shoal*3.));
 			vec3 reflectedDir = reflect(-view, normal);
 			vec2 skyUv = vec2(.5 + (atan(reflectedDir.z,reflectedDir.x) + skyTurn)/6.2831853, .5 + asin(clamp(reflectedDir.y,.0,1.))/3.14159);
-			vec3 reflected = texture2D(sky, vec2(fract(skyUv.x),skyUv.y), 2.).rgb;
+			vec3 reflected = textureLod(sky, vec2(fract(skyUv.x),skyUv.y), 5.).rgb;
+			reflected = mix(reflected,vec3(.35,.49,.59),.52);
 			col = mix(col, reflected*.80, fresnel) + detail * (.005 * ripples + .007 * chop);
 			float glint = pow(max(dot(reflect(-normalize(vec3(-.83,.95,-.45)),normal),view),0.),64.);
 			col += vec3(1.,.82,.55) * glint * .8 * detail;

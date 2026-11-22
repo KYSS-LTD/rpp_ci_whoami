@@ -17,7 +17,7 @@ function tint(geometry, base) {
 
 function limb(from, to, bottom, top, color) {
 	const vector = to.clone().sub(from);
-	const geometry = new THREE.CylinderGeometry(top, bottom, vector.length(), 7);
+	const geometry = new THREE.CylinderGeometry(top, bottom, vector.length(), 6, 1, true);
 	geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, vector.normalize()));
 	const center = from.clone().lerp(to, .5);
 	return tint(geometry.translate(center.x, center.y, center.z), color);
@@ -50,8 +50,8 @@ function tree_Model(birch, seed) {
 	const pale = birch ? 0xd2c8a3 : 0x6d5846;
 	wood.push(limb(origin, crown, birch ? .016 : .031, .004, pale));
 	if (birch) {
-		for (let i = 1; i < 18; i++) {
-			const h = i * .043, center = crown.clone().multiplyScalar(h);
+		for (let i = 1; i < 11; i++) {
+			const h = i * .069, center = crown.clone().multiplyScalar(h);
 			const radius = .016 - h * .012;
 			const mark = new THREE.CylinderGeometry(radius + .0009, radius + .001, .003 + random() * .006, 7, 1, true, random() * tau, 1 + random() * 3);
 			wood.push(tint(mark.translate(center.x, center.y, center.z), 0x685f54));
@@ -76,6 +76,13 @@ function tree_Model(birch, seed) {
 			leaf.rotateX((random() - .48) * 1.95);
 			leaf.rotateY(a + j * 1.45);
 			leaf.translate(pos.x, pos.y, pos.z);
+			const vertex = new THREE.Vector3();
+			for (let v = 0; v < leaf.attributes.position.count; v++) {
+				vertex.fromBufferAttribute(leaf.attributes.position,v);
+				vertex.y = .14 + (vertex.y - .66) * .66;
+				vertex.normalize();
+				leaf.attributes.normal.setXYZ(v,vertex.x,vertex.y,vertex.z);
+			}
 			// Наружная часть кроны лучше освещена, в глубине виден более тёмный второй план.
 			const color = new THREE.Color().setHSL((birch ? .218 : .265) + random() * .033, .29 + random() * .12, .215 + level * .073 + random() * .097);
 			leaves.push(tint(leaf, color));
@@ -104,7 +111,7 @@ function grass_Model() {
 	const random = random_Stream(798);
 	const positions = [], colors = [];
 	const base = new THREE.Color(0x687039), tips = new THREE.Color();
-	for (let i = 0; i < 25; i++) {
+	for (let i = 0; i < 17; i++) {
 		const a = random() * tau, d = random() * .37, height = .19 + random() * .38;
 		const x = d * Math.cos(a), z = d * Math.sin(a), w = .012 + .026 * random();
 		positions.push(x - w * Math.sin(a), -.025, z + w * Math.cos(a), x + w * Math.sin(a), -.025, z - w * Math.cos(a),
@@ -121,10 +128,16 @@ function grass_Model() {
 
 export function create_Landscape(scene, elevation, seed) {
 	const random = random_Stream(seed), cells = new Map(), parts = new Map(), solids = new Map();
+	const mobile = matchMedia('(pointer: coarse)').matches;
+	let grassIndex = 0;
 	const opaque = new THREE.MeshLambertMaterial({ vertexColors: true });
 	const canopy = new THREE.MeshLambertMaterial({
 		map: leaf_Texture(), vertexColors: true, side: THREE.DoubleSide, alphaTest: .38, alphaToCoverage: true,
 	});
+	// Нормали направлены наружу от кроны. Лист освещается одинаково с обеих сторон.
+	canopy.onBeforeCompile = shader => {
+		shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal *= faceDirection;');
+	};
 	const grassSurface = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
 	function part(name, geometry, surface = opaque) { parts.set(name, { geometry, surface }); }
 	for (const species of ['birch', 'oak']) {
@@ -219,7 +232,10 @@ export function create_Landscape(scene, elevation, seed) {
 				return py<=y+h+.14 && ((dx*cos-dz*sin)/(rx+.12))**2 + ((dx*sin+dz*cos)/(rz+.12))**2 + ((py-y-h*.09)/(ry+.12))**2 < 1;
 			});
 		},
-		grass(x,z,size=1) { instance('grass',x,elevation(x,z),z,size,size,size,random()*tau,.76+random()*.49); },
+		grass(x,z,size=1) {
+			if (mobile && ++grassIndex % 2 === 0) return;
+			instance('grass',x,elevation(x,z),z,size,size,size,random()*tau,.76+random()*.49);
+		},
 		touches(x,y,z) {
 			const list = solids.get(Math.floor(x/8)+'/'+Math.floor(z/8));
 			if (list) for (const check of list) if (check(x,y,z)) return true;
