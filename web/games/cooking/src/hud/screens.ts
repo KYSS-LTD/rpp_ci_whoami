@@ -6,6 +6,7 @@ import type { DishId, FailureInfo, GameSnapshot, HudCallbacks, InputMode, Result
 import { dishTutorials } from "../config/tutorial";
 import { controlsTexts, hudTexts } from "../texts";
 import { closeModal, openModal } from "./dialogs";
+import { preloadTutorialImages, TUTORIAL_DIR } from "./tutorialPreload";
 import { createElement, setAttribute, setText } from "./dom";
 
 // Строка подсказки управления: что нажать и что произойдёт (формат texts/controls.ts).
@@ -102,6 +103,8 @@ export function createScreens(deps: ScreensDeps): Screens {
 	start.dialog.append(prologue, dayLabel, dayGoal, startGoal, rules, controlsSection, startActions);
 
 	// Подсказки рецептов открываются до смены. Для reduced motion <picture> подставляет неподвижный постер вместо GIF.
+	// Картинки всех шагов начинают грузиться сразу, пока игрок читает стартовый экран (hud/tutorialPreload.ts).
+	const tutorialPreload = { images: preloadTutorialImages(deps.tutorialDishes) };
 	const tutorial = createDialog("tutorial", "", { dismissible: false });
 	const tutorialCount = createElement("p", { className: "hud-day-label", attributes: { "aria-live": "polite" } });
 	const tutorialCaption = createElement("p", { className: "hud-dialog__lead", attributes: { "aria-live": "polite" } });
@@ -128,8 +131,8 @@ export function createScreens(deps: ScreensDeps): Screens {
 		setText(tutorial.title, hudTexts.tutorial.title(hudTexts.dishNames[dish]));
 		setText(tutorialCount, hudTexts.tutorial.stepLabel(tutorialStepIndex + 1, config.steps.length));
 		setText(tutorialCaption, hudTexts.tutorial.steps[step.id as keyof typeof hudTexts.tutorial.steps]);
-		tutorialPoster.setAttribute("srcset", `tutorial/${step.posterFile}`);
-		tutorialImage.src = `tutorial/${step.animationFile}`;
+		tutorialPoster.setAttribute("srcset", `${TUTORIAL_DIR}${step.posterFile}`);
+		tutorialImage.src = `${TUTORIAL_DIR}${step.animationFile}`;
 		tutorialImage.alt = hudTexts.dishNames[dish];
 		setText(tutorialNext, tutorialStepIndex + 1 < config.steps.length || tutorialDishIndex + 1 < deps.tutorialDishes.length
 			? hudTexts.tutorial.next : hudTexts.tutorial.done);
@@ -137,6 +140,7 @@ export function createScreens(deps: ScreensDeps): Screens {
 
 	function finishTutorials(): void {
 		tutorialDismissed = true;
+		tutorialPreload.images = [];
 		setText(startButton, hudTexts.start.startButton);
 		closeModal(tutorial.dialog);
 		if (phase === "ready" && !startRequested) openModal(start.dialog);

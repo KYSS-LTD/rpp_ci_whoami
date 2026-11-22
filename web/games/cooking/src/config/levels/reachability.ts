@@ -97,17 +97,21 @@ export function listLevelTargets(level: LevelConfig): LevelTarget[] {
 	return targets;
 }
 
+// Какие цели проверять: все, только станции кухни (из старта повара: кухня отделена от зала стеной с окном выдачи) или только
+// цели зала и улицы (из точек ожидания официантов: дверь, очередь, места, точка забора у окна).
+export type ReachabilityScope = "all" | "kitchen" | "hall";
+
 // Возвращает подписи недостижимых из origin целей уровня (пустой список: всё достижимо). К станции можно подойти, если
 // достижима хотя бы одна клетка вплотную к её прямоугольнику.
-export function findUnreachableTargets(level: LevelConfig, origin: Vec2): string[] {
+export function findUnreachableTargets(level: LevelConfig, origin: Vec2, scope: ReachabilityScope = "all"): string[] {
 	const reached = findReachableCells(level, origin);
 	const unreachable: string[] = [];
-	listLevelTargets(level).forEach((target) => {
+	(scope === "kitchen" ? [] : listLevelTargets(level)).forEach((target) => {
 		if (!isPointReachable(level, reached, target.point)) {
 			unreachable.push(target.label);
 		}
 	});
-	level.stations.forEach((station) => {
+	(scope === "hall" ? [] : level.stations).forEach((station) => {
 		const canApproach = listStationApproachPoints(station.rect).some((approach) => isPointReachable(level, reached, approach));
 		if (!canApproach) {
 			unreachable.push(`станция ${station.id}`);
@@ -118,7 +122,7 @@ export function findUnreachableTargets(level: LevelConfig, origin: Vec2): string
 
 // То же по настоящей навигации: сетка buildGeometry (с раздутием на радиус NPC) и поиск пути A* из sim/nav. Цель недостижима,
 // если её клетка заблокирована или пути до неё нет. Станции проверяются подходом на соседнюю свободную клетку.
-export function findUnreachableTargetsOnNavGrid(level: LevelConfig, origin: Vec2): string[] {
+export function findUnreachableTargetsOnNavGrid(level: LevelConfig, origin: Vec2, scope: ReachabilityScope = "all"): string[] {
 	const geometry = buildGeometry(level);
 	const pathfinder = createPathfinder(geometry.navGrid);
 	const grid = geometry.navGrid;
@@ -128,12 +132,12 @@ export function findUnreachableTargetsOnNavGrid(level: LevelConfig, origin: Vec2
 	};
 	const isReachableOnGrid = (point: Vec2): boolean => isFree(point) && pathfinder.findPath(origin, point) !== null;
 	const unreachable: string[] = [];
-	listLevelTargets(level).forEach((target) => {
+	(scope === "kitchen" ? [] : listLevelTargets(level)).forEach((target) => {
 		if (!isReachableOnGrid(target.point)) {
 			unreachable.push(target.label);
 		}
 	});
-	level.stations.forEach((station) => {
+	(scope === "hall" ? [] : level.stations).forEach((station) => {
 		if (!listStationApproachPoints(station.rect).some((approach) => isReachableOnGrid(approach))) {
 			unreachable.push(`станция ${station.id}`);
 		}

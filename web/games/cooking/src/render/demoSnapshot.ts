@@ -88,20 +88,21 @@ function createStationSnapshot(station: StationConfig, indexOfKind: number, time
 			}
 			return { ...base, items: [{ type: "ingredient", kind: "steak", state: "chopped" }], phase: "ready" };
 		}
-		case "pan": {
-			const cycle = shifted % 20;
-			if (cycle < 6) {
-				return { ...base, items: [{ type: "ingredient", kind: "patty", state: "raw" }], phase: "processing", progress: cycle / 6 };
-			}
-			if (cycle < 12) {
-				return { ...base, items: [{ type: "ingredient", kind: "patty", state: "cooked" }], phase: "ready", burnProgress: (cycle - 6) / 6 };
-			}
-			if (cycle < 16) {
-				return { ...base, items: [{ type: "ingredient", kind: "patty", state: "burnt" }], phase: "burnt" };
-			}
-			return base;
-		}
 		case "stove": {
+			// Плита с кастрюлей (рагу) показывает варку, остальные плиты жарят котлету прямо на конфорке.
+			if (station.startItem !== "pot") {
+				const cycle = shifted % 20;
+				if (cycle < 6) {
+					return { ...base, items: [{ type: "ingredient", kind: "patty", state: "raw" }], phase: "processing", progress: cycle / 6, isHeating: true };
+				}
+				if (cycle < 12) {
+					return { ...base, items: [{ type: "ingredient", kind: "patty", state: "cooked" }], phase: "ready", burnProgress: (cycle - 6) / 6 };
+				}
+				if (cycle < 16) {
+					return { ...base, items: [{ type: "ingredient", kind: "patty", state: "burnt" }], phase: "burnt" };
+				}
+				return base;
+			}
 			const cycle = shifted % 24;
 			if (cycle < 4) {
 				return { ...base, items: [{ type: "pot", hasWater: true, contents: [{ type: "ingredient", kind: "carrot", state: "chopped" }, { type: "ingredient", kind: "potato", state: "chopped" }], cookProgressSec: 0, portions: 0 }], phase: "holding" };

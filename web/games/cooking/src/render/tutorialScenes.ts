@@ -1,6 +1,6 @@
 // Сцены GIF-подсказок рецептов (страница tutorial-capture.html, только для разработки). Каждый шаг рецепта - небольшая сцена из
 // настоящих моделей игры: функция update(t) ставит объекты для момента t от 0 до 1 и возвращает подписи (клавиши, полосы прогресса).
-import { CylinderGeometry, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Scene, SphereGeometry, Vector3 } from "three";
+import { BoxGeometry, CylinderGeometry, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Scene, SphereGeometry, Vector3 } from "three";
 import { MODEL_SCALE, type DishId, type IngredientKind, type ItemState, type PotItem } from "../contracts";
 import type { LoadedAssets } from "./assets";
 import type { ItemVisualFactory } from "./items";
@@ -117,16 +117,28 @@ function steam(ctx: Ctx): { update(x: number, y: number, z: number, t: number, s
 	};
 }
 
-// Кран: у игры нет модели крана, он рисуется примитивами (труба и носик над прилавком).
-function createTap(ctx: Ctx, x: number, z: number): { stream: Mesh } {
-	const metal = new MeshStandardMaterial({ color: 0xaab4bd, metalness: 0.4, roughness: 0.4 });
-	const pipe = new Mesh(new CylinderGeometry(0.05, 0.05, 0.5, 12), metal);
-	pipe.position.set(x, COUNTER_TOP + 0.25, z);
-	const spout = new Mesh(new CylinderGeometry(0.045, 0.045, 0.3, 12), metal);
+// Раковина: прилавок с утопленной мойкой и краном у задней кромки (как в игре, render/stations.ts: модели раковины в паке нет).
+function createSink(ctx: Ctx, x: number, z: number): { stream: Mesh } {
+	ctx.put("kitchencounter_straight_A", x, 0, z);
+	const metal = new MeshStandardMaterial({ color: 0xb8c4c8, metalness: 0.6, roughness: 0.3 });
+	const basin = new MeshStandardMaterial({ color: 0x8f9ca3, metalness: 0.5, roughness: 0.35 });
+	const box = (width: number, height: number, depth: number, material: MeshStandardMaterial, px: number, py: number, pz: number): void => {
+		const mesh = new Mesh(new BoxGeometry(width, height, depth), material);
+		mesh.position.set(x + px, py, z + pz);
+		ctx.scene.add(mesh);
+	};
+	box(0.7, 0.03, 0.08, metal, 0, COUNTER_TOP + 0.015, -0.31);
+	box(0.7, 0.03, 0.08, metal, 0, COUNTER_TOP + 0.015, 0.31);
+	box(0.08, 0.03, 0.54, metal, -0.31, COUNTER_TOP + 0.015, 0);
+	box(0.08, 0.03, 0.54, metal, 0.31, COUNTER_TOP + 0.015, 0);
+	box(0.56, 0.02, 0.5, basin, 0, COUNTER_TOP - 0.005, 0.02);
+	const pipe = new Mesh(new CylinderGeometry(0.03, 0.04, 0.3, 12), metal);
+	pipe.position.set(x, COUNTER_TOP + 0.15, z - 0.36);
+	const spout = new Mesh(new CylinderGeometry(0.028, 0.028, 0.22, 12), metal);
 	spout.rotation.x = Math.PI / 2;
-	spout.position.set(x, COUNTER_TOP + 0.5, z + 0.15);
-	const stream = new Mesh(new CylinderGeometry(0.025, 0.025, 1, 8), new MeshBasicMaterial({ color: 0x57bde0 }));
-	stream.position.set(x, COUNTER_TOP + 0.3, z + 0.3);
+	spout.position.set(x, COUNTER_TOP + 0.29, z - 0.26);
+	const stream = new Mesh(new CylinderGeometry(0.022, 0.022, 1, 8), new MeshBasicMaterial({ color: 0x57bde0 }));
+	stream.position.set(x, COUNTER_TOP + 0.2, z - 0.16);
 	ctx.scene.add(pipe, spout, stream);
 	return { stream };
 }
@@ -152,11 +164,10 @@ function takeScene(crateModel: string, make: (ctx: Ctx) => Object3D): SceneBuild
 	};
 }
 
-// Готовка на сковороде: сырое меняется на готовое, зелёная полоса растёт, красная начинает расти после готовности.
-function panScene(rawMake: (ctx: Ctx, x: number, z: number) => Object3D, cookedMake: (ctx: Ctx) => Object3D): SceneBuilder {
+// Жарка прямо на плите (сковород нет): сырое меняется на готовое, зелёная полоса растёт, красная начинает расти после готовности.
+function stoveScene(rawMake: (ctx: Ctx, x: number, z: number) => Object3D, cookedMake: (ctx: Ctx) => Object3D): SceneBuilder {
 	return (ctx) => {
 		ctx.put("stove_single", 0, 0, 0);
-		ctx.put("pan_A", 0, STOVE_TOP, 0.05, 0);
 		const raw = rawMake(ctx, 0, 0.05);
 		const cooked = cookedMake(ctx);
 		const fumes = steam(ctx);
@@ -167,8 +178,8 @@ function panScene(rawMake: (ctx: Ctx, x: number, z: number) => Object3D, cookedM
 				const green = clamp01(t / 0.55);
 				const red = seg(t, 0.62, 1) * 0.45;
 				const done = green >= 1;
-				raw.position.set(0, STOVE_TOP + 0.07, 0.05);
-				cooked.position.set(0, STOVE_TOP + 0.07, 0.05);
+				raw.position.set(0, STOVE_TOP + 0.03, 0.05);
+				cooked.position.set(0, STOVE_TOP + 0.03, 0.05);
 				show(raw, !done);
 				show(cooked, done);
 				fumes.update(0, STOVE_TOP + 0.2, 0.05, t, done ? 0.6 : 1);
@@ -273,7 +284,7 @@ const hamServe = serveScene((ctx) => ingredient(ctx, "ham", "cooked"), "ham");
 // --- Стейк ---
 
 const steakTake = takeScene("crate_steak", (ctx) => ingredient(ctx, "steak", "raw"));
-const steakCook = panScene((ctx) => ingredient(ctx, "friedSteak", "raw"), (ctx) => ingredient(ctx, "friedSteak", "cooked"));
+const steakCook = stoveScene((ctx) => ingredient(ctx, "friedSteak", "raw"), (ctx) => ingredient(ctx, "friedSteak", "cooked"));
 const steakPlate = plateScene((ctx) => ingredient(ctx, "friedSteak", "cooked"), "steak");
 const steakServe = serveScene((ctx) => ingredient(ctx, "friedSteak", "cooked"), "steak");
 
@@ -310,7 +321,7 @@ const burgerPrepare: SceneBuilder = (ctx) => {
 	};
 };
 
-const burgerCook = panScene((ctx) => ingredient(ctx, "patty", "raw"), (ctx) => ingredient(ctx, "patty", "cooked"));
+const burgerCook = stoveScene((ctx) => ingredient(ctx, "patty", "raw"), (ctx) => ingredient(ctx, "patty", "cooked"));
 
 // Во сколько раз бургер в руках крупнее игрового, чтобы собранный бургер был хорошо виден в маленьком кадре.
 const BIG = 1.6;
@@ -385,31 +396,31 @@ const veggiePrepare: SceneBuilder = (ctx) => {
 	};
 };
 
-const veggieCook = panScene((ctx) => ingredient(ctx, "veggiePatty", "raw"), (ctx) => ingredient(ctx, "veggiePatty", "cooked"));
+const veggieCook = stoveScene((ctx) => ingredient(ctx, "veggiePatty", "raw"), (ctx) => ingredient(ctx, "veggiePatty", "cooked"));
 const veggieAssemble = assembleScene("veggiePatty");
 const veggieServe = serveScene((ctx) => burgerStack(ctx, "veggiePatty", true), "veggieBurger");
 
 // --- Рагу ---
 
 // Шаг 1: взять пустую кастрюлю со стола.
+// Шаг 1: снять пустую кастрюлю с плиты (в день рагу она стоит на плите с начала смены).
 const stewPot: SceneBuilder = (ctx) => {
-	ctx.put("kitchencounter_straight_A", 0, 0, 0);
+	ctx.put("stove_single", 0, 0, 0);
 	const pot = potItem(ctx, {});
 	return {
 		posterT: 0.95,
 		view: { distance: 3.2, y: 0.8 },
 		update(t) {
 			const lift = ease(seg(t, 0.3, 0.7));
-			pot.position.set(0, COUNTER_TOP + lift * 0.5 + Math.sin(t * Math.PI * 4) * 0.02 * seg(t, 0.7, 1), lerp(0, 0.1, lift));
+			pot.position.set(0, STOVE_TOP + lift * 0.5 + Math.sin(t * Math.PI * 4) * 0.02 * seg(t, 0.7, 1), lerp(0, 0.1, lift));
 			return t < 0.65 ? [key("E", 0, 1.3)] : [];
 		},
 	};
 };
 
-// Шаг 2: наполнить кастрюлю водой у крана.
+// Шаг 2: наполнить кастрюлю водой в раковине.
 const stewWater: SceneBuilder = (ctx) => {
-	ctx.put("kitchencounter_straight_A", 0, 0, 0);
-	const tap = createTap(ctx, 0, -0.3);
+	const tap = createSink(ctx, 0, 0);
 	const empty = potItem(ctx, {});
 	const full = potItem(ctx, { hasWater: true });
 	return {
@@ -424,20 +435,20 @@ const stewWater: SceneBuilder = (ctx) => {
 			show(full, done);
 			const flowing = fill > 0 && fill < 1;
 			show(tap.stream, flowing);
-			tap.stream.scale.y = 0.45;
-			tap.stream.position.y = COUNTER_TOP + 0.42;
+			tap.stream.scale.y = 0.2;
+			tap.stream.position.y = COUNTER_TOP + 0.2;
 			return flowing || t < 0.25 ? [key("E", 0.5, 1.15)] : [];
 		},
 	};
 };
 
-// Шаг 3: нарезать картофель, морковь и лук на досках.
+// Шаг 3: нарезать картофель, морковь и лук (на доске и прилавках: резать можно на любой поверхности).
 const stewChop: SceneBuilder = (ctx) => {
 	const xs = [-0.9, 0, 0.9];
 	const kinds: IngredientKind[] = ["potato", "carrot", "onion"];
-	xs.forEach((x) => {
+	xs.forEach((x, index) => {
 		ctx.put("kitchencounter_straight_A", x, 0, 0);
-		ctx.put("cuttingboard", x, COUNTER_TOP, 0);
+		if (index === 1) ctx.put("cuttingboard", x, COUNTER_TOP, 0);
 	});
 	const raws = kinds.map((kind) => ingredient(ctx, kind, "raw"));
 	const cuts = kinds.map((kind) => ingredient(ctx, kind, "chopped"));
@@ -453,8 +464,9 @@ const stewChop: SceneBuilder = (ctx) => {
 				show(raws[index], !done);
 				show(cuts[index], done);
 				const bounce = progress > 0 && !done ? Math.abs(Math.sin(progress * Math.PI * 3)) * 0.07 : 0;
-				raws[index].position.set(xs[index], BOARD_TOP + bounce, 0);
-				cuts[index].position.set(xs[index], BOARD_TOP, 0);
+				const top = index === 1 ? BOARD_TOP : COUNTER_TOP;
+				raws[index].position.set(xs[index], top + bounce, 0);
+				cuts[index].position.set(xs[index], top, 0);
 				if (progress > 0 && !done) {
 					overlays.push(key("Q", xs[index], 1.05));
 					overlays.push({ kind: "bars", at: v(xs[index], 1.55, 0), green: progress, red: 0 });
@@ -465,9 +477,9 @@ const stewChop: SceneBuilder = (ctx) => {
 	};
 };
 
-// Шаг 4: положить нарезанные овощи в кастрюлю с водой.
+// Шаг 4: вернуть кастрюлю с водой на плиту и положить в неё нарезанные овощи.
 const stewFill: SceneBuilder = (ctx) => {
-	ctx.put("kitchencounter_straight_A", 0.5, 0, 0);
+	ctx.put("stove_single", 0.5, 0, 0);
 	const kinds: IngredientKind[] = ["carrot", "potato", "onion"];
 	const pots = [0, 1, 2, 3].map((count) =>
 		potItem(ctx, { hasWater: true, contents: kinds.slice(0, count).map((kind) => ({ type: "ingredient" as const, kind, state: "chopped" as const })) }),
@@ -481,20 +493,20 @@ const stewFill: SceneBuilder = (ctx) => {
 			const slots = [seg(t, 0.1, 0.36), seg(t, 0.36, 0.62), seg(t, 0.62, 0.88)];
 			const count = slots.filter((value) => value >= 1).length;
 			pots.forEach((pot, index) => {
-				pot.position.set(0.5, COUNTER_TOP, 0.05);
+				pot.position.set(0.5, STOVE_TOP, 0.05);
 				show(pot, index === count);
 			});
 			veggies.forEach((veggie, index) => {
 				const inPot = slots[index] >= 1;
 				show(veggie, !inPot);
-				fly(veggie, starts[index], v(0.5, COUNTER_TOP + 0.4, 0.05), slots[index], 0.3);
+				fly(veggie, starts[index], v(0.5, STOVE_TOP + 0.4, 0.05), slots[index], 0.3);
 			});
 			return count < 3 ? [key("E", 0.5, 1.4)] : [];
 		},
 	};
 };
 
-// Шаг 5: поставить кастрюлю на конфорку, она варится и выключается сама.
+// Шаг 5: с полным набором плита включается сама, рагу варится, и плита выключается.
 const stewCook: SceneBuilder = (ctx) => {
 	ctx.put("stove_single", 0, 0, 0);
 	const kinds: IngredientKind[] = ["carrot", "potato", "onion"];
@@ -517,7 +529,35 @@ const stewCook: SceneBuilder = (ctx) => {
 	};
 };
 
-const stewServe = serveScene(null, "stew", (ctx) => potItem(ctx, { hasWater: true, portions: 2 }));
+// Шаг 6: взять тарелку, набрать порцию из кастрюли на плите и сдать рагу в окно.
+const stewServe: SceneBuilder = (ctx) => {
+	ctx.put("kitchencounter_straight_A", -1.6, 0, 0);
+	ctx.put("dishrack_plates", -1.6, COUNTER_TOP, 0);
+	ctx.put("stove_single", -0.6, 0, 0);
+	ctx.put("wall_orderwindow", 1.0, 0, -0.8);
+	const pot = potItem(ctx, { hasWater: true, portions: 2 });
+	pot.position.set(-0.6, STOVE_TOP, 0.05);
+	const plate = ctx.item(ctx.items.createItemVisual({ type: "assembly", plated: true, dish: null, contents: [] }).object, 0, 0, 0);
+	const result = ctx.item(ctx.items.createDishVisual("stew").object, 0, 0, 0);
+	return {
+		posterT: 0.97,
+		view: { distance: 4.5, x: -0.2, y: 0.95 },
+		update(t) {
+			const toPot = ease(seg(t, 0.05, 0.3));
+			const toWindow = ease(seg(t, 0.5, 0.88));
+			const filled = t >= 0.38;
+			show(plate, !filled);
+			plate.position.set(lerp(-1.6, -0.6, toPot), lerp(COUNTER_TOP + 0.5, STOVE_TOP + 0.55, toPot) + Math.sin(toPot * Math.PI) * 0.2, 0);
+			show(result, filled);
+			result.position.set(lerp(-0.6, 0.95, toWindow), lerp(STOVE_TOP + 0.55, 0.55, toWindow) + Math.sin(toWindow * Math.PI) * 0.45, lerp(0, -0.35, toWindow));
+			const overlays: Overlay[] = [];
+			if (t < 0.12) overlays.push(key("E", -1.6, 1.6));
+			else if (t < 0.42) overlays.push(key("E", -0.6, 1.6, 0.1, seg(t, 0.12, 0.2)));
+			else if (t < 0.9) overlays.push(key("E", 0.95, 1.2, -0.3, seg(t, 0.42, 0.5)));
+			return overlays;
+		},
+	};
+};
 
 export const dishScenes: Record<string, readonly SceneBuilder[]> = {
 	ham: [hamTake, hamCook, hamPlate, hamServe],

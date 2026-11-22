@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { DISH_IDS, LEVEL_IDS, type IngredientKind, type LevelConfig, type LevelId, type StationKind } from "../../contracts";
 import { assetModelNames } from "../assets";
 import { buildDaySchedule } from "../../sim/customers/schedule";
+import { applyCampaignDay } from "./campaign";
 import { getLevelConfig, isLevelId, pickVerifiedSeed } from "./index";
 import { findUnreachableTargets } from "./reachability";
 import { validateLevelConfig } from "./validate";
@@ -46,8 +47,9 @@ describe.each(LEVEL_IDS)("общие проверки уровня %s", (levelId
 	});
 
 	it("сценарий 'Проверка при тестировании': все цели достижимы из старта повара и из точки ожидания официанта", () => {
-		expect(findUnreachableTargets(level, level.chefStart.position)).toEqual([]);
-		level.waiters.waitPoints.forEach((waitPoint) => expect(findUnreachableTargets(level, waitPoint)).toEqual([]));
+		// Кухня отделена от зала стеной с окном выдачи: повар достаёт все станции, официанты все цели зала.
+		expect(findUnreachableTargets(level, level.chefStart.position, "kitchen")).toEqual([]);
+		level.waiters.waitPoints.forEach((waitPoint) => expect(findUnreachableTargets(level, waitPoint, "hall")).toEqual([]));
 	});
 
 	it("сценарий 'Группа помещается': есть стол, вмещающий самую большую группу расписания", () => {
@@ -59,8 +61,8 @@ describe.each(LEVEL_IDS)("общие проверки уровня %s", (levelId
 	});
 
 	it("уровень содержит минимальный набор станций для меню", () => {
-		expect(countStations(level, "cuttingBoard")).toBeGreaterThanOrEqual(2);
-		expect(countStations(level, "pan")).toBeGreaterThanOrEqual(2);
+		expect(countStations(level, "cuttingBoard")).toBeGreaterThanOrEqual(1);
+		expect(level.stations.filter((station) => station.kind === "stove" && station.startItem !== "pot").length).toBeGreaterThanOrEqual(2);
 		expect(countStations(level, "oven")).toBeGreaterThanOrEqual(1);
 		expect(countStations(level, "plateStack")).toBeGreaterThanOrEqual(1);
 		expect(countStations(level, "trash")).toBeGreaterThanOrEqual(1);
@@ -144,10 +146,10 @@ describe("уровень hard (задача 8.3)", () => {
 		expect(level.tables).toHaveLength(6);
 	});
 
-	it("сценарий 'Кастрюля для рагу': стол с кастрюлей и конфорка есть на каждом уровне кампании", () => {
+	it("сценарий 'Кастрюля для рагу': плита с кастрюлей и раковина есть на каждом уровне кампании", () => {
 		for (const candidate of LEVEL_IDS.map((id) => getLevelConfig(id))) {
-			expect(candidate.stations.some((station) => station.id === "pot-table" && station.startItem === "pot")).toBe(true);
-			expect(countStations(candidate, "stove")).toBeGreaterThanOrEqual(1);
+			expect(candidate.stations.some((station) => station.kind === "stove" && station.startItem === "pot")).toBe(true);
+			expect(countStations(candidate, "tap")).toBe(1);
 		}
 	});
 
@@ -213,5 +215,37 @@ describe("сравнение уровней (спецификация cooking-le
 	it("уровни не делят объекты между собой", () => {
 		expect(easy.stations).not.toBe(medium.stations);
 		expect(easy.params).not.toBe(medium.params);
+	});
+});
+
+describe("мебель кухни по дням кампании", () => {
+	// Что появляется в каждый день: окно выдачи есть всегда, мебель остаётся на своих местах.
+	const added: Record<number, string[]> = {
+		1: ["oven-1", "counter-1", "counter-2", "trash-1", "crate-ham", "plates-1"],
+		2: ["crate-steak", "stove-1", "stove-2"],
+		3: ["board-1", "crate-bun"],
+		4: ["crate-potato", "crate-carrot"],
+		5: ["crate-onion", "sink-1", "pot-stove"],
+	};
+
+	it("каждый день добавляет свою мебель, меню растёт по блюду, станции не двигаются и все достижимы", () => {
+		for (const levelId of LEVEL_IDS) {
+			const full = getLevelConfig(levelId);
+			let expected: string[] = ["window-1"];
+			for (let day = 1; day <= 5; day += 1) {
+				expected = [...expected, ...added[day]];
+				const level = applyCampaignDay(getLevelConfig(levelId), day);
+				expect(level.stations.map((station) => station.id).sort()).toEqual([...expected].sort());
+				expect(level.params.menu).toHaveLength(day);
+				level.stations.forEach((station) => expect(station.rect).toEqual(full.stations.find((other) => other.id === station.id)?.rect));
+				expect(findUnreachableTargets(level, level.chefStart.position, "kitchen")).toEqual([]);
+			}
+		}
+	});
+
+	it("сковород и стола с кастрюлей нет: жарят плиты, кастрюля стоит на своей плите с пятого дня", () => {
+		const level = getLevelConfig("hard");
+		expect(level.stations.filter((station) => station.kind === "stove").map((station) => station.startItem ?? null).sort()).toEqual(["pot", null, null].sort());
+		expect(level.stations.some((station) => station.kind === "counter" && station.startItem !== undefined)).toBe(false);
 	});
 });

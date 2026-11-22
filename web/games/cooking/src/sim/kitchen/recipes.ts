@@ -70,7 +70,7 @@ export const cutTransitions: CutTransition[] = [
 export const cookTransitions: CookTransition[] = [
 	{
 		id: "patty",
-		stationKind: "pan",
+		stationKind: "stove",
 		inputs: [{ kind: "steak", state: "chopped" }],
 		cooking: { kind: "patty", state: "raw" },
 		cooked: { kind: "patty", state: "cooked" },
@@ -78,7 +78,7 @@ export const cookTransitions: CookTransition[] = [
 	},
 	{
 		id: "veggiePatty",
-		stationKind: "pan",
+		stationKind: "stove",
 		inputs: [
 			{ kind: "potato", state: "chopped" },
 			{ kind: "carrot", state: "chopped" },
@@ -89,7 +89,7 @@ export const cookTransitions: CookTransition[] = [
 	},
 	{
 		id: "friedSteak",
-		stationKind: "pan",
+		stationKind: "stove",
 		inputs: [{ kind: "steak", state: "raw" }],
 		cooking: { kind: "friedSteak", state: "raw" },
 		cooked: { kind: "friedSteak", state: "cooked" },
@@ -205,7 +205,7 @@ export function findCutTransition(ingredient: IngredientItem): CutTransition | u
 	return cutTransitions.find((transition) => isSameSpec(transition.input, ingredient));
 }
 
-// Переходы готовки для вида станции: сковорода, кастрюля или духовка.
+// Переходы готовки для вида станции: плита (жарка без сковороды) или духовка. Рагу в кастрюле описывает potRecipe.
 export function findCookTransitions(stationKind: StationKind): CookTransition[] {
 	return cookTransitions.filter((transition) => transition.stationKind === stationKind);
 }

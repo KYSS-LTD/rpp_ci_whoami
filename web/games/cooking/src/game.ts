@@ -5,8 +5,10 @@
 import type { GameProgress, GameSnapshot, Hud, InputSource, LevelConfig, PortalBridgeApi, ResultReporter, SceneRenderer, ShiftPhase, Simulation } from "./contracts";
 import { debugLog, isDebugEnabled } from "./config/debug";
 import { getLevelConfig, isLevelId, pickVerifiedSeed } from "./config/levels";
+import { applyCampaignDay } from "./config/levels/campaign";
 import { createHud } from "./hud";
 import { createResultReporter } from "./hud/reporter";
+import { preloadTutorialImages } from "./hud/tutorialPreload";
 import { createInputSystem } from "./input";
 import { getCampaignDay, getCampaignMenu, listDishesNeedingTutorial, markCampaignDayCompleted, markDishCooked, parseGameProgress } from "./progress";
 import { createDishIcons, createFrameLoop, createSceneRenderer, prepareAssets } from "./render";
@@ -112,7 +114,8 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 	function runLevel(baseLevel: LevelConfig, initialProgress: GameProgress, checkpoint?: unknown): void {
 		const saved = readShiftCheckpoint(checkpoint, baseLevel, initialProgress.completedDays[baseLevel.id]);
 		const campaignDay = saved?.day ?? getCampaignDay(initialProgress, baseLevel.id);
-		const level: LevelConfig = { ...baseLevel, params: { ...baseLevel.params, menu: getCampaignMenu(campaignDay) } };
+		// Меню и обстановка кухни дня: мебель появляется по дням кампании.
+		const level: LevelConfig = applyCampaignDay(baseLevel, campaignDay);
 		handle.paused = false;
 		documentRef.title = systemTexts.documentTitle;
 		const journal = saved?.journal ?? createShiftJournal();
@@ -151,6 +154,8 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 		let removeVisibilityListener: () => void = () => undefined;
 		// Экран завершённого дня показан: итог порталу не уходит, пока игрок проходит неделю дальше.
 		let dayCompleteShown = false;
+		// Картинки подсказок следующего дня (ссылки держатся, пока идёт загрузка).
+		const nextDayPreload: { images: HTMLImageElement[] } = { images: [] };
 
 		// Снимает всё, что успело создаться (в том числе при сбое посреди запуска): цикл, подписку, ввод, HUD, сцену. Повторный вызов ничего не делает.
 		let tornDown = false;
@@ -181,6 +186,7 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 			}
 			bridge.saveCheckpoint?.("run", null);
 			teardown();
+			nextDayPreload.images = [];
 			try {
 				runLevel(baseLevel, progress);
 			} catch (error) {
@@ -328,6 +334,8 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 						if (!dayCompleteShown) {
 							dayCompleteShown = true;
 							hud?.showDayComplete({ day: campaignDay, score: snapshot.result.score, maxScore: snapshot.result.maxScore });
+							// Подсказки нового блюда следующего дня грузятся, пока игрок смотрит итог дня.
+							nextDayPreload.images = preloadTutorialImages(listDishesNeedingTutorial(getCampaignMenu(getCampaignDay(progress, level.id)), progress));
 						}
 					} else {
 						const isSent = reporter.reportResult(snapshot.result);

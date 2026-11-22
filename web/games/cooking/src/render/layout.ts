@@ -21,6 +21,7 @@ const floorTileModels: Readonly<Record<ZoneKind, string | null>> = {
 	kitchen: "floor_kitchen_small",
 	hall: null,
 	street: null,
+	garden: null,
 };
 
 // Доля прямоугольника стола, которую занимает видимая столешница (коллизия и места считаются по полному прямоугольнику).
@@ -93,6 +94,10 @@ function applyWorldUv(geometry: BufferGeometry, centerX: number, centerZ: number
 // Участок пола. Кухня: плитки модели пака через InstancedMesh (одна отрисовка на всю зону); зал: доски из текстуры;
 // улица: плитка тротуара общим материалом окружения. Без текстур зоны рисуются плитой цвета зоны.
 function createFloor(floor: FloorConfig, assets: LoadedAssets, surfaces: LayoutSurfaces, disposables: Array<{ dispose(): void }>): Object3D {
+	// Газон пола не имеет: под ним трава окружения (environment.ts), кусты ставит interior.ts.
+	if (floor.zone === "garden") {
+		return new Group();
+	}
 	const tileModelName = floorTileModels[floor.zone];
 	const rect = floor.rect;
 	if (tileModelName !== null && assets.has(tileModelName)) {
@@ -176,6 +181,17 @@ export function fitWallThickness(model: Object3D, rect: Rect): void {
 	model.scale.z *= Math.min(rect.width, rect.depth) / (WALL_MODEL_THICKNESS * MODEL_SCALE);
 }
 
+// Длина куска стены пака в мире (модель 4 в единицах модели).
+const WALL_PIECE_WORLD_LENGTH = 2;
+
+// Сжимает модель куска стены по длине до прямоугольника конфига: у Г-образного здания крайние куски короче 2 (угол кухни).
+export function fitWallLength(model: Object3D, rect: Rect): void {
+	const length = Math.max(rect.width, rect.depth);
+	if (Math.abs(length - WALL_PIECE_WORLD_LENGTH) > 1e-6) {
+		model.scale.x *= length / WALL_PIECE_WORLD_LENGTH;
+	}
+}
+
 // Препятствие или декор (стена, колонна, мебель). Модель null означает невидимый объект: на сцене его нет.
 // Наружные стены могут получить модель с окном того же размера (getWallWindowModel).
 function createProp(prop: PropConfig, assets: LoadedAssets): Object3D | null {
@@ -188,6 +204,7 @@ function createProp(prop: PropConfig, assets: LoadedAssets): Object3D | null {
 	const model = assets.cloneModel(modelName);
 	if (modelName.startsWith("wall")) {
 		fitWallThickness(model, prop.rect);
+		fitWallLength(model, prop.rect);
 	}
 	wrapper.add(model);
 	enableShadows(wrapper);

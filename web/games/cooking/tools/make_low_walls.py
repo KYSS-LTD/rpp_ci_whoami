@@ -1,6 +1,8 @@
-"""Делает низкие версии стены и проёма из высоких моделей KayKit: срез по плоскости y = CUT_Y, верхняя (бежевая) часть удаляется.
+"""Делает низкие версии стены, проёма и окна выдачи из высоких моделей KayKit: срез по плоскости y = CUT_Y, верхняя (бежевая) часть удаляется.
 
-Запуск: python tools/make_low_walls.py (из папки games/cooking). Читает public/models/wall*.gltf, пишет wall_low*.gltf и wall_doorway_low*.gltf.
+Запуск: python tools/make_low_walls.py (из папки games/cooking). Читает public/models/wall*.gltf, пишет wall_low*.gltf,
+wall_doorway_low*.gltf и wall_orderwindow_low*.gltf. У окна выдачи срез убирает перемычку над проёмом: остаются нижняя стенка
+с прилавком и боковые стойки высотой с низкую стену.
 Срез идёт по острию канавки (y = 2.0): остаются бирюзовая нижняя часть и светлая фаска, сверху ставится плоская крышка того же цвета.
 """
 import json
@@ -91,8 +93,12 @@ def convex_hull(points):
     return lower[:-1] + upper[:-1]
 
 
-def add_caps(vertices, triangles):
-    """Крышка на срезе: меш делится на связные куски (по совпадающим позициям), у каждого куска выпуклая оболочка точек среза."""
+def add_caps(vertices, triangles, split_by_side=False):
+    """Крышка на срезе: меш делится на связные куски (по совпадающим позициям), у каждого куска выпуклая оболочка точек среза.
+
+    split_by_side: точки среза левее и правее x = 0 закрываются отдельными крышками (стойки окна выдачи связаны через нижнюю
+    стенку, и общая оболочка накрыла бы проём над прилавком).
+    """
     parent = {}
 
     def key(v):
@@ -112,7 +118,8 @@ def add_caps(vertices, triangles):
     groups = {}
     for v in vertices:
         if abs(v[0][1] - CUT_Y) < EPS:
-            groups.setdefault(find(key(v)), set()).add((round(v[0][0], 4), round(v[0][2], 4)))
+            group_key = (find(key(v)), v[0][0] > 0) if split_by_side else find(key(v))
+            groups.setdefault(group_key, set()).add((round(v[0][0], 4), round(v[0][2], 4)))
     print("  cap groups:", len(groups))
     for group in groups.values():
         hull = convex_hull(list(group))
@@ -132,12 +139,12 @@ def add_caps(vertices, triangles):
                 triangles.append([ids[0], ids[k + 1], ids[k]])
 
 
-def write(source_name, target_name):
+def write(source_name, target_name, split_by_side=False):
     gltf, positions, uvs, normals, indices = load(source_name)
     vertices = [(positions[i], uvs[i], normals[i]) for i in range(len(positions))]
     triangles = [indices[i : i + 3] for i in range(0, len(indices), 3)]
     vertices, triangles = clip_below(vertices, triangles)
-    add_caps(vertices, triangles)
+    add_caps(vertices, triangles, split_by_side)
 
     pos_blob = b"".join(struct.pack("<3f", *v[0]) for v in vertices)
     uv_blob = b"".join(struct.pack("<2f", *v[1]) for v in vertices)
@@ -176,3 +183,4 @@ def write(source_name, target_name):
 if __name__ == "__main__":
     write("wall", "wall_low")
     write("wall_doorway", "wall_doorway_low")
+    write("wall_orderwindow", "wall_orderwindow_low", split_by_side=True)

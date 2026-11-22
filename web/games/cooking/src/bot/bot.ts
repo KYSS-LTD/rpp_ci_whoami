@@ -126,7 +126,7 @@ interface Job {
 const COMPONENT_OF_DISH: Record<DishId, CookRecipeId> = { burger: "patty", steak: "friedSteak", ham: "ham", veggieBurger: "veggiePatty", stew: "stew" };
 
 // Вид станции, где идёт готовка компонента.
-const COOKER_KIND_OF_COMPONENT: Record<CookRecipeId, StationKind> = { patty: "pan", veggiePatty: "pan", friedSteak: "pan", ham: "oven", stew: "stove" };
+const COOKER_KIND_OF_COMPONENT: Record<CookRecipeId, StationKind> = { patty: "stove", veggiePatty: "stove", friedSteak: "stove", ham: "oven", stew: "stove" };
 
 // Нужно ли блюду добавлять булочку (бургеры собираются на прилавке с булочкой).
 function needsBun(component: CookRecipeId): boolean {
@@ -144,7 +144,7 @@ export function createBot(simulation: Simulation, options: BotOptions = {}): Bot
 	const windowStation = stationsOfKind("servingWindow")[0];
 	const plateStation = stationsOfKind("plateStack")[0];
 	const trashStation = stationsOfKind("trash")[0];
-	const cookerCount = stationsOfKind("pan").length + stationsOfKind("oven").length + stationsOfKind("stove").length;
+	const cookerCount = stationsOfKind("oven").length + stationsOfKind("stove").length;
 	const maxInFlight = options.maxInFlight ?? cookerCount;
 	const windowCapacity = level.window.dishPoints.length;
 
@@ -299,10 +299,10 @@ export function createBot(simulation: Simulation, options: BotOptions = {}): Bot
 		const ops: Op[] = [];
 		const cookerCenter = centerOf(cooker.id);
 		if (job.component === "stew") {
-			const potTable = level.stations.find((station) => station.kind === "counter" && station.startItem === "pot");
+			// Кастрюля стоит на своей плите: снять, налить воду в раковине, вернуть на плиту и класть овощи прямо в неё.
 			const tap = stationsOfKind("tap")[0];
-			if (!potTable || !tap) throw new Error("для рагу нужны стол с кастрюлей и кран");
-			ops.push({ type: "interact", station: potTable.id }, { type: "interact", station: tap.id }, { type: "interact", station: potTable.id });
+			if (!tap) throw new Error("для рагу нужна раковина");
+			ops.push({ type: "interact", station: cooker.id }, { type: "interact", station: tap.id }, { type: "interact", station: cooker.id });
 			for (const ingredient of ingredientsOf(job.component)) {
 				const board = findFreeStation("cuttingBoard", stations, cookerCenter, new Set());
 				if (!board) throw new Error("нет свободной разделочной доски для рагу");
@@ -311,10 +311,9 @@ export function createBot(simulation: Simulation, options: BotOptions = {}): Bot
 					{ type: "interact", station: board.id },
 					{ type: "cut", station: board.id },
 					{ type: "interact", station: board.id },
-					{ type: "interact", station: potTable.id },
+					{ type: "interact", station: cooker.id },
 				);
 			}
-			ops.push({ type: "interact", station: potTable.id }, { type: "interact", station: cooker.id });
 		} else if (job.component === "ham" || job.component === "friedSteak") {
 			// Окорок и жареный стейк не режутся: из ящика сразу на плиту.
 			ops.push({ type: "interact", station: findCrate(job.component === "ham" ? "ham" : "steak").id }, { type: "interact", station: cooker.id });
@@ -448,7 +447,8 @@ export function createBot(simulation: Simulation, options: BotOptions = {}): Bot
 	// Сколько порций рагу свободно для новых работ: порции готового или варящегося рагу минус уже занятые работами.
 	function freePotPortions(pot: StationConfig, stations: Map<StationId, StationSnapshot>): number {
 		const snapshot = stations.get(pot.id);
-		if (!snapshot) {
+		// Плита без кастрюли жарит продукты: её готовка к рагу не относится.
+		if (!snapshot || !snapshot.items.some((item) => item.type === "pot")) {
 			return 0;
 		}
 		const claimed = jobs.filter((job) => job.cooker === pot.id).length;
@@ -537,10 +537,8 @@ export function createBot(simulation: Simulation, options: BotOptions = {}): Bot
 				if (!station || owned.has(config.id) || reservedCounters.has(config.id)) {
 					continue;
 				}
-				const isLeftover =
-					station.phase === "burnt" ||
-					(kind !== "stove" && station.phase === "holding" && station.items.length > 0) ||
-					(kind !== "stove" && station.phase === "ready");
+				const hasPot = station.items.some((item) => item.type === "pot");
+				const isLeftover = station.phase === "burnt" || (!hasPot && ((station.phase === "holding" && station.items.length > 0) || station.phase === "ready"));
 				if (isLeftover) {
 					const ops: Op[] = [{ type: "interact", station: config.id }, { type: "interact", station: trashStation.id }];
 					return isSafeToSpend(ops, null) ? { name: "clearCooker", jobId: null, ops } : null;
@@ -590,7 +588,11 @@ export function createBot(simulation: Simulation, options: BotOptions = {}): Bot
 					job.cooker = pot.id;
 					return planMacro(snapshot);
 				}
-				const idlePot = findFreeStation("stove", stations, chefPosition, reservedStations);
+				const idlePot = stationsOfKind("stove").find((config) => {
+					const station = stations.get(config.id);
+					const pot = station?.items.find((item) => item.type === "pot");
+					return pot?.type === "pot" && pot.portions === 0 && pot.contents.length === 0 && station?.phase === "holding" && !reservedStations.has(config.id);
+				});
 				if (!idlePot) {
 					continue;
 				}

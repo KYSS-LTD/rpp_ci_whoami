@@ -3,10 +3,10 @@
 // Параметры баланса: значения по умолчанию из defaults.ts и ниже, откалиброваны эталонным ботом (задача 8.6, bot/verify.ts).
 // Владелец: Opus-агент.
 import type { LevelConfig } from "../../contracts";
-import { createFloors, createServingWindow, point } from "./builders";
+import { createServingWindow, point } from "./builders";
 import { calibratedDishes } from "./dishes";
 import { createParams } from "./defaults";
-import { MEDIUM_TABLE_SLOTS, createHallTables, createSharedDoor, createSharedKitchenStations, createSharedQueue, createSharedShell, sharedChefStart, sharedShellSpec, sharedWaiterWaitPoints } from "./sharedLayout";
+import { MEDIUM_TABLE_SLOTS, createHallTables, createSharedDoor, createSharedFloors, createSharedKitchenStations, createSharedQueue, createSharedShell, sharedChefStart, sharedWaiterWaitPoints } from "./sharedLayout";
 
 // Создаёт новый объект уровня medium.
 export function createMediumLevel(): LevelConfig {
@@ -16,7 +16,7 @@ export function createMediumLevel(): LevelConfig {
 		id: "medium",
 		bounds: shell.bounds,
 		view: shell.bounds,
-		floors: createFloors(sharedShellSpec, shell),
+		floors: createSharedFloors(shell),
 		props: shell.props,
 		colliders: [],
 		stations: [...createSharedKitchenStations(), servingWindow.station],

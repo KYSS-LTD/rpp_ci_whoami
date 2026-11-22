@@ -4,9 +4,12 @@
 import type { FloorConfig, PropConfig, QueueConfig, Rect, Rotation, SeatConfig, ServingWindowConfig, StationConfig, StationKind, TableConfig, Vec2 } from "../../contracts";
 
 // Низкие стены (передняя стена и куски разделителя южнее окна выдачи) не закрывают от камеры блюда и зал. Это не сжатые по
-// высоте высокие стены, а отдельные модели: копии wall и wall_doorway с отрезанной верхней частью (tools/make_low_walls.py).
+// высоте высокие стены, а отдельные модели: копии wall, wall_doorway и wall_orderwindow с отрезанной верхней частью
+// (tools/make_low_walls.py).
 export const LOW_WALL_MODEL = "wall_low";
 export const LOW_DOORWAY_MODEL = "wall_doorway_low";
+// Окно выдачи тоже низкое (без перемычки над проёмом, стойки высотой с низкую стену): блюда на прилавке видны камере.
+export const LOW_SERVING_WINDOW_MODEL = "wall_orderwindow_low";
 
 // Толщина стен в мире.
 export const WALL_THICKNESS = 0.5;
@@ -221,7 +224,7 @@ export function createFloors(spec: ShellSpec, shell: ShellResult): FloorConfig[]
 
 // Станция окна выдачи на разделяющей стене и описание окна: слоты блюд вдоль окна со стороны зала, точка забора официанта.
 export function createServingWindow(shell: ShellResult, dishSlotCount: number): { station: StationConfig; window: ServingWindowConfig } {
-	const station: StationConfig = { id: "window-1", kind: "servingWindow", rect: shell.windowRect, rotationDeg: 90, model: "wall_orderwindow" };
+	const station: StationConfig = { id: "window-1", kind: "servingWindow", rect: shell.windowRect, rotationDeg: 90, model: LOW_SERVING_WINDOW_MODEL };
 	const slotStep = 1.1 / Math.max(1, dishSlotCount - 1);
 	const dishPoints = Array.from({ length: dishSlotCount }, (_, index) => point(shell.windowRect.x + 0.25, shell.windowRect.z + 0.45 + index * slotStep));
 	return {

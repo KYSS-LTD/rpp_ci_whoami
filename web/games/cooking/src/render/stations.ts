@@ -31,10 +31,10 @@ export const stationSurfaceHeights = {
 	counter: 0.5,
 	// Толщина разделочной доски на прилавке.
 	boardThickness: 0.075,
-	// Верх плиты stove_single под сковородой и кастрюлей.
+	// Верх плиты stove_single: на нём стоит кастрюля и прямо на конфорке жарятся продукты.
 	stove: 0.57,
-	// Дно сковороды над плитой.
-	panFloor: 0.07,
+	// Продукт на конфорке чуть выше её решётки.
+	burnerLift: 0.03,
 	// Верх духовки (модель oven 2.02 в паке).
 	oven: 1.0,
 	// Высота индикатора над поверхностью станции.
@@ -97,7 +97,7 @@ export function createStationViews(level: LevelConfig, assets: LoadedAssets, ite
 	const surfaceHeights = new Map<string, number>();
 	const disposables: Array<{ dispose(): void }> = [];
 
-	// Общие геометрия и материалы индикаторов: подложка на одну полосу (доска) и на две (сковорода, кастрюля, духовка).
+	// Общие геометрия и материалы индикаторов: подложка на одну полосу (доска) и на две (плита, духовка).
 	const singleBackgroundGeometry = new PlaneGeometry(indicatorWidth + indicatorBorder * 2, indicatorRowHeight + indicatorBorder * 2);
 	const doubleBackgroundGeometry = new PlaneGeometry(indicatorWidth + indicatorBorder * 2, indicatorRowHeight * 2 + indicatorRowGap + indicatorBorder * 2);
 	const fillGeometry = new PlaneGeometry(indicatorWidth, indicatorRowHeight).translate(indicatorWidth / 2, 0, 0);
@@ -164,15 +164,10 @@ export function createStationViews(level: LevelConfig, assets: LoadedAssets, ite
 				addLocalModel(stationRoot, stationTopModelNames.cuttingBoard, stationSurfaceHeights.counter);
 				surfaceY = stationSurfaceHeights.counter + stationSurfaceHeights.boardThickness;
 				break;
-			case "pan":
-				addLocalModel(stationRoot, station.model ?? (stationBaseModelNames.pan as string));
-				addLocalModel(stationRoot, stationTopModelNames.pan, stationSurfaceHeights.stove);
-				surfaceY = stationSurfaceHeights.stove + stationSurfaceHeights.panFloor;
-				break;
 			case "stove":
+				// Сковороды нет: продукт лежит прямо на конфорке, кастрюля появляется, только когда стоит на плите (по снимку).
 				addLocalModel(stationRoot, station.model ?? (stationBaseModelNames.stove as string));
-				potState.body = addLocalModel(stationRoot, stationTopModelNames.pot, stationSurfaceHeights.stove);
-				surfaceY = stationSurfaceHeights.stove + 0.05;
+				surfaceY = stationSurfaceHeights.stove + stationSurfaceHeights.burnerLift;
 				flame = new Group();
 				flame.name = `flame-${station.id}`;
 				flame.visible = false;
@@ -208,26 +203,45 @@ export function createStationViews(level: LevelConfig, assets: LoadedAssets, ite
 				surfaceY = 0.5;
 				break;
 			case "tap": {
+				// Раковина: прилавок с утопленной стальной мойкой и краном у задней кромки (модели раковины в паке нет).
+				addLocalModel(stationRoot, station.model ?? (stationBaseModelNames.tap as string));
 				const metal = new MeshStandardMaterial({ color: 0xb8c4c8, metalness: 0.75, roughness: 0.22 });
-				const baseGeometry = new CylinderGeometry(0.2, 0.22, 0.08, 16);
-				const stemGeometry = new CylinderGeometry(0.045, 0.06, 0.34, 12);
-				const spoutGeometry = new CylinderGeometry(0.045, 0.045, 0.28, 12);
-				const handleGeometry = new BoxGeometry(0.22, 0.045, 0.06);
-				disposables.push(metal, baseGeometry, stemGeometry, spoutGeometry, handleGeometry);
-				const base = new Mesh(baseGeometry, metal);
-				base.position.y = 0.04;
+				const basinMaterial = new MeshStandardMaterial({ color: 0x8f9ca3, metalness: 0.6, roughness: 0.35 });
+				const waterMaterial = new MeshStandardMaterial({ color: 0x6fb7d9, metalness: 0.1, roughness: 0.1, transparent: true, opacity: 0.75 });
+				const top = stationSurfaceHeights.counter;
+				const rimGeometry = new BoxGeometry(0.7, 0.03, 0.08);
+				const sideGeometry = new BoxGeometry(0.08, 0.03, 0.54);
+				const bottomGeometry = new BoxGeometry(0.56, 0.02, 0.5);
+				const waterGeometry = new BoxGeometry(0.54, 0.01, 0.48);
+				const stemGeometry = new CylinderGeometry(0.03, 0.04, 0.3, 12);
+				const spoutGeometry = new CylinderGeometry(0.028, 0.028, 0.22, 12);
+				const handleGeometry = new BoxGeometry(0.16, 0.03, 0.04);
+				disposables.push(metal, basinMaterial, waterMaterial, rimGeometry, sideGeometry, bottomGeometry, waterGeometry, stemGeometry, spoutGeometry, handleGeometry);
+				// Кромка мойки поверх столешницы и дно чуть ниже неё.
+				for (const z of [-0.31, 0.31]) {
+					const rim = new Mesh(rimGeometry, metal);
+					rim.position.set(0, top + 0.015, z);
+					stationRoot.add(rim);
+				}
+				for (const x of [-0.31, 0.31]) {
+					const side = new Mesh(sideGeometry, metal);
+					side.position.set(x, top + 0.015, 0);
+					stationRoot.add(side);
+				}
+				const bottom = new Mesh(bottomGeometry, basinMaterial);
+				bottom.position.set(0, top - 0.005, 0.02);
+				const water = new Mesh(waterGeometry, waterMaterial);
+				water.position.set(0, top + 0.008, 0.02);
+				// Кран у задней кромки (локальная -z), носик над мойкой.
 				const stem = new Mesh(stemGeometry, metal);
-				stem.position.set(0, 0.22, 0);
+				stem.position.set(0, top + 0.15, -0.36);
 				const spout = new Mesh(spoutGeometry, metal);
-				spout.rotation.z = Math.PI / 2;
-				spout.position.set(0.13, 0.38, 0);
-				const end = new Mesh(stemGeometry, metal);
-				end.scale.set(0.8, 0.5, 0.8);
-				end.position.set(0.27, 0.32, 0);
+				spout.rotation.x = Math.PI / 2;
+				spout.position.set(0, top + 0.29, -0.26);
 				const handle = new Mesh(handleGeometry, metal);
-				handle.position.set(-0.12, 0.4, 0);
-				stationRoot.add(base, stem, spout, end, handle);
-				surfaceY = 0.52;
+				handle.position.set(0, top + 0.21, -0.36);
+				stationRoot.add(bottom, water, stem, spout, handle);
+				surfaceY = top + 0.03;
 				break;
 			}
 		}
@@ -247,7 +261,7 @@ export function createStationViews(level: LevelConfig, assets: LoadedAssets, ite
 
 		// Индикаторы: подложка и полосы, лицом к камере, над станцией. На сковороде, в кастрюле и в духовке две полосы
 		// (готовка зелёная, подгорание красная), на доске одна (резка).
-		const hasBurnRow = station.kind === "pan" || station.kind === "oven";
+		const hasBurnRow = station.kind === "stove" || station.kind === "oven";
 		const indicator = new Group();
 		indicator.name = `indicator-${station.id}`;
 		indicator.position.set(center.x, surfaceY + stationSurfaceHeights.indicatorLift, center.z);
@@ -340,9 +354,11 @@ export function createStationViews(level: LevelConfig, assets: LoadedAssets, ite
 			anchor.remove(child);
 		}
 		const list: readonly Item[] = snapshot.items;
-		if (station.kind === "stove" && potState.body !== null) {
+		if (station.kind === "stove") {
 			rebuildPot(snapshot, anchor, potState);
-			return;
+			if (list.some((item) => item.type === "pot")) {
+				return;
+			}
 		}
 		if (list.length === 0 || station.kind === "crate" || station.kind === "trash" || station.kind === "plateStack" || station.kind === "servingWindow") {
 			return;
@@ -351,14 +367,15 @@ export function createStationViews(level: LevelConfig, assets: LoadedAssets, ite
 		anchor.add(visual.object);
 	}
 
-	// Кастрюля на конфорке: овощи видны внутри до варки, после варки показывается модель готового рагу.
+	// Кастрюля на конфорке: овощи видны внутри до варки, после варки показывается модель готового рагу. Без кастрюли тело убирается.
 	function rebuildPot(snapshot: StationSnapshot, anchor: Group, potState: PotState): void {
+		if (potState.body !== null) {
+			potState.parent.remove(potState.body);
+			potState.body = null;
+		}
 		const pot = snapshot.items.find((item) => item.type === "pot");
 		if (!pot || pot.type !== "pot") return;
 		const hasStew = pot.portions > 0;
-		if (potState.body !== null) {
-			potState.parent.remove(potState.body);
-		}
 		const nextBody = new Group();
 		nextBody.add(assets.cloneModel(hasStew ? stationTopModelNames.potWithStew : stationTopModelNames.pot));
 		nextBody.position.y = stationSurfaceHeights.stove;
