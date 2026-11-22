@@ -37,7 +37,7 @@
 
 .finalReport { max-block-size: calc(100% - 24px); overflow: auto; }
 
-@container desk (max-width: 1120px) {
+@container desk (width <= 1120px) or (height < 620px) {
 	.finalReport { grid-column: 1 / -1; max-block-size: none; overflow: visible; }
 }
 

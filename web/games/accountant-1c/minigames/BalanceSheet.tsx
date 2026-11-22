@@ -61,8 +61,8 @@ function BalanceDesk({ data, pile, orderIds, placements, computedInput, onComput
 		tutorialTarget,
 		onPlace,
 		getMovingElement: findMovingPaper,
-		onFreeDrop(itemId, offset) {
-			layout?.moveBy(itemId, cardPosition(orderIds.indexOf(itemId)), offset.dx, offset.dy);
+		onFreeDrop(event) {
+			layout?.moveBy(event.itemId, cardPosition(orderIds.indexOf(event.itemId)), event);
 		},
 	});
 	const tiltDeg = calculateBalanceTilt(assetsTotal, liabilitiesTotal);
@@ -225,7 +225,6 @@ export function BalanceSheet({ data, random, tutorialEnabled = false, onComplete
 			monitorSection="reports"
 			monitorTitle={texts.tab}
 			rulebookTab="balance"
-			deskHeight={540}
 			monitor={
 				<div className={styles.monitorForm}>
 					<h2 className={styles.formTitle}>{accountantTexts.balancePapers.monitorTitle}</h2>

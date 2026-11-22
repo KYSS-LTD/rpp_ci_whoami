@@ -95,12 +95,10 @@ interface WorkplaceProps {
 	desk: ReactNode;
 	// Нужна ли на столе папка-справочник и с какой вкладки её открывать.
 	rulebookTab?: RulebookTabId;
-	// Высота стола в пикселях на широком экране.
-	deskHeight?: number;
 	tutorial?: TutorialController;
 }
 
-export function Workplace({ booth, monitorSection, monitorTitle, monitor, desk, rulebookTab, deskHeight = 500, tutorial }: WorkplaceProps) {
+export function Workplace({ booth, monitorSection, monitorTitle, monitor, desk, rulebookTab, tutorial }: WorkplaceProps) {
 	const chrome = useLevelChrome();
 	const rootRef = useRef<HTMLElement>(null);
 	const deskRef = useRef<HTMLDivElement>(null);
@@ -174,7 +172,7 @@ export function Workplace({ booth, monitorSection, monitorTitle, monitor, desk, 
 
 					<div className={styles.deskArea} inert={isAppOpen}>
 						<DeskLayoutProvider deskRef={deskRef}>
-							<div className={styles.desk} data-tutorial-id="desk" ref={deskRef} style={{ "--desk-height": `${deskHeight}px` } as React.CSSProperties}>
+							<div className={styles.desk} data-tutorial-id="desk" ref={deskRef}>
 								{desk}
 								{rulebookTab ? <Rulebook defaultPosition={{ x: 850, y: 374 }} initialTab={rulebookTab} /> : null}
 								<Calculator defaultPosition={{ x: 830, y: 16 }} />

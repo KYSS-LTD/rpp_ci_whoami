@@ -47,8 +47,8 @@ function SortingDesk({ documents, orderIds, sections, tutorialTarget, onPlace }:
 		tutorialTarget,
 		onPlace,
 		getMovingElement: findMovingPaper,
-		onFreeDrop(itemId, offset) {
-			layout?.moveBy(itemId, sortingPaperPosition(orderIds.indexOf(itemId)), offset.dx, offset.dy);
+		onFreeDrop(event) {
+			layout?.moveBy(event.itemId, sortingPaperPosition(orderIds.indexOf(event.itemId)), event);
 		},
 	});
 

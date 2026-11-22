@@ -2,7 +2,7 @@
 // Клавиатура: Tab к элементу, Enter выбирает его и переводит фокус на цели, стрелки двигают по целям, Enter кладёт, Escape отменяет.
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { playMove, playReject, type Offset } from "./motion";
-import { useDrag, type DragHandleProps, type DropTargetResolver } from "./useDrag";
+import { useDrag, type DragHandleProps, type DropEvent, type DropTargetResolver } from "./useDrag";
 
 export interface UsePickAndDropOptions {
 	targetIds: string[];
@@ -12,7 +12,7 @@ export interface UsePickAndDropOptions {
 	resolveTarget?: DropTargetResolver;
 	// Элемент брошен мимо целей: на столе бумага просто остаётся там, куда её положили.
 	// Без обработчика элемент возвращается на место.
-	onFreeDrop?: (itemId: string, offset: Offset) => void;
+	onFreeDrop?: (event: DropEvent) => void;
 	// Какой элемент двигать при перетаскивании (например, всю бумагу, а не только кнопку на ней).
 	getMovingElement?: (handle: HTMLElement) => HTMLElement;
 }
@@ -122,7 +122,7 @@ export function usePickAndDrop({ targetIds, tutorialTarget, onPlace, resolveTarg
 					return;
 				}
 				if (onFreeDrop && event.targetId === null) {
-					onFreeDrop(event.itemId, event.offset);
+					onFreeDrop(event);
 					return;
 				}
 				playReject(event.element, event.offset);

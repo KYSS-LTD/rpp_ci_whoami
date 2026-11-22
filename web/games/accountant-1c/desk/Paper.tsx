@@ -2,7 +2,7 @@
 
 // Бумага на столе (design.md, D11): лежит с лёгким наклоном, двигается за заголовок и поднимается наверх стопки.
 // На узком экране бумаги идут столбиком без свободного положения (desk.module.css).
-import type { CSSProperties, ReactNode } from "react";
+import { useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { useDrag } from "../ui/useDrag";
 import { useDeskLayout, type PaperPosition } from "./contexts";
 import styles from "./desk.module.css";
@@ -28,8 +28,6 @@ interface PaperProps {
 	tilt?: number;
 	ariaLabel?: string;
 	className?: string;
-	// Бумага развёрнута (открытый справочник): CSS удерживает её целиком в пределах стола.
-	isExpanded?: boolean;
 	anchorRight?: boolean;
 	children?: ReactNode;
 }
@@ -44,22 +42,30 @@ export function Paper({
 	tilt = 0,
 	ariaLabel,
 	className,
-	isExpanded = false,
 	anchorRight = false,
 	children,
 }: PaperProps) {
 	const layout = useDeskLayout();
+	const paperRef = useRef<HTMLElement>(null);
 	const position = layout?.getPosition(id, defaultPosition) ?? defaultPosition;
 	const anchored = anchorRight && position === defaultPosition;
+
+	useLayoutEffect(() => {
+		const paper = paperRef.current;
+		if (!paper) return;
+		const measure = () => paper.style.setProperty("--paper-height", `${paper.offsetHeight}px`);
+		measure();
+		if (typeof ResizeObserver === "undefined") return;
+		const observer = new ResizeObserver(measure);
+		observer.observe(paper);
+		return () => observer.disconnect();
+	}, []);
+
 	const drag = useDrag({
 		resolveTarget: noTarget,
 		getMovingElement: findMovingPaper,
 		onDrop(event) {
-			const { element, offset } = event;
-			const origin = anchored && element.offsetParent === layout?.deskRef.current
-				? { x: element.offsetLeft, y: element.offsetTop }
-				: defaultPosition;
-			layout?.moveBy(id, origin, offset.dx, offset.dy);
+			layout?.moveBy(id, defaultPosition, event);
 		},
 	});
 
@@ -73,11 +79,11 @@ export function Paper({
 
 	return (
 		<article
+			ref={paperRef}
 			className={`${styles.paper} ${className ?? ""}`}
 			data-paper={id}
 			data-tutorial-id={id}
 			data-variant={variant}
-			data-expanded={isExpanded ? "true" : undefined}
 			data-anchor-right={anchored ? "true" : undefined}
 			style={style}
 			aria-label={ariaLabel}

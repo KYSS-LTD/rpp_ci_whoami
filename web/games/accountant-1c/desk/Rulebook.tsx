@@ -32,7 +32,6 @@ export function Rulebook({ defaultPosition, initialTab = "accounts" }: RulebookP
 			width={isOpen ? 360 : 150}
 			title={texts.title}
 			ariaLabel={texts.title}
-			isExpanded={isOpen}
 		>
 			{isOpen ? (
 				<div className={styles.rulebookOpen}>

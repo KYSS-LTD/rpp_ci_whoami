@@ -293,10 +293,11 @@
 }
 
 .desk {
+	--paper-edge: 12px;
+	--paper-bottom: var(--paper-edge);
 	position: relative;
 	flex: 1;
 	min-inline-size: 0;
-	min-height: var(--desk-height, 500px);
 	overflow: hidden;
 	background:
 		repeating-linear-gradient(90deg, transparent 0 118px, rgb(0 0 0 / 0.12) 118px 120px),
@@ -308,8 +309,8 @@
 
 .paper {
 	position: absolute;
-	top: var(--y);
-	left: var(--x);
+	top: clamp(var(--paper-edge), var(--y), calc(100% - var(--paper-height, 0px) - var(--paper-bottom)));
+	left: clamp(var(--paper-edge), var(--x), calc(100% - var(--paper-width, 240px) - var(--paper-edge)));
 	width: var(--paper-width, 240px);
 	font-family: var(--mono);
 	font-size: 0.8rem;
@@ -322,12 +323,6 @@
 		4px 6px 0 rgb(0 0 0 / 0.28);
 	transform: rotate(var(--tilt, 0deg));
 	transition: box-shadow 0.15s;
-}
-
-/* Развёрнутая бумага (открытый справочник) не уходит за край стола. */
-.paper[data-expanded="true"] {
-	top: min(var(--y), calc(var(--desk-height, 580px) - 400px));
-	left: min(var(--x), calc(100% - 370px));
 }
 
 .paper:focus-within {
@@ -742,7 +737,7 @@
 
 /* ---------- Узкое рабочее место: всё столбиком ---------- */
 
-@container desk (max-width: 1120px) {
+@container desk (width <= 1120px) or (height < 620px) {
 	.desk {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -754,8 +749,7 @@
 		padding: 12px;
 	}
 
-	.paper,
-	.paper[data-expanded="true"] {
+	.paper {
 		position: relative;
 		inset: auto;
 		width: 100%;
@@ -781,7 +775,7 @@
 	}
 }
 
-@container desk (min-width: 600px) and (max-width: 1120px) {
+@container desk (width >= 600px) and ((width <= 1120px) or (height < 620px)) {
 	.desk .paper[data-variant="device"] {
 		justify-self: end;
 		max-inline-size: 18rem;
@@ -794,7 +788,15 @@
 	}
 }
 
-@container desk (width > 1120px) {
+@container desk (width > 1120px) and (height >= 620px) {
+	.desk {
+		overflow: clip;
+	}
+
+	.desk:has(> [data-tutorial-id="stamp-tray"]) {
+		--paper-bottom: 8rem;
+	}
+
 	.paper[data-anchor-right="true"] {
 		left: auto;
 		right: 16px;
@@ -834,6 +836,10 @@
 		overscroll-behavior: contain;
 	}
 
+	.deskArea {
+		container-type: size;
+	}
+
 	.upper {
 		grid-template-columns: minmax(0, 1fr);
 		border-block-end: 0;
@@ -842,7 +848,7 @@
 
 	.desk {
 		align-self: start;
-		min-block-size: max(100%, var(--desk-height, 500px));
+		min-block-size: 100%;
 	}
 }
 
