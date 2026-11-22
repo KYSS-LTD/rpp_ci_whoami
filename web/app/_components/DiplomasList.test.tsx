@@ -1,7 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { platformStorage, storageKeys } from "@/core/storage";
-import { commonTexts } from "@/texts/common";
 import { diplomasTexts } from "@/texts/diplomas";
 import { accountantTexts } from "@/games/accountant-1c/texts";
 import { DiplomasList } from "./DiplomasList";
@@ -19,12 +18,11 @@ describe("страница дипломов", () => {
 		cleanup();
 	});
 
-	it("дипломы сгруппированы по игре и показывают пометку о локальном хранении", () => {
+	it("дипломы сгруппированы по игре", () => {
 		const { container } = render(<DiplomasList />);
 		expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(1);
 		expect(within(container).getByText(/Уровень: hard/)).toBeTruthy();
 		expect(within(container).getByText(/Уровень: easy/)).toBeTruthy();
-		expect(screen.getByRole("note").textContent).toBe(commonTexts.localDataNotice);
 	});
 
 	it("кнопка у диплома скачивает HTML-сертификат с именем, игрой, сложностью и очками", async () => {

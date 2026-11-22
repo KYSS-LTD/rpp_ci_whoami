@@ -34,9 +34,6 @@ export function DiplomasList() {
 		<section className={ui.page}>
 			<div className={ui.pageHeader}>
 				<h1>{diplomasTexts.title}</h1>
-				<p role="note" className={ui.note}>
-					{commonTexts.localDataNotice}
-				</p>
 			</div>
 			{diplomas.length === 0 ? <p className={ui.empty}>{diplomasTexts.empty}</p> : null}
 			{gameIds.map((gameId) => {
