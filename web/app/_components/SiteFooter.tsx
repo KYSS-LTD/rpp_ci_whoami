@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { commonTexts } from "@/texts/common";
 import styles from "./SiteFooter.module.css";
 
@@ -10,7 +11,18 @@ const footerLinks = [
 	{ href: "/me", label: commonTexts.navProfile },
 ];
 
-// Подвал сайта: название, короткое описание, ссылки и пометка о локальном хранении данных.
+const credits = commonTexts.footerCredits;
+
+// Ссылка на внешний сайт, открывается в новой вкладке.
+function ExternalLink({ href, children }: { href: string; children: ReactNode }) {
+	return (
+		<a href={href} target="_blank" rel="noopener noreferrer">
+			{children}
+		</a>
+	);
+}
+
+// Подвал сайта: название, короткое описание, ссылки и сведения о проекте.
 export function SiteFooter() {
 	return (
 		<footer className={styles.footer}>
@@ -31,7 +43,16 @@ export function SiteFooter() {
 						))}
 					</ul>
 				</nav>
-				<p className={styles.notice}>{commonTexts.localDataNotice}</p>
+				<div className={styles.credits}>
+					<p>
+						{credits.eventPrefix} <ExternalLink href={credits.eventUrl}>{credits.eventName}</ExternalLink>. {credits.caseText}
+					</p>
+					<p>
+						{credits.teamPrefix} <ExternalLink href={credits.teamUrl}>{credits.teamName}</ExternalLink>
+						<span className={styles.divider} aria-hidden="true" />
+						<ExternalLink href={credits.sourceUrl}>{credits.sourceLabel}</ExternalLink>
+					</p>
+				</div>
 			</div>
 		</footer>
 	);

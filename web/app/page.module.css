@@ -74,24 +74,6 @@
 	transform: translateX(3px) rotate(45deg);
 }
 
-.privacy {
-	display: inline-flex;
-	align-items: center;
-	gap: 8px;
-	font-size: 0.92rem;
-	color: var(--color-text-muted);
-}
-
-/* Зелёная точка: данные в безопасности */
-.privacy::before {
-	content: "";
-	flex: none;
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	background: var(--color-success);
-}
-
 /* Коллаж из трёх кадров игр, разложенных веером */
 .collage {
 	position: relative;

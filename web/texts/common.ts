@@ -48,7 +48,17 @@ export const commonTexts = {
 	achievementsIntro: "Ачивки за уровни и упражнения сохраняются в этом браузере.",
 	achievementLocked: "Закрыто",
 	achievementAwardedOn: "Получено",
-	localDataNotice: "Все данные хранятся только в этом браузере и не проверяются сервером.",
 	footerTagline: "Мини-игры, которые помогают выбрать профессию.",
 	footerNavigationLabel: "Навигация в подвале",
+	footerCredits: {
+		eventPrefix: "Данный проект был разработан в формате форума программных разработчиков",
+		eventName: "CyberGarden XX",
+		eventUrl: "https://cybergarden.ru/",
+		caseText: "Проект создан по мотивам кейса от компании ПАО КБ «Центр-инвест» на School треке.",
+		teamPrefix: "Команда разработчиков:",
+		teamName: "KYSS",
+		teamUrl: "https://github.com/KYSS-LTD",
+		sourceLabel: "Исходный код",
+		sourceUrl: "https://github.com/KYSS-LTD/rpp_ci_whoami",
+	},
 };

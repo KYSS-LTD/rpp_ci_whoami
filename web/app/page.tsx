@@ -18,7 +18,6 @@ export default function LandingPage() {
 						<Link href="/games" className={`button-primary ${styles.cta}`}>
 							{landingTexts.gamesButton}
 						</Link>
-						<p className={styles.privacy}>{landingTexts.privacyNote}</p>
 					</div>
 				</div>
 				<div className={styles.collage} aria-hidden="true">
