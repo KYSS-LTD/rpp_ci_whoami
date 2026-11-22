@@ -1,6 +1,6 @@
 export const tutorialTexts = {
-	skip: "Пропустить",
-	next: "Понятно",
+	close: "Закрыть обучение",
+	next: "Далее",
 	replay: "Повторить обучение",
 	showTarget: "Показать цель",
 	showSource: "Показать источник",

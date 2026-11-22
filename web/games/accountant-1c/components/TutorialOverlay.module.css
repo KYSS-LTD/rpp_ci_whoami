@@ -61,8 +61,27 @@
 	font-family: var(--acc-font-pixel, monospace);
 }
 
-.noteHeader span {
+.noteHeader > span {
 	margin-left: auto;
+}
+
+.note .close {
+	flex: none;
+	display: grid;
+	place-items: center;
+	inline-size: 44px;
+	block-size: 44px;
+	padding: 0;
+	color: inherit;
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 0;
+	font: 1.125rem/1 sans-serif;
+}
+
+.note .close:hover {
+	background: #ffdf70;
+	border-color: #9a4a24;
 }
 
 .portrait {

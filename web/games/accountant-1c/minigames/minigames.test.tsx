@@ -180,7 +180,7 @@ describe("перетаскивание на Pointer Events", () => {
 		acknowledge();
 		expect(screen.getByText(tutorialTexts.steps.sortPlace)).toBeTruthy();
 		fireEvent.keyDown(document.activeElement!, { key: "Escape" });
-		expect(screen.queryByRole("button", { name: tutorialTexts.skip })).toBeNull();
+		expect(screen.queryByRole("button", { name: tutorialTexts.close })).toBeNull();
 		for (const document of easyDocuments.documents.slice(1)) {
 			fireEvent.keyDown(documentButton(document.id), { key: "Enter" });
 			fireEvent.click(stamp(document.sectionId));

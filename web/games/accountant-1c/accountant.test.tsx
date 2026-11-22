@@ -168,8 +168,8 @@ describe("режим отладки", () => {
 		render(<AccountantLevel level={accountantManifest.levels[0]} onFinish={onFinish} />);
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.newspaper.openLetter }));
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.start }));
-		fireEvent.click(screen.getByRole("button", { name: tutorialTexts.skip }));
-		fireEvent.click(screen.getByRole("button", { name: tutorialTexts.skip }));
+		fireEvent.click(screen.getByRole("button", { name: tutorialTexts.close }));
+		fireEvent.click(screen.getByRole("button", { name: tutorialTexts.close }));
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.window.exitEarly }));
 		expect(debugSpy).toHaveBeenCalledWith("[debug:accountant-1c]", "фаза", "easy", "gameA");
 		expect(debugSpy).toHaveBeenCalledWith("[debug:accountant-1c]", "результат уровня", expect.objectContaining({ completed: false }));
@@ -181,8 +181,8 @@ describe("режим отладки", () => {
 		render(<AccountantLevel level={accountantManifest.levels[0]} onFinish={vi.fn()} />);
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.newspaper.openLetter }));
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.buttons.start }));
-		fireEvent.click(screen.getByRole("button", { name: tutorialTexts.skip }));
-		fireEvent.click(screen.getByRole("button", { name: tutorialTexts.skip }));
+		fireEvent.click(screen.getByRole("button", { name: tutorialTexts.close }));
+		fireEvent.click(screen.getByRole("button", { name: tutorialTexts.close }));
 		fireEvent.click(screen.getByRole("button", { name: accountantTexts.window.exitEarly }));
 		debugLog("accountant-1c", "проверка");
 		expect(debugSpy).not.toHaveBeenCalled();

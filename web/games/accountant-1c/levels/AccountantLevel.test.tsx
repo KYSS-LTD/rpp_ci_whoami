@@ -66,7 +66,7 @@ function clickButton(name: string) {
 function startLevel() {
 	clickButton(accountantTexts.newspaper.openLetter);
 	clickButton(accountantTexts.newspaper.start);
-	clickButton(tutorialTexts.skip);
+	clickButton(tutorialTexts.close);
 }
 
 afterEach(() => {
@@ -93,7 +93,7 @@ describe("сценарий уровня", () => {
 		expect(screen.getByText(tutorialTexts.steps.overviewWindow)).toBeTruthy();
 		clickButton(tutorialTexts.next);
 		expect(screen.getByText(tutorialTexts.steps.overviewDesk)).toBeTruthy();
-		expect(screen.queryByRole("button", { name: tutorialTexts.skip })).toBeNull();
+		expect(screen.getByRole("button", { name: tutorialTexts.close })).toBeTruthy();
 		clickButton(tutorialTexts.next);
 		expect(screen.getByText(`fake-${kindA}`)).toBeTruthy();
 		clickButton("fake-complete");
