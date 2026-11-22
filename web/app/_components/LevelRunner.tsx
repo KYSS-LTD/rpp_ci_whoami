@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { gameRegistry } from "@/core/registry";
 import { readGameProgress, recordLevelResult, recordPracticeResult, saveGameProgress } from "@/core/progress";
+import { defaultCheckpointSlot, hasCheckpoint, readCheckpoints, writeCheckpoint } from "@/core/progress/checkpoints";
 import type { LevelResult } from "@/core/contract/types";
 import { achievementDefinitions, type AwardedAchievement } from "@/core/achievements";
 import { commonTexts } from "@/texts/common";
@@ -32,7 +33,7 @@ export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
 	const [newlyAwarded, setNewlyAwarded] = useState<AwardedAchievement[]>([]);
 	// Номер запуска уровня: повтор после сбоя меняет его, и уровень монтируется заново.
 	const [launchNumber, setLaunchNumber] = useState(0);
-	// iframe-игра сообщила о выходе без результата: экран незавершённого уровня без сохранения.
+	// Игра вышла без итогового результата.
 	const [hasExitedWithoutResult, setHasExitedWithoutResult] = useState(false);
 
 	const game = gameRegistry.games.find((registered) => registered.manifest.gameId === gameId);
@@ -60,6 +61,7 @@ export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
 			return;
 		}
 		const outcome = recordLevelResult(result, undefined, undefined, false);
+		if (outcome.accepted && outcome.writeResult.ok) writeCheckpoint(gameId, levelId, defaultCheckpointSlot, null);
 		setIsResultRejected(!outcome.accepted);
 		setIsSaveFailed(!outcome.writeResult.ok);
 		setNewlyAwarded(outcome.newlyAwarded);
@@ -76,20 +78,24 @@ export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
 	}
 
 	if (hasExitedWithoutResult) {
+		const saved = !isSaveFailed && hasCheckpoint(gameId, levelId);
 		return (
 			<section className={`${ui.card} ${styles.result}`} data-completed="false">
 				<span className={styles.badge} aria-hidden="true" />
-				<h1>{commonTexts.levelAbandonedTitle}</h1>
-				<p className={styles.message}>{commonTexts.levelExitedBody}</p>
+				<h1>{saved ? commonTexts.levelPausedTitle : commonTexts.levelAbandonedTitle}</h1>
+				{isSaveFailed
+					? <p role="alert" className={styles.error}>{commonTexts.levelSaveError}</p>
+					: <p className={styles.message}>{saved ? commonTexts.levelPausedBody : commonTexts.levelExitedBody}</p>}
 				<div className={styles.actions}>
 					<button
 						type="button"
 						onClick={() => {
+							setIsSaveFailed(false);
 							setHasExitedWithoutResult(false);
 							setLaunchNumber((number) => number + 1);
 						}}
 					>
-						{commonTexts.levelRetry}
+						{saved ? commonTexts.levelContinue : commonTexts.levelRetry}
 					</button>{" "}
 					<Link href="/games" className="button-primary">
 						{commonTexts.backToGames}
@@ -193,8 +199,12 @@ export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
 				runtime={game.manifest.runtime}
 				onFinish={handleFinish}
 				onPracticeFinish={isFree ? handlePractice : undefined}
-				onExitWithoutResult={() => setHasExitedWithoutResult(true)}
-				progress={readGameProgress(game.manifest.gameId)}
+				onExitWithoutResult={(saveFailed) => {
+					setIsSaveFailed(saveFailed);
+					setHasExitedWithoutResult(true);
+				}}
+				loadProgress={() => ({ progress: readGameProgress(gameId), checkpoints: readCheckpoints(gameId, levelId) })}
+				onCheckpoint={(slot, data) => writeCheckpoint(gameId, levelId, slot, data)}
 				onSaveProgress={(data) => saveGameProgress(game.manifest.gameId, data)}
 			/>
 		);
@@ -212,7 +222,14 @@ export function LevelRunner({ gameId, levelId }: LevelRunnerProps) {
 
 	return (
 		<LevelErrorBoundary key={launchNumber} onRetry={() => setLaunchNumber((number) => number + 1)}>
-			<LevelComponent level={level} onFinish={handleFinish} />
+			{isSaveFailed ? <p role="alert" className={styles.error}>{commonTexts.levelSaveError}</p> : null}
+			<LevelComponent
+				level={level}
+				onFinish={handleFinish}
+				onPause={() => setHasExitedWithoutResult(true)}
+				checkpoint={readCheckpoints(gameId, levelId)[defaultCheckpointSlot]}
+				onCheckpoint={(data) => setIsSaveFailed(!writeCheckpoint(gameId, levelId, defaultCheckpointSlot, data))}
+			/>
 		</LevelErrorBoundary>
 	);
 }

@@ -11,6 +11,7 @@ import { createInputSystem } from "./input";
 import { getCampaignDay, getCampaignMenu, listDishesNeedingTutorial, markCampaignDayCompleted, markDishCooked, parseGameProgress } from "./progress";
 import { createDishIcons, createFrameLoop, createSceneRenderer, prepareAssets } from "./render";
 import { createSimulation } from "./sim/simulation";
+import { createShiftJournal, readShiftCheckpoint } from "./shift-checkpoint";
 import { systemTexts } from "./texts";
 
 // Модули, из которых собирается игра. В тестах подменяются поддельными (в jsdom нет WebGL).
@@ -99,7 +100,7 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 			return;
 		}
 		try {
-			runLevel(getLevelConfig(start.levelId), parseGameProgress(start.progress));
+			runLevel(getLevelConfig(start.levelId), parseGameProgress(start.progress), start.checkpoints?.run);
 		} catch (error) {
 			debugLog("game", "ошибка запуска уровня", error);
 			handle.cleanup();
@@ -108,16 +109,30 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 	});
 
 	// Запуск уровня: симуляция, ввод, сцена, HUD, цикл кадров.
-	function runLevel(baseLevel: LevelConfig, initialProgress: GameProgress): void {
-		const campaignDay = getCampaignDay(initialProgress, baseLevel.id);
+	function runLevel(baseLevel: LevelConfig, initialProgress: GameProgress, checkpoint?: unknown): void {
+		const saved = readShiftCheckpoint(checkpoint, baseLevel, initialProgress.completedDays[baseLevel.id]);
+		const campaignDay = saved?.day ?? getCampaignDay(initialProgress, baseLevel.id);
 		const level: LevelConfig = { ...baseLevel, params: { ...baseLevel.params, menu: getCampaignMenu(campaignDay) } };
 		handle.paused = false;
 		documentRef.title = systemTexts.documentTitle;
-		const simulation = modules.createSimulation({ level, seed: pickVerifiedSeed(level, random) });
+		const journal = saved?.journal ?? createShiftJournal();
+		const seed = saved?.seed ?? pickVerifiedSeed(level, random);
+		const simulation = modules.createSimulation({ level, seed, onFixedStep: bridge.saveCheckpoint ? journal.record : undefined });
+		saved?.journal.restore(simulation);
 		handle.simulation = simulation;
 		// Прогресс блюд: блюдо, принятое окном выдачи при игре с вводом, запоминается и уходит порталу один раз на блюдо.
 		let progress = initialProgress;
-		let campaignDaySaved = false;
+		let campaignDaySaved = saved?.dayComplete === true && !saved.replay && initialProgress.completedDays[level.id] >= campaignDay;
+		const isReplay = saved?.replay ?? initialProgress.completedDays[level.id] >= 5;
+		let lastSavedTick = -1;
+		function saveShift(force = false): void {
+			if (!bridge.saveCheckpoint || handle.closed) return;
+			const { phase, tick, result } = simulation.getSnapshot();
+			if (phase === "ready" || (!force && tick === lastSavedTick)) return;
+			lastSavedTick = tick;
+			bridge.saveCheckpoint("run", { version: 1, day: campaignDay, seed, input: journal.serialize(), replay: isReplay, dayComplete: result?.completed === true });
+		}
+		bridge.onSaveCheckpoint?.(() => saveShift(true));
 		simulation.subscribe((event) => {
 			if (event.type === "dishAccepted") {
 				const updated = markDishCooked(progress, event.dish);
@@ -164,6 +179,7 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 			if (handle.closed || !dayCompleteShown) {
 				return;
 			}
+			bridge.saveCheckpoint?.("run", null);
 			teardown();
 			try {
 				runLevel(baseLevel, progress);
@@ -179,7 +195,6 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 			handle.cleanup();
 		});
 		// Повтор уже пройденной недели: порталу уходят очки одного дня, а не сумма прошлой недели.
-		const isReplay = initialProgress.completedDays[level.id] >= 5;
 		// Порталу уходят общие очки за все дни недели. Завершённый день уже добавлен в прогресс, незавершённый добавляется здесь.
 		const reporter: ResultReporter = {
 			get isClosed() {
@@ -203,7 +218,7 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 		const icons = modules.createDishIcons(loadedAssets);
 
 		// Фаза смены по последнему снимку: время идёт только в running.
-		let lastPhase: ShiftPhase = "ready";
+		let lastPhase: ShiftPhase = saved ? simulation.getSnapshot().phase : "ready";
 		let inputEnabled = true;
 
 		// Ввод включён, только пока смена идёт и пауза не включена: на стартовом экране, провале и паузе он не нужен.
@@ -241,6 +256,7 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 				onStartPressed: () => {
 					simulation.start();
 					lastPhase = simulation.getSnapshot().phase;
+					saveShift();
 					syncInput();
 				},
 				onPauseRequested: pauseGame,
@@ -257,6 +273,10 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 		// До нажатия "Начать" ввод выключен.
 		input.setEnabled(false);
 		inputEnabled = false;
+		if (saved) {
+			hud.update(simulation.getSnapshot(), 0);
+			if (lastPhase === "running") pauseGame();
+		}
 
 		// Скрытая вкладка ставит игру на паузу: время симуляции не идёт, вернувшийся игрок видит меню паузы.
 		const onVisibilityChange = (): void => {
@@ -277,6 +297,7 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 		}
 
 		// Один кадр: шаги симуляции по вводу, снимок, события, сцена и HUD.
+		let nextSave = 0;
 		function handleFrame(frameDtSec: number, nowMs: number): void {
 			if (handle.closed) {
 				return;
@@ -288,6 +309,10 @@ export async function startGame(deps: GameDeps): Promise<GameHandle | null> {
 				const snapshot: GameSnapshot = simulation.getSnapshot();
 				lastPhase = snapshot.phase;
 				syncInput();
+				if (bridge.saveCheckpoint && (nowMs >= nextSave || lastPhase === "finished" || lastPhase === "failed")) {
+					saveShift();
+					nextSave = nowMs + 750;
+				}
 				// Смена завершена успешно или по времени. Успешный день, после которого неделя не закончена, показывает экран
 				// "Следующий день" в самой игре. Иначе результат уходит порталу один раз, дальше игра закрывается.
 				if (snapshot.phase === "finished" && snapshot.result) {

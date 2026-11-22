@@ -1381,10 +1381,12 @@ export interface PortalBridgeApi {
 	getLevelId(): LevelId;
 	// Подписка на старт от портала. Первый вызов сообщает порталу о готовности. progress: сохранённый блок данных игры (объект)
 	// или null (старый портал, нет блока, LocalStorage недоступен); его разбирает parseGameProgress.
-	onStart(callback: (start: { gameId: string; levelId: string; progress: unknown }) => void): void;
+	onStart(callback: (start: { gameId: string; levelId: string; progress: unknown; checkpoints?: Record<string, unknown> }) => void): void;
 	// Отправляет порталу блок данных игры (до 4096 байт JSON, объект); портал хранит последний блок и отдаёт в следующем старте.
 	// false: блок слишком большой, не сериализуется или сообщение не ушло (портала нет).
 	saveProgress(data: unknown): boolean;
+	onSaveCheckpoint?(callback: (() => void) | null): void;
+	saveCheckpoint?(slot: string, data: Record<string, unknown> | null): void;
 	// Итог уровня. false, если результат уже отправлен или числа неверные.
 	finish(result: { score: number; maxScore: number; completed?: boolean }): boolean;
 	// Выход без результата.
@@ -1536,6 +1538,7 @@ export interface SimulationOptions {
 	level: LevelConfig;
 	// Seed расписания дня. Должен быть из LevelConfig.verifiedSeeds (проверяет вызывающий; тесты могут брать любой).
 	seed: number;
+	onFixedStep?: (input: InputState) => void;
 }
 
 // Порядок одного шага (sim/simulation.ts), только в фазе running:

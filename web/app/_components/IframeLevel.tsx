@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { buildLevelUrl, buildStartMessage, parseGameMessage } from "@/core/bridge";
+import { bridgeProtocolVersion, buildLevelUrl, buildStartMessage, parseGameMessage, portalMessageSource } from "@/core/bridge";
 import type { PracticeResult } from "@/core/bridge/protocol";
 import { defaultReadyTimeoutSec, type IframeRuntime, type LevelDefinition, type LevelResult } from "@/core/contract/types";
+import type { Checkpoint } from "@/core/progress/checkpoints";
 import { debugLog } from "@/core/debug";
 import { commonTexts } from "@/texts/common";
 import { LevelFallback } from "./LevelFallback";
@@ -18,9 +20,11 @@ interface IframeLevelProps {
 	// Результат уровня с gameId, levelId и временем запуска. Проверку и сохранение делает LevelRunner.
 	onFinish: (result: LevelResult) => void;
 	onPracticeFinish?: (result: PracticeResult) => void;
-	// Игра сообщила о выходе без результата: показать экран незавершённого уровня, ничего не сохранять.
-	onExitWithoutResult: () => void;
+	// Игра вышла без итогового результата.
+	onExitWithoutResult: (saveFailed: boolean) => void;
 	progress?: unknown;
+	loadProgress?: () => { progress: unknown; checkpoints: Record<string, Checkpoint> };
+	onCheckpoint?: (slot: string, data: Checkpoint | null) => boolean;
 	onSaveProgress?: (data: Record<string, unknown>) => void;
 }
 
@@ -28,7 +32,10 @@ interface IframeLevelProps {
 type LevelPhase = "loading" | "running" | "failed";
 
 // Уровень iframe-игры (capability game-iframe-bridge): сборка в изолированном фрейме и обмен сообщениями по протоколу.
-export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPracticeFinish, onExitWithoutResult, progress = null, onSaveProgress }: IframeLevelProps) {
+export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPracticeFinish, onExitWithoutResult, progress = null, onSaveProgress, loadProgress, onCheckpoint }: IframeLevelProps) {
+	const router = useRouter();
+	const exitTimer = useRef<number | undefined>(undefined);
+	const [checkpointFailed, setCheckpointFailed] = useState(false);
 	const frameRef = useRef<HTMLIFrameElement>(null);
 	const levelRef = useRef<HTMLElement>(null);
 	const [nativeFullscreen, setNativeFullscreen] = useState(false);
@@ -86,10 +93,24 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 	const hasResultRef = useRef(false);
 	const freeMode = Boolean(onPracticeFinish);
 	const frameUrl = `${buildLevelUrl(runtime.entry, level.id)}${freeMode ? "&mode=free" : ""}${attempt.number ? `&retry=${attempt.number}` : ""}`;
-	const callbacksRef = useRef({ onFinish, onPracticeFinish, onExitWithoutResult, onSaveProgress });
+	const callbacksRef = useRef({ onFinish, onPracticeFinish, onExitWithoutResult, onSaveProgress, progress, loadProgress, onCheckpoint });
 	useEffect(() => {
-		callbacksRef.current = { onFinish, onPracticeFinish, onExitWithoutResult, onSaveProgress };
-	}, [onFinish, onPracticeFinish, onExitWithoutResult, onSaveProgress]);
+		callbacksRef.current = { onFinish, onPracticeFinish, onExitWithoutResult, onSaveProgress, progress, loadProgress, onCheckpoint };
+	}, [onFinish, onPracticeFinish, onExitWithoutResult, onSaveProgress, progress, loadProgress, onCheckpoint]);
+
+	function exitToGames() {
+		if (exitTimer.current !== undefined) return;
+		const frameWindow = frameRef.current?.contentWindow;
+		if (!frameWindow || phaseRef.current !== "running") {
+			router.push("/games");
+			return;
+		}
+		exitTimer.current = window.setTimeout(() => {
+			exitTimer.current = undefined;
+			router.push("/games");
+		}, 750);
+		frameWindow.postMessage({ source: portalMessageSource, version: bridgeProtocolVersion, type: "save-checkpoint" }, "*");
+	}
 
 	function changePhase(nextPhase: LevelPhase) {
 		phaseRef.current = nextPhase;
@@ -100,6 +121,7 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 	useEffect(() => {
 		phaseRef.current = "loading";
 		hasResultRef.current = false;
+		let lastCheckpointFailed = false;
 
 		function handleMessage(event: MessageEvent) {
 			const frameWindow = frameRef.current?.contentWindow;
@@ -117,11 +139,30 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 
 			if (message.type === "ready" && currentPhase === "loading") {
 				// targetOrigin "*": у изолированного фрейма нет адресуемого источника, а в сообщении нет секретов.
-				frameWindow.postMessage(buildStartMessage(gameId, level.id, progress), "*");
+				const saved = callbacksRef.current.loadProgress?.();
+				frameWindow.postMessage(buildStartMessage(gameId, level.id, saved ? saved.progress : callbacksRef.current.progress, saved?.checkpoints), "*");
 				startedAtRef.current = Date.now();
 				phaseRef.current = "running";
 				setPhase("running");
 				frameRef.current?.focus();
+				return;
+			}
+			if (message.type === "checkpoint" && currentPhase === "running" && !hasResultRef.current) {
+				if (callbacksRef.current.onCheckpoint) {
+					const saved = callbacksRef.current.onCheckpoint(message.slot, message.data);
+					lastCheckpointFailed = !saved;
+					setCheckpointFailed(lastCheckpointFailed);
+					if (!saved && exitTimer.current !== undefined) {
+						window.clearTimeout(exitTimer.current);
+						exitTimer.current = undefined;
+					}
+				}
+				return;
+			}
+			if (message.type === "checkpoint-saved" && exitTimer.current !== undefined) {
+				window.clearTimeout(exitTimer.current);
+				exitTimer.current = undefined;
+				router.push("/games");
 				return;
 			}
 			if (message.type === "progress" && currentPhase === "running" && !hasResultRef.current) {
@@ -146,7 +187,7 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 				return;
 			}
 			if (message.type === "exit" && currentPhase !== "failed" && !hasResultRef.current) {
-				callbacksRef.current.onExitWithoutResult();
+				callbacksRef.current.onExitWithoutResult(lastCheckpointFailed);
 				return;
 			}
 			if (message.type === "error" && currentPhase !== "failed" && !hasResultRef.current) {
@@ -163,8 +204,12 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 		// Быстрая сборка может отправить ready сразу после загрузки. Сначала подключаем обработчик.
 		const frame = frameRef.current;
 		if (frame && frame.getAttribute("src") !== frameUrl) frame.setAttribute("src", frameUrl);
-		return () => window.removeEventListener("message", handleMessage);
-	}, [gameId, level.id, frameUrl, freeMode, progress, onSaveProgress]);
+		return () => {
+			window.clearTimeout(exitTimer.current);
+			exitTimer.current = undefined;
+			window.removeEventListener("message", handleMessage);
+		};
+	}, [gameId, level.id, frameUrl, freeMode, router]);
 
 	// Разрешение Gamepad для изолированного iframe различается между браузерами.
 	// В таком случае портал передаёт игре только значения органов управления, без данных об устройстве.
@@ -243,9 +288,13 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 						</svg>
 					</button>
 					<Link href="/games" className={`button-secondary ${styles.fullscreenButton}`}
-						aria-label={commonTexts.levelExit} title={commonTexts.levelExit}><span aria-hidden="true">×</span></Link>
+						aria-label={onCheckpoint ? commonTexts.saveAndExit : commonTexts.levelExit} title={onCheckpoint ? commonTexts.saveAndExit : commonTexts.levelExit} onNavigate={(event) => {
+							event.preventDefault();
+							exitToGames();
+						}}><span aria-hidden="true">×</span></Link>
 				</div>
 			</div>
+			{checkpointFailed ? <p role="alert">{commonTexts.levelSaveError}</p> : null}
 			<div className={styles.stage} data-phase={phase}>
 				<iframe
 					key={attempt.number}

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { GameManifest, LevelId } from "@/core/contract/types";
+import { hasCheckpoint } from "@/core/progress/checkpoints";
+import { commonTexts } from "@/texts/common";
 import { gamesTexts } from "@/texts/games";
 import { professionNames } from "@/texts/professions";
 import { uavTexts } from "@/games/uav-operator/texts";
@@ -24,7 +26,9 @@ export function GameSheet({ game, completedLevelIds, rating, ratingMessage, onRa
 	const dialogRef = useRef<HTMLDialogElement>(null);
 	// По умолчанию выбран первый непройденный уровень: так игрок продолжает с того места, где остановился.
 	const [selectedLevelId, setSelectedLevelId] = useState<LevelId>(
-		() => game.levels.find((level) => !completedLevelIds.includes(level.id))?.id ?? game.levels[0].id,
+		() => game.levels.find((level) => hasCheckpoint(game.gameId, level.id))?.id
+			?? game.levels.find((level) => !completedLevelIds.includes(level.id))?.id
+			?? game.levels[0].id,
 	);
 
 	useEffect(() => {
@@ -111,7 +115,9 @@ export function GameSheet({ game, completedLevelIds, rating, ratingMessage, onRa
 
 				<div className={styles.actions}>
 					<Link href={`/games/${game.gameId}/${selectedLevelId}`} className={`button-primary ${styles.start}`}>
-						{game.gameId === "uav-operator" ? uavTexts.story : gamesTexts.startLevel}
+						{hasCheckpoint(game.gameId, selectedLevelId)
+							? commonTexts.levelContinue
+							: game.gameId === "uav-operator" ? uavTexts.story : gamesTexts.startLevel}
 					</Link>
 					{game.gameId === "uav-operator" ? <Link href="/games/uav-operator/free" className="button-secondary">
 						<span aria-hidden="true">✣</span> {uavTexts.free}

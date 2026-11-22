@@ -39,7 +39,7 @@ function copyItem(item: Item): Item {
 // Создаёт симуляцию уровня по seed расписания. Расписание, геометрия и все модули строятся сразу; смена стоит в фазе ready,
 // пока не вызван start().
 export const createSimulation: SimulationFactory = (options: SimulationOptions): Simulation => {
-	const { level, seed } = options;
+	const { level, seed, onFixedStep } = options;
 	const clock: SimClock = { nowSec: 0 };
 	const bus: EventBus = createEventBus(clock);
 
@@ -96,7 +96,9 @@ export const createSimulation: SimulationFactory = (options: SimulationOptions):
 	const loop = createFixedStepLoop({
 		stepSec: SIM_STEP_SEC,
 		onStep: () => {
-			runStep({ ...frameInput, actionPressed: pendingActionPressed, workPressed: pendingWorkPressed });
+			const input = { ...frameInput, actionPressed: pendingActionPressed, workPressed: pendingWorkPressed };
+			if (phase === "running") onFixedStep?.(input);
+			runStep(input);
 			pendingActionPressed = false;
 			pendingWorkPressed = false;
 		},

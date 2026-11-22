@@ -22,7 +22,7 @@ async function LevelContent({ params }: LevelPageProps) {
 	const { gameId, level } = await params;
 	return (
 		<ClientOnly>
-			<LevelRunner gameId={gameId} levelId={level} />
+			<LevelRunner key={`${gameId}/${level}`} gameId={gameId} levelId={level} />
 		</ClientOnly>
 	);
 }

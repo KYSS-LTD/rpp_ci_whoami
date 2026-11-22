@@ -32,6 +32,7 @@ export interface LevelChrome {
 	removeSlip: (id: number) => void;
 	closeNotification: (id: number) => void;
 	onExitEarly: () => void;
+	exitLabel?: string;
 	isExitDisabled: boolean;
 }
 

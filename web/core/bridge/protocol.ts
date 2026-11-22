@@ -3,6 +3,7 @@
 // Те же значения повторены в SDK (sdk/web/portal-bridge.js): при изменении протокола править оба места и docs/game-bridge-protocol.md.
 
 import type { LevelId, PracticeAttempt } from "../contract/types";
+import { isCheckpoint, isCheckpointSlot, type Checkpoint } from "../progress/checkpoints";
 
 // Версия протокола. Сообщения с другой версией портал игнорирует.
 export const bridgeProtocolVersion = 1;
@@ -32,6 +33,8 @@ export type PracticeResult = Omit<PracticeAttempt, "gameId"> & { type: "practice
 // Сообщения игры, которые портал понимает.
 export type GameMessage =
 	| { type: "ready" }
+	| { type: "checkpoint"; slot: string; data: Checkpoint | null }
+	| { type: "checkpoint-saved" }
 	| { type: "progress"; data: Record<string, unknown> }
 	| { type: "level-result"; score: number; maxScore: number; completed: boolean }
 	| PracticeResult
@@ -46,6 +49,7 @@ export interface StartMessage {
 	gameId: string;
 	levelId: LevelId;
 	progress: Record<string, unknown> | null;
+	checkpoints?: Record<string, Checkpoint>;
 }
 
 // Итог разбора: сообщение или причина, по которой оно проигнорировано (для журнала отладки).
@@ -68,6 +72,13 @@ export function parseGameMessage(data: unknown): ParsedGameMessage {
 	switch (raw.type) {
 		case "ready":
 			return { ok: true, message: { type: "ready" } };
+		case "checkpoint-saved":
+			return { ok: true, message: { type: "checkpoint-saved" } };
+		case "checkpoint":
+			if (!isCheckpointSlot(raw.slot) || (raw.data !== null && !isCheckpoint(raw.data))) {
+				return { ok: false, reason: "неверное сохранение игры" };
+			}
+			return { ok: true, message: { type: "checkpoint", slot: raw.slot, data: raw.data } };
 		case "progress":
 			if (!isValidGameProgress(raw.data)) return { ok: false, reason: "неверный или слишком большой блок прогресса игры" };
 			return { ok: true, message: { type: "progress", data: raw.data as Record<string, unknown> } };
@@ -101,9 +112,9 @@ export function parseGameMessage(data: unknown): ParsedGameMessage {
 }
 
 // Собирает сообщение о старте уровня для игры.
-export function buildStartMessage(gameId: string, levelId: LevelId, progress: unknown = null): StartMessage {
+export function buildStartMessage(gameId: string, levelId: LevelId, progress: unknown = null, checkpoints?: Record<string, Checkpoint>): StartMessage {
 	return { source: portalMessageSource, version: bridgeProtocolVersion, type: "start", gameId, levelId,
-		progress: isValidGameProgress(progress) ? progress as Record<string, unknown> : null };
+		progress: isValidGameProgress(progress) ? progress as Record<string, unknown> : null, ...(checkpoints && { checkpoints }) };
 }
 
 // Адрес сборки с уровнем в параметре: "/game-builds/x/index.html" -> "/game-builds/x/index.html?level=easy".

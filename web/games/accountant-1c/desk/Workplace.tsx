@@ -4,6 +4,7 @@
 // Под полосой дня расположены окошко в коридор, монитор и стол с бумагами.
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { TutorialOverlay } from "../components/TutorialOverlay";
+import { useSavedState } from "../hooks/checkpoint";
 import type { TutorialController } from "../hooks/useTutorial";
 import { tutorialTexts } from "../texts/tutorial";
 import { fillTemplate } from "../logic/feedback";
@@ -104,7 +105,7 @@ export function Workplace({ booth, monitorSection, monitorTitle, monitor, desk, 
 	const deskRef = useRef<HTMLDivElement>(null);
 	const launcherRef = useRef<HTMLButtonElement>(null);
 	const returnFocusRef = useRef<HTMLButtonElement>(null);
-	const [isAppOpen, setIsAppOpen] = useState(false);
+	const [isAppOpen, setIsAppOpen] = useSavedState("desk.appOpen", false);
 	const ficusState = getFicusState(chrome.share);
 	const texts = accountantTexts.workplace;
 
@@ -132,8 +133,8 @@ export function Workplace({ booth, monitorSection, monitorTitle, monitor, desk, 
 					{tutorial?.enabled ? (
 						<button type="button" className={styles.tutorialHelp} data-tutorial-help aria-label={tutorialTexts.replay} onClick={tutorial.replay}>?</button>
 					) : null}
-					<button type="button" className={styles.exitButton} aria-label={accountantTexts.window.exitEarly} onClick={chrome.onExitEarly} disabled={chrome.isExitDisabled}>
-						<span className={styles.exitLabel}>{accountantTexts.window.exitEarly}</span>
+					<button type="button" className={styles.exitButton} aria-label={chrome.exitLabel ?? accountantTexts.window.exitEarly} onClick={chrome.onExitEarly} disabled={chrome.isExitDisabled}>
+						<span className={styles.exitLabel}>{chrome.exitLabel ?? accountantTexts.window.exitEarly}</span>
 						<span className={styles.exitCompact} aria-hidden="true">{accountantTexts.window.exitCompact}</span>
 					</button>
 				</header>

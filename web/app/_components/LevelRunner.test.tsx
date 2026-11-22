@@ -6,6 +6,9 @@ import { commonTexts } from "@/texts/common";
 import { diplomasTexts } from "@/texts/diplomas";
 import { LevelRunner } from "./LevelRunner";
 
+const router = { push: vi.fn() };
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
+
 // Тестовая игра с одним компонентом уровня, который сразу сообщает результат.
 vi.mock("@/core/registry", () => {
 	const FakeLevel = ({ level, onFinish }: { level: { id: string }; onFinish: (result: unknown) => void }) => (

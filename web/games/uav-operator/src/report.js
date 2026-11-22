@@ -13,13 +13,12 @@ export function read_Record(value, index) {
 }
 
 // Часы идут и при разметке в диалоге. Инструктаж, меню, подтверждение сдачи и скрытая вкладка исключены.
-export function track_Practice(record, signal) {
+export function track_Practice(record, signal, started = false) {
 	const tutorial = document.querySelector('#stage-tutorial');
 	const orientation = document.querySelector('#flight-orientation');
 	const menu = document.querySelector('#stage-menu');
 	const confirm = document.querySelector('#stage-submit');
 	let since = null;
-	let started = false;
 	function measure() {
 		const now = performance.now();
 		if (since !== null) record.elapsed += Math.round(now - since);
@@ -40,6 +39,7 @@ export function track_Practice(record, signal) {
 		observer.disconnect();
 	}, { once: true });
 	measure();
+	return measure;
 }
 
 function duration_Text(ms) {

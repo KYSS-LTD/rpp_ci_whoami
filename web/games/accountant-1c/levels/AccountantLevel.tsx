@@ -6,11 +6,13 @@
 // Результат уходит в портал ровно один раз за запуск (D9): "Сдать отчёт" или "Уйти домой пораньше".
 import { useCallback, useRef, useState, type ComponentType } from "react";
 import type { LevelComponentProps, LevelId } from "@/core/contract/types";
+import { commonTexts } from "@/texts/common";
 import { debugLog } from "@/core/debug";
 import { LevelChromeProvider, type LevelChrome, type Slip } from "../desk/contexts";
 import { Paper } from "../desk/Paper";
 import { Workplace } from "../desk/Workplace";
 import { levelTutorials } from "../data/tutorials";
+import { CheckpointProvider, useCheckpoint, useSavedState } from "../hooks/checkpoint";
 import { useTutorial } from "../hooks/useTutorial";
 import { hintLevels, levelMaxScore, levelScenarios, miniGameMaxScore, type MiniGameData } from "../data/levels";
 import { buildChiefReply, fillTemplate, type MistakeRecord } from "../logic/feedback";
@@ -42,28 +44,39 @@ function readClockMs(): number {
 	return Date.now();
 }
 
-export function AccountantLevel({ level, onFinish, random }: AccountantLevelProps) {
+export function AccountantLevel(props: AccountantLevelProps) {
+	return (
+		<CheckpointProvider key={props.level.id} checkpoint={props.checkpoint} onSave={props.onCheckpoint}>
+			<AccountantRun {...props} />
+		</CheckpointProvider>
+	);
+}
+
+function AccountantRun({ level, onFinish, onPause, random }: AccountantLevelProps) {
+	const session = useCheckpoint();
+	const [previousDuration] = useSavedState("elapsedMs", 0);
 	const levelId = level.id as LevelId;
 	const scenario = levelScenarios[levelId];
-	const [startedAtMs] = useState(() => Date.now());
-	const [phase, setPhase] = useState<LevelPhase>("intro");
-	const [isLetterOpen, setIsLetterOpen] = useState(false);
-	const [isOverviewOpen, setIsOverviewOpen] = useState(false);
-	const overview = useTutorial(isOverviewOpen, levelTutorials[levelId], () => {
+	const [startedAtMs] = useState(() => Date.now() - previousDuration);
+	const [phase, setPhase] = useSavedState<LevelPhase>("level.phase", "intro");
+	const [isLetterOpen, setIsLetterOpen] = useSavedState("level.isLetterOpen", false);
+	const [isOverviewOpen, setIsOverviewOpen] = useSavedState("level.isOverviewOpen", false);
+	const overview = useTutorial("level.tutorial", isOverviewOpen, levelTutorials[levelId], () => {
 		setIsOverviewOpen(false);
 		notifyDirector("start");
 		goToPhase(getNextPhase("intro"));
 	});
-	const [outcomes, setOutcomes] = useState<MiniGameOutcome[]>([]);
-	const [liveProgress, setLiveProgress] = useState<MiniGameProgress>(emptyProgress);
-	const [messages, setMessages] = useState<WindowMessage[]>([]);
-	const [slips, setSlips] = useState<Slip[]>([]);
-	const [mistakesCount, setMistakesCount] = useState(0);
-	const [notifications, setNotifications] = useState<WindowNotification[]>([]);
+	const [outcomes, setOutcomes] = useSavedState<MiniGameOutcome[]>("level.outcomes", []);
+	const [liveProgress, setLiveProgress] = useSavedState<MiniGameProgress>("level.liveProgress", emptyProgress);
+	const [messages, setMessages] = useSavedState<WindowMessage[]>("level.messages", []);
+	const [slips, setSlips] = useSavedState<Slip[]>("level.slips", []);
+	const [mistakesCount, setMistakesCount] = useSavedState("level.mistakesCount", 0);
+	const [notifications, setNotifications] = useSavedState<WindowNotification[]>("level.notifications", []);
 	const [isSent, setIsSent] = useState(false);
 	// Флаг отправки в ref: защищает от двойного вызова onFinish даже при двух быстрых нажатиях до перерисовки.
 	const isSentRef = useRef(false);
-	const nextMessageIdRef = useRef(1);
+	const nextMessageIdRef = useRef(Math.max(0, ...messages.map(({ id }) => id),
+		...slips.map(({ id }) => id), ...notifications.map(({ id }) => id)) + 1);
 	const focusLetterHeading = useCallback((heading: HTMLHeadingElement | null) => {
 		heading?.focus();
 	}, []);
@@ -84,11 +97,11 @@ export function AccountantLevel({ level, onFinish, random }: AccountantLevelProp
 
 	const closeNotification = useCallback((id: number) => {
 		setNotifications((previous) => previous.filter((notification) => notification.id !== id));
-	}, []);
+	}, [setNotifications]);
 
 	const removeSlip = useCallback((id: number) => {
 		setSlips((previous) => previous.filter((slip) => slip.id !== id));
-	}, []);
+	}, [setSlips]);
 
 	function goToPhase(nextPhase: LevelPhase) {
 		debugLog(debugScope, "фаза", levelId, nextPhase);
@@ -154,7 +167,16 @@ export function AccountantLevel({ level, onFinish, random }: AccountantLevelProp
 		notifications,
 		removeSlip,
 		closeNotification,
-		onExitEarly: () => sendResult(false),
+		exitLabel: onPause ? commonTexts.saveAndExit : undefined,
+		onExitEarly: () => {
+			if (!onPause) {
+				sendResult(false);
+				return;
+			}
+			session?.update("elapsedMs", readClockMs() - startedAtMs);
+			session?.flush();
+			onPause();
+		},
 		isExitDisabled: isSent,
 	};
 

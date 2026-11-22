@@ -28,7 +28,7 @@ describe("сценарии обучения", () => {
 	it("неверное учебное действие не проходит в игру, а пропуск возвращает обычные правила", () => {
 		const onClose = vi.fn();
 		const { result, rerender } = renderHook(
-			({ steps }) => useTutorial(true, steps, onClose),
+			({ steps }) => useTutorial("test", true, steps, onClose),
 			{ initialProps: { steps: scenarios.documentSorting } },
 		);
 		act(() => result.current.next());

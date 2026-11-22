@@ -3,7 +3,7 @@
 // Мини-игра "Сверка банковской выписки" (hard). На столе два листа: выписка банка и карточка счёта 51.
 // Строку выписки сопоставляют со строкой учёта: перетащить на неё, выбрать её и затем пару, или клавиатурой.
 // То, что не сходится, отмечают на бумаге кнопкой «Расхождение», причину выбирают в программе.
-import { useState } from "react";
+import { useSavedState } from "../hooks/checkpoint";
 import { miniGameTutorials } from "../data/tutorials";
 import { useTutorial } from "../hooks/useTutorial";
 import { type BankReconciliationData, type DiscrepancyReason, type StatementRow } from "../data/levels";
@@ -129,7 +129,7 @@ function StatementDesk({ bankRows, ledgerRows, matches, marks, isFinished, tutor
 }
 
 export function BankReconciliation({ data, random, tutorialEnabled = false, onComplete, onMistake, onNotice }: MiniGameProps<BankReconciliationData>) {
-	const [rowOrder] = useState(() => ({
+	const [rowOrder] = useSavedState("bankReconciliation.rowOrder", () => ({
 		bank: shuffle(
 			data.rows.filter((row) => row.side === "bank"),
 			random,
@@ -140,9 +140,9 @@ export function BankReconciliation({ data, random, tutorialEnabled = false, onCo
 		),
 	}));
 	// Сопоставленные пары: строка выписки -> строка учёта.
-	const [matches, setMatches] = useState<Record<string, string>>({});
-	const [marks, setMarks] = useState<ReconciliationMarks>({});
-	const [isFinished, setIsFinished] = useState(false);
+	const [matches, setMatches] = useSavedState<Record<string, string>>("bankReconciliation.matches", {});
+	const [marks, setMarks] = useSavedState<ReconciliationMarks>("bankReconciliation.marks", {});
+	const [isFinished, setIsFinished] = useSavedState("bankReconciliation.isFinished", false);
 
 	const matchedLedgerIds = Object.values(matches);
 	const openPair = data.matchingPairs.find(([bankId, ledgerId]) =>
@@ -151,7 +151,7 @@ export function BankReconciliation({ data, random, tutorialEnabled = false, onCo
 	const practiceDiscrepancy = data.discrepancies
 		.flatMap(({ rowIds, reason }) => rowIds.map((rowId) => ({ rowId, reason, marked: marks[rowId] !== undefined })))
 		.find(({ rowId, reason }) => matches[rowId] === undefined && !matchedLedgerIds.includes(rowId) && marks[rowId] !== reason);
-	const tutorial = useTutorial(tutorialEnabled, miniGameTutorials.bankReconciliation(openPair, practiceDiscrepancy));
+	const tutorial = useTutorial("bankReconciliation.tutorial", tutorialEnabled, miniGameTutorials.bankReconciliation(openPair, practiceDiscrepancy));
 	const tutorialTarget = tutorial.current?.action === "match" ? tutorial.current.targets[1].slice("target-".length) : undefined;
 
 	function handleMatch(bankId: string, ledgerId: string): boolean {

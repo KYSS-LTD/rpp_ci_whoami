@@ -66,7 +66,7 @@ function draw_Map(context, x, z, heading, scanned, { limits, points, beach }) {
 	context.restore();
 }
 
-export function start_Flight({ mount, coast, renderer, signal, settings, restart, attempts, onLaunch, sound, restarting, logAction, practice, resetMessage, freeMode, storyCamera, onCameraChange }) {
+export function start_Flight({ mount, coast, renderer, signal, settings, restart, attempts, onLaunch, sound, restarting, logAction, practice, resetMessage, freeMode, storyCamera, onCameraChange, restoredState }) {
 	const copy = text.flight;
 	const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 	const beach = !practice || practice.map === 'beach';
@@ -86,7 +86,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	const kit = droneKey ? fleet[droneKey] : fpvKit;
 	const fieldDrone = droneKey ? create_FleetModel(scene, droneKey) : world.fieldDrone;
 	if (droneKey && beach) coast.fieldDrone.drone.visible = false;
-	let chase = (practice?.camera ?? storyCamera) === 'chase';
+	let chase = (restoredState?.camera ?? practice?.camera ?? storyCamera) === 'chase';
 	let cameraChanged = true;
 	const droneCenter = fieldDrone.drone.worldToLocal(new THREE.Box3().setFromObject(fieldDrone.drone).getCenter(new THREE.Vector3()));
 	const chaseDistance = Math.max(1.4, (kit.length ?? .32) * 5.5);
@@ -156,7 +156,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		bootTimer = setTimeout(() => { boot.hidden = true; }, 1450);
 	}
 	let lossTimer;
-	if (restarting) connect_Camera();
+	if (restarting && !restoredState) connect_Camera();
 	signal.addEventListener('abort', () => { clearTimeout(bootTimer); clearTimeout(lossTimer); }, { once: true });
 	frame.tabIndex = -1;
 	const focus = () => frame.focus({ preventScroll: true });
@@ -249,6 +249,20 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	let nextGate = 0;
 	let completionTimer;
 	let completion = null;
+	if (restoredState) {
+		({ flightSeconds, battery, armed, hasLaunched, signalLost, landing, landed, errors, hasLifted,
+			raceStart, raceFinish, impactCooldown, previousObstacle, nextGate, completion, cameraStarted } = restoredState);
+		Object.assign(motion, restoredState.motion);
+		acro.restore(restoredState.acro);
+		damage.hull = restoredState.hull;
+		damage.propellers.splice(0, 4, ...restoredState.propellers);
+		for (const index of restoredState.scanned) {
+			const point = sectors[index];
+			if (!point) continue;
+			scanned.add(point);
+			query(`#sector-${point.label}`).classList.add('captured');
+		}
+	}
 
 	function record_Completion() {
 		if (completionNotice) completion = { score: score_Flight(), duration: raceFinish ?? flightSeconds };
@@ -301,7 +315,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		button.setAttribute('aria-label', label);
 		button.title = label;
 	}
-	set_Action(stabilized ? copy.takeoff : copy.arm);
+	set_Action(armed ? (beach && scanned.size < sectors.length ? copy.photo : copy.land) : (stabilized ? copy.takeoff : copy.arm));
 	set_Status(resetMessage || (stabilized ? copy.waiting : copy.waitingAcro));
 
 	function distance(point) {
@@ -564,7 +578,28 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		const hundredths = Math.round(value * 100);
 		return `${Math.floor(hundredths / 6000)}:${((hundredths % 6000) / 100).toFixed(2).padStart(5, '0')}`;
 	};
+	if (restoredState) {
+		if (beach && scanned.size) capture_Sector([...scanned].at(-1));
+		if (signalLost) {
+			frame.classList.add('signal-lost');
+			flightControls.classList.add('retry-flight');
+			button.hidden = landButton.hidden = true;
+			set_Status(copy.signalLost, 'warn');
+		}
+		if (landed) button.hidden = true;
+		if (completion || landed) {
+			const notice = beach ? (freeMode ? text.free.beachDone : copy.completeNotice) : race ? text.free.raceDone : text.free.fieldDone;
+			announce_Completion(notice);
+		}
+	}
+
 	return { scene, camera, focus, motion, damage, points, limits, restart: request_Restart,
+		checkpoint: () => ({
+			motion, flightSeconds, battery, armed, hasLaunched, signalLost, landing, landed, errors, hasLifted,
+			raceStart, raceFinish, impactCooldown, previousObstacle, nextGate, completion, cameraStarted,
+			camera: chase ? 'chase' : 'fpv', acro: acro.checkpoint(), hull: damage.hull, propellers: damage.propellers,
+			scanned: [...scanned].map(point => sectors.indexOf(point)),
+		}),
 		completed: () => completion !== null,
 		score: () => completion?.score ?? score_Flight(),
 		duration: () => completion?.duration ?? null,

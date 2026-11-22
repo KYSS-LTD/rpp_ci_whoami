@@ -8,6 +8,7 @@ import { computeProfessionScores } from "@/core/analysis";
 import { debugLog } from "@/core/debug";
 import { gameRegistry } from "@/core/registry";
 import { platformStorage, storageKeys } from "@/core/storage";
+import { commonTexts } from "@/texts/common";
 import { professionNames } from "@/texts/professions";
 import { LevelRunner } from "@/app/_components/LevelRunner";
 import { accountantGameModule } from "./index";
@@ -119,11 +120,20 @@ describe("LevelRunner запускает игру", () => {
 		expect(screen.getByRole("button", { name: accountantTexts.window.open })).toBeTruthy();
 	});
 
-	it("досрочный выход сохраняется порталом как незавершённый уровень", () => {
+	it("возвращает к открытому письму и хранит состояние отдельно для каждой сложности", () => {
+		const easy = render(<LevelRunner gameId="accountant-1c" levelId="easy" />);
+		fireEvent.click(screen.getByRole("button", { name: accountantTexts.newspaper.openLetter }));
+		fireEvent.click(screen.getByRole("button", { name: commonTexts.saveAndExit }));
+		expect(screen.getByText(commonTexts.levelPausedBody)).toBeTruthy();
+		expect(platformStorage.read(storageKeys.levelResults, [])).toEqual([]);
+		easy.unmount();
+
+		const medium = render(<LevelRunner gameId="accountant-1c" levelId="medium" />);
+		expect(screen.getByRole("button", { name: accountantTexts.newspaper.openLetter })).toBeTruthy();
+		medium.unmount();
+
 		render(<LevelRunner gameId="accountant-1c" levelId="easy" />);
-		fireEvent.click(screen.getByRole("button", { name: accountantTexts.window.exitEarly }));
-		const saved = platformStorage.read<Array<{ gameId: string; completed: boolean; score: number }>>(storageKeys.levelResults, []);
-		expect(saved).toEqual([expect.objectContaining({ gameId: "accountant-1c", completed: false, score: 0 })]);
+		expect(screen.getByRole("heading", { name: accountantTexts.intros.easy.subject })).toBeTruthy();
 	});
 });
 

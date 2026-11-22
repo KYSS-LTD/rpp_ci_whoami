@@ -1,8 +1,9 @@
 import { useEffect, useState, type RefObject } from "react";
+import { useSavedState } from "./checkpoint";
 import type { TutorialStep } from "../data/tutorials";
 
-export function useTutorial(enabled: boolean, steps: readonly TutorialStep[], onClose?: () => void) {
-	const [run, setRun] = useState({ steps, index: 0, failed: false });
+export function useTutorial(field: string, enabled: boolean, steps: readonly TutorialStep[], onClose?: () => void) {
+	const [run, setRun] = useSavedState(field, { steps, index: 0, failed: false });
 	const current = enabled ? run.steps[run.index] : undefined;
 
 	function close() {

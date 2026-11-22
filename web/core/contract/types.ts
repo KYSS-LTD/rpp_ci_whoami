@@ -1,5 +1,6 @@
 // Типы контракта игры по спецификации game-module-contract.
 import type { ComponentType } from "react";
+import type { Checkpoint } from "../progress/checkpoints";
 
 // Версия контракта, которую поддерживает платформа. Игра с другой версией не регистрируется.
 export const supportedContractVersion = 1;
@@ -98,6 +99,9 @@ export interface PracticeAttempt {
 export interface LevelComponentProps {
 	level: LevelDefinition;
 	onFinish: (result: LevelResult) => void;
+	onPause?: () => void;
+	checkpoint?: Checkpoint;
+	onCheckpoint?: (data: Checkpoint) => void;
 }
 
 // Вход реестра: модуль игры. Реестр проверяет только манифест, компоненты уровней передаются как есть.

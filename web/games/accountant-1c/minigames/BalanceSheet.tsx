@@ -3,7 +3,7 @@
 // Мини-игра "Бухгалтерский баланс" (hard). Карточки ОСВ с суммами лежат на столе рядом с бланком баланса:
 // карточку перетаскивают на строку или выбирают её и затем строку. Нераспределённую прибыль игрок считает сам
 // (калькулятор на столе). Весы показывают, сходится ли актив с пассивом.
-import { useState } from "react";
+import { useSavedState } from "../hooks/checkpoint";
 import { miniGameTutorials } from "../data/tutorials";
 import { useTutorial } from "../hooks/useTutorial";
 import { type BalanceItem, type BalanceLineId, type BalanceSheetData } from "../data/levels";
@@ -154,17 +154,17 @@ function BalanceDesk({ data, pile, orderIds, placements, computedInput, onComput
 }
 
 export function BalanceSheet({ data, random, tutorialEnabled = false, onComplete, onMistake, onProgress }: MiniGameProps<BalanceSheetData>) {
-	const [itemOrder] = useState(() => shuffle(data.items, random));
+	const [itemOrder] = useSavedState("balanceSheet.itemOrder", () => shuffle(data.items, random));
 	// Строки, куда карточка положена верно.
-	const [placements, setPlacements] = useState<Record<string, BalanceLineId>>({});
+	const [placements, setPlacements] = useSavedState<Record<string, BalanceLineId>>("balanceSheet.placements", {});
 	// Первая попытка по каждой карточке: по ней считаются очки.
-	const [firstAttempts, setFirstAttempts] = useState<Record<string, BalanceLineId>>({});
-	const [computedInput, setComputedInput] = useState("");
-	const [mistakeIds, setMistakeIds] = useState<string[]>([]);
-	const [isFinished, setIsFinished] = useState(false);
+	const [firstAttempts, setFirstAttempts] = useSavedState<Record<string, BalanceLineId>>("balanceSheet.firstAttempts", {});
+	const [computedInput, setComputedInput] = useSavedState("balanceSheet.computedInput", "");
+	const [mistakeIds, setMistakeIds] = useSavedState<string[]>("balanceSheet.mistakeIds", []);
+	const [isFinished, setIsFinished] = useSavedState("balanceSheet.isFinished", false);
 
 	const pile = itemOrder.filter((item) => placements[item.id] === undefined);
-	const tutorial = useTutorial(tutorialEnabled, miniGameTutorials.balanceSheet(pile[0]));
+	const tutorial = useTutorial("balanceSheet.tutorial", tutorialEnabled, miniGameTutorials.balanceSheet(pile[0]));
 	const tutorialTarget = tutorial.current?.action === "balance" ? tutorial.current.targets[1].slice("target-".length) : undefined;
 	const computedAmount = parseAmountInput(computedInput);
 

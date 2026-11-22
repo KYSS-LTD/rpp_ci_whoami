@@ -5,10 +5,13 @@ import type { LevelResult } from "@/core/contract/types";
 import { commonTexts } from "@/texts/common";
 import { IframeLevel } from "./IframeLevel";
 
+const router = { push: vi.fn() };
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
+
 // Имитация next/link: в тестах обычный тег a.
 vi.mock("next/link", () => ({
-	default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
-		<a href={href} {...rest}>
+	default: ({ href, children, onNavigate, ...rest }: { href: string; children: React.ReactNode; onNavigate?: (event: React.MouseEvent) => void }) => (
+		<a href={href} onClick={onNavigate} {...rest}>
 			{children}
 		</a>
 	),
@@ -18,7 +21,7 @@ const runtime = { kind: "iframe" as const, entry: "/game-builds/city-builder/ind
 const level = { id: "medium" as const, title: "Средний" };
 
 // Отрисовывает уровень и возвращает фрейм и подменённые обработчики.
-function renderLevel() {
+function renderLevel(onCheckpoint?: (slot: string, data: Record<string, unknown> | null) => boolean) {
 	const onFinish = vi.fn<(result: LevelResult) => void>();
 	const onExitWithoutResult = vi.fn();
 	render(
@@ -28,6 +31,7 @@ function renderLevel() {
 			level={level}
 			runtime={runtime}
 			onFinish={onFinish}
+			onCheckpoint={onCheckpoint}
 			onExitWithoutResult={onExitWithoutResult}
 		/>,
 	);
@@ -48,6 +52,7 @@ function sendFromGame(source: Window, type: string, fields: Record<string, unkno
 
 beforeEach(() => {
 	vi.useFakeTimers();
+	router.push.mockClear();
 });
 
 afterEach(() => {
@@ -73,6 +78,21 @@ describe("iframe-уровень: запуск", () => {
 		);
 		expect(document.activeElement).toBe(frame);
 		expect(screen.queryByRole("status")).toBeNull();
+	});
+
+	it("при выходе сначала сохраняет состояние своего фрейма и ждёт подтверждения", () => {
+		const onCheckpoint = vi.fn(() => true);
+		const { frameWindow, postMessageSpy } = renderLevel(onCheckpoint);
+		sendFromGame(frameWindow, "ready");
+		fireEvent.click(screen.getByRole("link", { name: commonTexts.saveAndExit }));
+		expect(postMessageSpy).toHaveBeenLastCalledWith({ source: "portal", version: 1, type: "save-checkpoint" }, "*");
+		sendFromGame(window, "checkpoint", { slot: "run", data: { step: 3 } });
+		expect(onCheckpoint).not.toHaveBeenCalled();
+		sendFromGame(frameWindow, "checkpoint", { slot: "run", data: { step: 3 } });
+		expect(onCheckpoint).toHaveBeenCalledWith("run", { step: 3 });
+		expect(router.push).not.toHaveBeenCalled();
+		sendFromGame(frameWindow, "checkpoint-saved");
+		expect(router.push).toHaveBeenCalledWith("/games");
 	});
 
 	it("игнорирует сообщения из другого окна", () => {

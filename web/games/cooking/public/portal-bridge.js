@@ -27,6 +27,7 @@
 	var isReadySent = false;
 	var isFinished = false;
 	var savedProgress = null;
+	var captureCheckpoint = null;
 
 	// Уровень из адреса сборки. Портал всегда передаёт его в параметре level.
 	function readLevelFromUrl() {
@@ -67,10 +68,29 @@
 		}
 		if (data.type === "start" && !startPayload) {
 			startPayload = { gameId: String(data.gameId), levelId: String(data.levelId), progress: data.progress && typeof data.progress === "object" ? data.progress : null };
+			if (data.checkpoints) startPayload.checkpoints = data.checkpoints;
 			savedProgress = startPayload.progress;
 			deliverStart();
 		}
+		if (data.type === "save-checkpoint") {
+			try {
+				if (captureCheckpoint && !isFinished) captureCheckpoint();
+			} finally {
+				send("checkpoint-saved", {});
+			}
+		}
 	});
+
+	function flushCheckpoint() {
+		if (captureCheckpoint && !isFinished) captureCheckpoint();
+	}
+
+	if (win.document) {
+		win.document.addEventListener("visibilitychange", function () {
+			if (win.document.hidden) flushCheckpoint();
+		});
+		win.addEventListener("pagehide", flushCheckpoint);
+	}
 
 	function isFiniteNumber(value) {
 		return typeof value === "number" && isFinite(value);
@@ -82,7 +102,7 @@
 			var json = JSON.stringify(data);
 			if (typeof json !== "string" || new TextEncoder().encode(json).length > 4096) return null;
 			return json;
-		} catch (error) {
+		} catch {
 			return null;
 		}
 	}
@@ -123,6 +143,14 @@
 		// Текущий блок также доступен в автономном режиме для отладки.
 		getProgress: function () { return savedProgress; },
 
+		onSaveCheckpoint: function (callback) {
+			captureCheckpoint = callback;
+		},
+
+		saveCheckpoint: function (slot, data) {
+			if (isEmbedded && !isFinished) send("checkpoint", { slot: slot, data: data });
+		},
+
 		// Итог уровня: { score, maxScore, completed }. completed по умолчанию true.
 		// Возвращает false, если результат уже отправлен или числа неверные (результат тогда не отправляется).
 		finish: function (result) {
@@ -145,6 +173,7 @@
 		// Игрок вышел без результата. Портал покажет экран незавершённого уровня и ничего не сохранит.
 		exit: function () {
 			if (!isFinished) {
+				flushCheckpoint();
 				isFinished = true;
 				send("exit", {});
 			}

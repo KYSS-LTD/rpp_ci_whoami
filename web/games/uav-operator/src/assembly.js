@@ -3,7 +3,7 @@ import { fpvKit } from './fpv.js';
 import { bind_Click, query, scene_Frame, set_Status, show_CompletePrompt, stage_Shell, vibrate_Device } from './ui.js';
 import { text } from './text.js';
 
-export function start_Assembly({ mount, signal, settings, sound, logAction, freeMode }) {
+export function start_Assembly({ mount, signal, settings, sound, logAction, freeMode, restoredState }) {
 	const { parts, preinstalled } = settings.assembly;
 	const bench = create_Bench({ parts, preinstalled });
 	const copy = text.assembly;
@@ -28,9 +28,21 @@ export function start_Assembly({ mount, signal, settings, sound, logAction, free
 	const step = query('#assembly-step');
 	const wires = query('#wires');
 	const ink = wires.getContext('2d');
-	let errors = 0;
-	let phase = 'opening';
-	let lidRemoved = false;
+	let errors = restoredState?.errors ?? 0;
+	let phase = restoredState?.phase ?? 'opening';
+	let lidRemoved = restoredState?.lidRemoved ?? false;
+	if (restoredState) {
+		bench.lidOpen = phase === 'wiring';
+		bench.selected = parts.includes(restoredState.selected) ? restoredState.selected : null;
+		bench.driverState = restoredState.driverState;
+		bench.engagedScrew = restoredState.engagedScrew;
+		for (const type of parts) if (restoredState.installed?.includes(type)) bench.installed.add(type);
+		bench.screws.forEach((screw, index) => {
+			const saved = restoredState.screws?.[index];
+			if (saved) Object.assign(screw, { state: saved.state, depth: saved.depth, shownDepth: saved.depth });
+		});
+		if (phase === 'secured') show_CompletePrompt(copy.completeNotice);
+	}
 	let dragging = null;
 	let lastGuide = '';
 	let touchInput = false;
@@ -365,6 +377,11 @@ export function start_Assembly({ mount, signal, settings, sound, logAction, free
 		const closed = phase === 'closing' || phase === 'secured';
 		return Math.max(0, wiring + (lidRemoved ? 8 : 0) + (closed ? 10 : 0) + (phase === 'secured' ? 10 : 0) - errors * 6);
 	};
+	bench.checkpoint = () => ({
+		errors, phase, lidRemoved, selected: bench.selected, driverState: bench.driverState, engagedScrew: bench.engagedScrew,
+		installed: [...bench.installed], screws: bench.screws.map(({ state, depth }) => ({ state, depth })),
+	});
+	bench.completed = () => phase === 'secured';
 	bench.summary = () => `${copy.summary} ${errors}`;
 	return bench;
 }

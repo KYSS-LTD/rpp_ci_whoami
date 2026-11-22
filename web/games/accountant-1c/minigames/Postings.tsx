@@ -3,7 +3,7 @@
 // Мини-игра "Проводки Дт/Кт" (medium): первичные документы лежат на столе, проводка вводится в программе.
 // "Провести" записывает документ в журнал с отметкой проведения и ставит штамп на бумагу,
 // "Дт/Кт" показывает движения проведённых документов, подсказка стоит одно очко.
-import { useState } from "react";
+import { useSavedState } from "../hooks/checkpoint";
 import { miniGameTutorials } from "../data/tutorials";
 import { useTutorial } from "../hooks/useTutorial";
 import { type PostingsData } from "../data/levels";
@@ -22,20 +22,20 @@ const texts = accountantTexts.miniGames.postings;
 const tilts = [-2, 1.5, -1, 2.5];
 
 export function Postings({ data, tutorialEnabled = false, hintsEnabled, onComplete, onMistake, onNotice, onProgress }: MiniGameProps<PostingsData>) {
-	const [answers, setAnswers] = useState<Record<string, PostingAnswer>>({});
-	const [currentId, setCurrentId] = useState(data.operations[0]?.id ?? "");
-	const [debit, setDebit] = useState("");
-	const [credit, setCredit] = useState("");
-	const [amountInput, setAmountInput] = useState("");
-	const [isMovementsOpen, setIsMovementsOpen] = useState(false);
-	const [hintedIds, setHintedIds] = useState<string[]>([]);
-	const [mistakeIds, setMistakeIds] = useState<string[]>([]);
+	const [answers, setAnswers] = useSavedState<Record<string, PostingAnswer>>("postings.answers", {});
+	const [currentId, setCurrentId] = useSavedState("postings.currentId", data.operations[0]?.id ?? "");
+	const [debit, setDebit] = useSavedState("postings.debit", "");
+	const [credit, setCredit] = useSavedState("postings.credit", "");
+	const [amountInput, setAmountInput] = useSavedState("postings.amountInput", "");
+	const [isMovementsOpen, setIsMovementsOpen] = useSavedState("postings.isMovementsOpen", false);
+	const [hintedIds, setHintedIds] = useSavedState<string[]>("postings.hintedIds", []);
+	const [mistakeIds, setMistakeIds] = useSavedState<string[]>("postings.mistakeIds", []);
 
 	const currentOperation = data.operations.find((operation) => operation.id === currentId) ?? null;
 	const isCurrentPosted = currentOperation !== null && answers[currentOperation.id] !== undefined;
 	const isAllPosted = data.operations.every((operation) => answers[operation.id] !== undefined);
 	const teachingOperation = isCurrentPosted ? data.operations.find((operation) => answers[operation.id] === undefined) : currentOperation;
-	const tutorial = useTutorial(tutorialEnabled, miniGameTutorials.postings(teachingOperation?.id));
+	const tutorial = useTutorial("postings.tutorial", tutorialEnabled, miniGameTutorials.postings(teachingOperation?.id));
 	const parsedAmount = parseAmountInput(amountInput);
 
 	function openOperation(operationId: string) {

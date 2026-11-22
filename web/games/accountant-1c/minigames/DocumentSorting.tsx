@@ -3,7 +3,7 @@
 // Мини-игра "Разбор первичных документов" (easy) на столе: курьер принёс стопку, документы раскладываются штампами разделов.
 // Выбрать документ и нажать штамп, перетащить документ на штамп или пройти клавиатурой (Tab, Enter, стрелки, Enter).
 // Неверный штамп возвращает документ, главбух печатает замечание. Разложенные документы улетают в журнал программы.
-import { useState } from "react";
+import { useSavedState } from "../hooks/checkpoint";
 import { miniGameTutorials } from "../data/tutorials";
 import { useTutorial } from "../hooks/useTutorial";
 import { miniGameMaxScore, type DocumentSortingData, type SortingSectionId } from "../data/levels";
@@ -87,15 +87,15 @@ function SortingDesk({ documents, orderIds, sections, tutorialTarget, onPlace }:
 }
 
 export function DocumentSorting({ data, random, tutorialEnabled = false, onComplete, onMistake, onProgress }: MiniGameProps<DocumentSortingData>) {
-	const [documentOrder] = useState(() => shuffle(data.documents, random));
+	const [documentOrder] = useSavedState("documentSorting.documentOrder", () => shuffle(data.documents, random));
 	// Разделы, куда документ положен верно.
-	const [placements, setPlacements] = useState<Record<string, SortingSectionId>>({});
+	const [placements, setPlacements] = useSavedState<Record<string, SortingSectionId>>("documentSorting.placements", {});
 	// Первая попытка по каждому документу: по ней считаются очки.
-	const [firstAttempts, setFirstAttempts] = useState<Record<string, SortingSectionId>>({});
-	const [mistakeIds, setMistakeIds] = useState<string[]>([]);
+	const [firstAttempts, setFirstAttempts] = useSavedState<Record<string, SortingSectionId>>("documentSorting.firstAttempts", {});
+	const [mistakeIds, setMistakeIds] = useSavedState<string[]>("documentSorting.mistakeIds", []);
 
 	const pile = documentOrder.filter((document) => placements[document.id] === undefined);
-	const tutorial = useTutorial(tutorialEnabled, miniGameTutorials.documentSorting(pile[0]));
+	const tutorial = useTutorial("documentSorting.tutorial", tutorialEnabled, miniGameTutorials.documentSorting(pile[0]));
 	const tutorialTarget = tutorial.current?.action === "sort" ? tutorial.current.targets[1].slice("target-".length) : undefined;
 	const isDone = pile.length === 0;
 

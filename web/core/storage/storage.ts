@@ -21,7 +21,7 @@ export const storageKeys = {
 	gameProgress: "gameProgress",
 } as const;
 
-export type StorageKeyName = (typeof storageKeys)[keyof typeof storageKeys];
+export type StorageKeyName = (typeof storageKeys)[keyof typeof storageKeys] | `checkpoint.${string}`;
 
 // Минимальный интерфейс хранилища. Совместим с window.localStorage и с подменами в тестах.
 export interface KeyValueBackend {
@@ -143,7 +143,29 @@ export function createPlatformStorage(backend: KeyValueBackend | null) {
 		keysToRemove.forEach((storedKey) => activeBackend.removeItem(storedKey));
 	}
 
-	return { read, write, clearProgress, getStatus: (): StorageStatus => status };
+	function list(prefix: StorageKeyName): StorageKeyName[] {
+		const keys: StorageKeyName[] = [];
+		try {
+			for (let index = 0; index < activeBackend.length; index += 1) {
+				const key = activeBackend.key(index);
+				if (key?.startsWith(fullKey(prefix))) keys.push(key.slice(storageKeyPrefix.length) as StorageKeyName);
+			}
+		} catch {
+			return keys;
+		}
+		return keys;
+	}
+
+	function remove(keyName: StorageKeyName): boolean {
+		try {
+			activeBackend.removeItem(fullKey(keyName));
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	return { read, write, list, remove, clearProgress, getStatus: (): StorageStatus => status };
 }
 
 export type PlatformStorage = ReturnType<typeof createPlatformStorage>;

@@ -2,7 +2,7 @@
 
 // Мини-игра "Расчёт зарплаты с НДФЛ" (medium). Число детей видно только в заявлениях на вычет на столе:
 // у кого заявления нет, вычета нет. Ведомость заполняется в программе, весы на столе выравниваются при верных полях.
-import { useState } from "react";
+import { useSavedState } from "../hooks/checkpoint";
 import { miniGameTutorials, type TutorialStep } from "../data/tutorials";
 import { useTutorial } from "../hooks/useTutorial";
 import { type PayrollData } from "../data/levels";
@@ -46,12 +46,12 @@ function parsePayrollInputs(inputs: PayrollInputs): Record<string, PayrollAnswer
 const tilts = [-2.5, 1.5, -1];
 
 export function Payroll({ data, tutorialEnabled = false, hintsEnabled, onComplete, onMistake, onNotice, onProgress }: MiniGameProps<PayrollData>) {
-	const [inputs, setInputs] = useState<PayrollInputs>(() =>
+	const [inputs, setInputs] = useSavedState<PayrollInputs>("payroll.inputs", () =>
 		Object.fromEntries(data.employees.map((employee) => [employee.id, { deduction: "", ndfl: "" }])),
 	);
-	const [draft, setDraft] = useState<{ step: TutorialStep; value: string }>();
-	const [hintedIds, setHintedIds] = useState<string[]>([]);
-	const [isFinished, setIsFinished] = useState(false);
+	const [draft, setDraft] = useSavedState<{ step: TutorialStep; value: string } | undefined>("payroll.draft", undefined);
+	const [hintedIds, setHintedIds] = useSavedState<string[]>("payroll.hintedIds", []);
+	const [isFinished, setIsFinished] = useSavedState("payroll.isFinished", false);
 
 	const answers = parsePayrollInputs(inputs);
 	const checks = countPayrollChecks(data, answers);
@@ -59,11 +59,11 @@ export function Payroll({ data, tutorialEnabled = false, hintsEnabled, onComplet
 	const isBalanced = checks.correct === checks.total;
 	const applicants = data.employees.filter((employee) => applicationTexts.employees[employee.id] !== undefined);
 	const employee = applicants[0] ?? data.employees[0];
-	const tutorial = useTutorial(tutorialEnabled, miniGameTutorials.payroll(employee?.id, applicants.length > 0));
+	const tutorial = useTutorial("payroll.tutorial", tutorialEnabled, miniGameTutorials.payroll(employee?.id, applicants.length > 0));
 
 	function fieldValue(employeeId: string, field: "deduction" | "ndfl") {
 		const id = `pay-${field === "ndfl" ? "tax" : field}-${employeeId}`;
-		return draft && draft.step === tutorial.current && tutorial.current.targets.includes(id) ? draft.value : inputs[employeeId][field];
+		return draft && draft.step.id === tutorial.current?.id && tutorial.current.targets.includes(id) ? draft.value : inputs[employeeId][field];
 	}
 
 	function handleChange(employeeId: string, field: "deduction" | "ndfl", value: string) {

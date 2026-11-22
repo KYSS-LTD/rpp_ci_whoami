@@ -26,7 +26,7 @@ function best_Match(selection, items) {
 	return items.map(item => ({ item, quality: match_Quality(selection, item) })).sort((first, second) => second.quality - first.quality)[0] ?? { item: null, quality: 0 };
 }
 
-export function start_Survey({ mount, signal, settings, invalidate, sound, logAction, freeMode }) {
+export function start_Survey({ mount, signal, settings, invalidate, sound, logAction, freeMode, restoredState }) {
 	const { photos: layoutIds, kinds, decoys: withDecoys } = settings.survey;
 	const copy = text.survey;
 	const totalTargets = layoutIds.reduce((sum, id) => sum + count_Targets(id, kinds), 0);
@@ -57,13 +57,14 @@ export function start_Survey({ mount, signal, settings, invalidate, sound, logAc
 	bind_Click('#cancel-classification', () => classification.close(), signal);
 	const feedback = query('#classification-feedback');
 	const nextPrompt = query('#next-photo-prompt');
-	let photoIndex = 0;
-	let photo = create_Photo(layoutIds[0], kinds, withDecoys);
-	let found = new Set();
-	let foundTotal = 0;
-	let errors = 0;
-	let hints = 0;
-	let accuracy = 0;
+	let photoIndex = layoutIds[restoredState?.photoIndex] ? restoredState.photoIndex : 0;
+	let photo = create_Photo(layoutIds[photoIndex], kinds, withDecoys);
+	let found = new Set((restoredState?.found ?? []).map(index => photo.targets[index]).filter(Boolean));
+	let foundTotal = restoredState?.foundTotal ?? 0;
+	let errors = restoredState?.errors ?? 0;
+	let hints = restoredState?.hints ?? 0;
+	let accuracy = restoredState?.accuracy ?? 0;
+	let hintTarget = photo.targets[restoredState?.hintTarget];
 	let active = null;
 	let anchor = null;
 	let selection = null;
@@ -96,6 +97,19 @@ export function start_Survey({ mount, signal, settings, invalidate, sound, logAc
 		confirm.disabled = !selection || !category.value;
 	}
 
+	function show_Hint(target) {
+		hint.hidden = false;
+		place_Box(hint, { x: target.x + target.w / 2 - .052, y: target.y + target.h / 2 - .083, w: .104, h: .166 });
+	}
+
+	function label_Target(target) {
+		const label = document.createElement('div');
+		label.className = 'photo-box accepted';
+		label.setAttribute('aria-label', copy.kinds[target.kind].title);
+		place_Box(label, target);
+		overlay.prepend(label);
+	}
+
 	function show_Draft(box) {
 		draft.hidden = false;
 		place_Box(draft, box);
@@ -123,6 +137,7 @@ export function start_Survey({ mount, signal, settings, invalidate, sound, logAc
 		cursor.hidden = true;
 		for (const label of overlay.querySelectorAll('.photo-box.accepted')) label.remove();
 		hint.hidden = true;
+		hintTarget = undefined;
 		nextPrompt.hidden = true;
 		clear_Draft();
 		update_Counters();
@@ -209,11 +224,10 @@ export function start_Survey({ mount, signal, settings, invalidate, sound, logAc
 	bind_Click('#photo-help', () => {
 		close_StageMenu();
 		if (!hint.hidden || photoDone()) return;
-		const target = photo.targets.find(item => !found.has(item));
+		hintTarget = photo.targets.find(item => !found.has(item));
 		hints++;
 		logAction('hint');
-		hint.hidden = false;
-		place_Box(hint, { x: target.x + target.w / 2 - .052, y: target.y + target.h / 2 - .083, w: .104, h: .166 });
+		show_Hint(hintTarget);
 		set_Status(copy.hintShown);
 	}, signal);
 	bind_Click('#next-photo-button', open_NextPhoto, signal);
@@ -242,12 +256,9 @@ export function start_Survey({ mount, signal, settings, invalidate, sound, logAc
 		accuracy += best.quality;
 		sound.play('mark');
 		vibrate_Device(15);
-		const label = document.createElement('div');
-		label.className = 'photo-box accepted';
-		label.setAttribute('aria-label', copy.kinds[category.value].title);
-		place_Box(label, best.item);
-		overlay.prepend(label);
+		label_Target(best.item);
 		hint.hidden = true;
+		hintTarget = undefined;
 		clear_Draft();
 		classification.close('accepted');
 		overlay.focus({ preventScroll: true });
@@ -262,7 +273,24 @@ export function start_Survey({ mount, signal, settings, invalidate, sound, logAc
 			show_CompletePrompt(copy.completeNotice);
 		}
 	}, signal);
+	for (const target of found) label_Target(target);
+	if (hintTarget) show_Hint(hintTarget);
 	update_Counters();
+	if (photoDone()) {
+		if (lastPhoto()) show_CompletePrompt(copy.completeNotice);
+		else nextPrompt.hidden = false;
+	} else if (restoredState?.selection) {
+		selection = restoredState.selection;
+		show_Draft(selection);
+		category.value = restoredState.category;
+		update_Controls();
+		classification.showModal();
+	}
+	view.checkpoint = () => ({
+		photoIndex, found: [...found].map(target => photo.targets.indexOf(target)), foundTotal, errors, hints, accuracy,
+		hintTarget: photo.targets.indexOf(hintTarget), selection, category: category.value,
+	});
+	view.completed = () => lastPhoto() && photoDone();
 	view.score = () => Math.max(0, Math.round((88 * foundTotal + 12 * accuracy) / totalTargets) - errors * 5 - hints * 3);
 	view.summary = () => `${copy.summary} ${foundTotal} / ${totalTargets} · ${copy.summaryErrors} ${errors}`;
 	view.focus = () => overlay.focus({ preventScroll: true });

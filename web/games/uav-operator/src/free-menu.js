@@ -7,7 +7,7 @@ const copy = text.free;
 const difficulties = ['easy', 'normal', 'hard'];
 export const freeOptions = { map: 'beach', drone: 'mini', mode: 'acro', camera: 'fpv' };
 
-export function mount_FreeMenu({ mount, signal, screen, select, start, exit }) {
+export function mount_FreeMenu({ mount, signal, screen, select, start, exit, hasSave }) {
 	const block = screen === 'assembly' || screen === 'survey';
 	const current = screen === 'assembly' ? 0 : 2;
 	const options = screen === 'flight';
@@ -43,14 +43,22 @@ export function mount_FreeMenu({ mount, signal, screen, select, start, exit }) {
 		${options ? optionsMarkup : block ? `<p>${copy.pickDifficulty}</p><fieldset class="free-difficulties"><legend class="sr-only">${copy.pickDifficulty}</legend>
 			${difficulties.map((id, index) => radio('difficulty', id, text.difficulty[id].title, '', 'easy', ['▁', '▁▃', '▁▃▆'][index])).join('')}</fieldset>` :
 			`<p>${copy.intro}</p><div class="free-blocks">${cards}</div>`}
-		${screen ? `<div class="free-launch"><button type="button" class="button button-primary" id="free-start"><span aria-hidden="true">▶</span>${copy.start}</button></div>` : ''}
+		${screen ? `<div class="free-launch"><button type="button" class="button button-primary" id="free-start"><span aria-hidden="true">▶</span><span id="free-start-label">${copy.start}</span></button></div>` : ''}
 	</section>`);
 	bind_Click('#free-back', () => screen ? select(null) : exit(), signal);
 	document.querySelectorAll('[data-screen]').forEach(button => button.addEventListener('click', () => select(button.dataset.screen), { signal }));
-	if (screen) bind_Click('#free-start', () => {
-		if (options) start(1, 'easy');
-		else start(current, query('input[name="difficulty"]:checked').value);
-	}, signal);
+	function update_Start() {
+		const level = options ? 'easy' : query('input[name="difficulty"]:checked').value;
+		query('#free-start-label').textContent = hasSave(options ? 1 : current, level) ? copy.resume : copy.start;
+	}
+	if (screen) {
+		bind_Click('#free-start', () => {
+			if (options) start(1, 'easy');
+			else start(current, query('input[name="difficulty"]:checked').value);
+		}, signal);
+		query('.free-page').addEventListener('change', update_Start, { signal });
+		update_Start();
+	}
 	query('h1').focus({ preventScroll: true });
 	if (!options) return null;
 

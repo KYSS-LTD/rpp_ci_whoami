@@ -3,7 +3,7 @@
 // Мини-игра "Касса" (easy) на столе: посетитель в окошке говорит, что ему нужно; бухгалтер отрывает бланк ПКО или РКО
 // от блока, пишет сумму (можно посчитать на калькуляторе), проводит и отдаёт ордер в окошко со штампом «Проведено».
 // В конце смены приходит инкассатор: излишек сверх лимита сдаётся в банк.
-import { useState } from "react";
+import { useSavedState } from "../hooks/checkpoint";
 import { miniGameTutorials } from "../data/tutorials";
 import { useTutorial } from "../hooks/useTutorial";
 import { type CashDeskData, type CashDocumentType } from "../data/levels";
@@ -30,22 +30,22 @@ interface HandedOrder {
 }
 
 export function CashDesk({ data, tutorialEnabled = false, onComplete, onMistake, onNotice, onProgress }: MiniGameProps<CashDeskData>) {
-	const [visitorIndex, setVisitorIndex] = useState(0);
+	const [visitorIndex, setVisitorIndex] = useSavedState("cashDesk.visitorIndex", 0);
 	// Бланк, оторванный от блока, или null, пока бланка на столе нет.
-	const [documentType, setDocumentType] = useState<CashDocumentType | null>(null);
-	const [amountInput, setAmountInput] = useState("");
-	const [surplusInput, setSurplusInput] = useState("");
-	const [isAmountInvalid, setIsAmountInvalid] = useState(false);
-	const [answers, setAnswers] = useState<Record<string, CashVisitorAnswer>>({});
-	const [handedOrder, setHandedOrder] = useState<HandedOrder | null>(null);
-	const [surplusAnswer, setSurplusAnswer] = useState<number | null>(null);
-	const [isSurplusPosted, setIsSurplusPosted] = useState(false);
-	const [mistakeIds, setMistakeIds] = useState<string[]>([]);
+	const [documentType, setDocumentType] = useSavedState<CashDocumentType | null>("cashDesk.documentType", null);
+	const [amountInput, setAmountInput] = useSavedState("cashDesk.amountInput", "");
+	const [surplusInput, setSurplusInput] = useSavedState("cashDesk.surplusInput", "");
+	const [isAmountInvalid, setIsAmountInvalid] = useSavedState("cashDesk.isAmountInvalid", false);
+	const [answers, setAnswers] = useSavedState<Record<string, CashVisitorAnswer>>("cashDesk.answers", {});
+	const [handedOrder, setHandedOrder] = useSavedState<HandedOrder | null>("cashDesk.handedOrder", null);
+	const [surplusAnswer, setSurplusAnswer] = useSavedState<number | null>("cashDesk.surplusAnswer", null);
+	const [isSurplusPosted, setIsSurplusPosted] = useSavedState("cashDesk.isSurplusPosted", false);
+	const [mistakeIds, setMistakeIds] = useSavedState<string[]>("cashDesk.mistakeIds", []);
 	// Остаток в кассе по верным суммам: ошибки главбух исправляет сразу.
-	const [balance, setBalance] = useState(data.openingBalance);
+	const [balance, setBalance] = useSavedState("cashDesk.balance", data.openingBalance);
 
 	const visitor = data.visitors[visitorIndex] ?? null;
-	const tutorial = useTutorial(tutorialEnabled, miniGameTutorials.cashDesk(visitor, visitor !== null && visitor.documentType === documentType));
+	const tutorial = useTutorial("cashDesk.tutorial", tutorialEnabled, miniGameTutorials.cashDesk(visitor, visitor !== null && visitor.documentType === documentType));
 	const isSurplusStage = visitor === null;
 
 	function reportProgress(nextAnswers: Record<string, CashVisitorAnswer>, surplus: number | null, surplusDone: boolean) {

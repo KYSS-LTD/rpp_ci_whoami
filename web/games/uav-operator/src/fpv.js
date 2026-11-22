@@ -29,6 +29,21 @@ export function create_Acro(angleMode = false, kit = fpvKit) {
 	}
 	return {
 		attitude, velocity, throttle: 0, voltage: kit.cells * 4.2, used: 0, impactUpright: 1,
+		checkpoint() {
+			return { attitude: attitude.toArray(), velocity: velocity.toArray(), rates: rates.toArray(),
+				filtered: filtered.toArray(), motor, remaining, charge, voltage: this.voltage, used: this.used };
+		},
+		restore(saved) {
+			attitude.fromArray(saved.attitude);
+			velocity.fromArray(saved.velocity);
+			rates.fromArray(saved.rates);
+			filtered.fromArray(saved.filtered);
+			motor = this.throttle = saved.motor;
+			remaining = saved.remaining;
+			charge = saved.charge;
+			this.voltage = saved.voltage;
+			this.used = saved.used;
+		},
 		reset(heading) {
 			attitude.setFromEuler(localRotation.set(0, heading, 0));
 			velocity.set(0, 0, 0);
