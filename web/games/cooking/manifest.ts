@@ -17,7 +17,7 @@ export const cookingManifest: GameManifest = {
 	professionTags: [{ professionId: "cook", weight: 1 }],
 	format: "3d",
 	summary: cookingTexts.summary,
-	preview: { frames: ["/game-previews/cooking/poster.webp"], animation: "/game-previews/cooking/play.webp" },
+	preview: { frames: ["/game-previews/cooking/poster.webp"], animation: "/game-previews/cooking/play-a6319141.webp" },
 	estimatedMinutes: 4,
 	runtime: {
 		kind: "iframe",

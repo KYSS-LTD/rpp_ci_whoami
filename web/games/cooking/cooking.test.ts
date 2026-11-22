@@ -37,7 +37,7 @@ describe("манифест игры cooking", () => {
 		expect(registered).toBeDefined();
 		expect(registered?.manifest.levels.map((level) => level.id)).toEqual(["easy", "medium", "hard"]);
 		expect(registered?.manifest.format).toBe("3d");
-		expect(registered?.manifest.preview?.animation).toBe("/game-previews/cooking/play.webp");
+		expect(registered?.manifest.preview?.animation).toBe("/game-previews/cooking/play-a6319141.webp");
 		expect("levelComponents" in cookingGameModule).toBe(false);
 	});
 

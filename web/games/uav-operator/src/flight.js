@@ -556,7 +556,6 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		if (nextGate !== sectors.length) return;
 		if (race) {
 			raceFinish = Math.max(.01, flightSeconds - raceStart);
-			flightControls.hidden = true;
 		}
 		record_Completion();
 		announce_Completion(race ? text.free.raceDone : text.free.fieldDone);
@@ -642,7 +641,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			const overlayOpen = resetting || stage_OverlayOpen();
 			if (overlayOpen && !paused) flightInputs.reset();
 			paused = overlayOpen;
-			const moving = !paused && raceFinish === null;
+			const moving = !paused;
 			if (!moving) delta = 0;
 			if (moving && armed && !signalLost) flightSeconds += elapsed;
 			if (moving) {
