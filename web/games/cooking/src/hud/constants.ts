@@ -50,9 +50,9 @@ export const MAX_ORDERS_PER_TABLE = 4;
 // Полная карточка стола: ширина, высота шапки, внутренние отступы и запас высоты одной строки заказа (название блюда
 // может занять две строки). Оценка нарочно с запасом: карточка не должна выйти за свою зону.
 export const FULL_CARD_WIDTH_PX = 264;
-export const FULL_CARD_HEADER_PX = 36;
-export const FULL_CARD_PADDING_PX = 20;
-export const FULL_ORDER_ROW_PX = 60;
+export const FULL_CARD_HEADER_PX = 32;
+export const FULL_CARD_PADDING_PX = 22;
+export const FULL_ORDER_ROW_PX = 56;
 
 // Полный вид занимает много места и закрывает кухню: он допустим, пока блок не выше этой доли высоты зоны. Возврат из компактного
 // вида в полный только при заполнении не выше второй, меньшей доли (гистерезис: вид не мигает, когда число заказов колеблется у границы).

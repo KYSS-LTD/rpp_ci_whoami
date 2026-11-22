@@ -360,11 +360,15 @@ export function createKitchen(deps: KitchenDeps): Kitchen {
 		return takeCooker(runtime);
 	}
 
+	// Плита: без кастрюли жарит продукты прямо на конфорке (как бывшая сковорода), пустая плита принимает кастрюлю.
 	function interactStove(runtime: StationRuntime): InteractResult {
 		const onStove = runtime.item;
 		if (onStove === null) {
 			if (hand?.type !== "pot") {
-				return rejected(hand === null ? "nothingToTake" : "itemNotAccepted");
+				return interactCooker(runtime);
+			}
+			if (runtime.cookStatus !== "empty") {
+				return rejected("stationOccupied");
 			}
 			runtime.item = hand;
 			hand = null;
@@ -575,7 +579,7 @@ export function createKitchen(deps: KitchenDeps): Kitchen {
 				progress: ratioOf(runtime.cutProgressSec, duration),
 			};
 		}
-		if (kind === "pan" || kind === "oven") {
+		if (kind === "oven" || kind === "stove" && runtime.item?.type !== "pot") {
 			const items = runtime.cookItems.map((item) => cloneItem(item));
 			const transition = runtime.cookRecipe;
 			const timing = transition ? params.cooking[transition.id] : null;
@@ -641,7 +645,6 @@ export function createKitchen(deps: KitchenDeps): Kitchen {
 				case "cuttingBoard":
 					result = interactSurface(runtime);
 					break;
-				case "pan":
 				case "oven":
 					result = interactCooker(runtime);
 					break;
@@ -672,10 +675,15 @@ export function createKitchen(deps: KitchenDeps): Kitchen {
 		step(dtSec: number): void {
 			stepCutting(dtSec);
 			stationList.forEach((runtime) => {
-				if (runtime.config.kind === "pan" || runtime.config.kind === "oven") {
+				if (runtime.config.kind === "oven") {
 					stepCooker(runtime, dtSec);
 				} else if (runtime.config.kind === "stove") {
-					stepPot(runtime, dtSec);
+					if (runtime.item?.type === "pot") {
+						stepPot(runtime, dtSec);
+					} else {
+						runtime.potHeating = false;
+						stepCooker(runtime, dtSec);
+					}
 				}
 			});
 		},

@@ -22,7 +22,7 @@ import {
 
 // Один шаг цепочки: чем и на какой станции получен предмет.
 interface ChainStep {
-	producer: "crate" | "cuttingBoard" | "pan" | "pot" | "oven";
+	producer: "crate" | "cuttingBoard" | "stove" | "pot" | "oven";
 	output: ItemSpec;
 }
 
@@ -73,8 +73,8 @@ describe("таблицы рецептов и переходов", () => {
 			dishRecipes[dish].ingredients.forEach((ingredient) => expandChain(ingredient)?.forEach((step) => producers.add(step.producer)));
 			return producers;
 		};
-		expect([...producersOf("burger")].sort()).toEqual(["crate", "cuttingBoard", "pan"]);
-		expect([...producersOf("veggieBurger")].sort()).toEqual(["crate", "cuttingBoard", "pan"]);
+		expect([...producersOf("burger")].sort()).toEqual(["crate", "cuttingBoard", "stove"]);
+		expect([...producersOf("veggieBurger")].sort()).toEqual(["crate", "cuttingBoard", "stove"]);
 		expect([...producersOf("ham")].sort()).toEqual(["crate", "oven"]);
 		expect([...producersOf("stew")].sort()).toEqual(["crate", "cuttingBoard", "pot"]);
 	});
@@ -102,10 +102,9 @@ describe("таблицы рецептов и переходов", () => {
 		});
 	});
 
-	it("переходы станций разложены по видам: сковорода, духовка, кастрюля", () => {
-		expect(findCookTransitions("pan").map((transition) => transition.id)).toEqual(["patty", "veggiePatty"]);
+	it("переходы станций разложены по видам: плита жарит без сковороды, духовка запекает", () => {
+		expect(findCookTransitions("stove").map((transition) => transition.id)).toEqual(["patty", "veggiePatty", "friedSteak"]);
 		expect(findCookTransitions("oven").map((transition) => transition.id)).toEqual(["ham"]);
-		expect(findCookTransitions("pot").map((transition) => transition.id)).toEqual(["stew"]);
 		expect(findCookTransitions("counter")).toEqual([]);
 	});
 

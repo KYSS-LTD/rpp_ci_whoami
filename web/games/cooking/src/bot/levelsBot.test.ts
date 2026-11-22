@@ -11,8 +11,9 @@ import { findVerifiedSeeds, MIN_PATIENCE_MARGIN, STUCK_THRESHOLD_SEC, verifySeed
 describe.each(LEVEL_IDS)("уровень %s: достижимость по навигационной сетке", (levelId: LevelId) => {
 	it("сценарий 'Проверка при тестировании': ни одна цель не недостижима из старта повара и из точек ожидания официантов", () => {
 		const level = getLevelConfig(levelId);
-		expect(findUnreachableTargetsOnNavGrid(level, level.chefStart.position)).toEqual([]);
-		level.waiters.waitPoints.forEach((waitPoint) => expect(findUnreachableTargetsOnNavGrid(level, waitPoint)).toEqual([]));
+		// Кухня отделена от зала стеной с окном выдачи: повар достаёт все станции, официанты все цели зала.
+		expect(findUnreachableTargetsOnNavGrid(level, level.chefStart.position, "kitchen")).toEqual([]);
+		level.waiters.waitPoints.forEach((waitPoint) => expect(findUnreachableTargetsOnNavGrid(level, waitPoint, "hall")).toEqual([]));
 	});
 });
 

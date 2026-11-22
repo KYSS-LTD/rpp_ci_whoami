@@ -1,5 +1,5 @@
 // Окружение ресторана: трава до края кадра, тротуар у входа, дорога с разметкой и переходом, дальний тротуар, ящики с цветами
-// вдоль фасада, маркиза и кадки у двери, фонари (загораются к вечеру), гидрант, урна, штендер, скамейки, велопарковка,
+// вдоль фасада, кадки у двери, фонари (загораются к вечеру), гидрант, урна, штендер, скамейки, велопарковка,
 // деревья и кусты вокруг здания, дома через дорогу и проезжающие машины.
 // Ничего из этого не участвует в навигации: декор стоит вне сетки уровня или в местах, куда персонажи не заходят
 // (вдоль фасада, по краям тротуара). Высокие предметы не ставятся южнее очереди, чтобы не заслонять её от камеры.
@@ -44,8 +44,6 @@ const colors = {
 	soil: 0x4a3628,
 	flowers: [0xe63946, 0xff8fab, 0xffd166, 0xfdfdfd, 0x9d4edd, 0xff9f1c] as const,
 	terracotta: 0xc0703f,
-	awningRed: 0xd64545,
-	awningCream: 0xf6efe0,
 	lampPost: 0x2f4f4f,
 	lampGlass: 0xffe3a3,
 	hydrant: 0xc0392b,
@@ -294,7 +292,7 @@ export function createEnvironment(level: LevelConfig, materials: DecorMaterials,
 		kit.box(materials.matte, colors.marking, 1.9, 0.007, 0.38, crossingX, markingY + 0.001, stripeZ);
 	}
 
-	// 2. Фасад: ящики с цветами вдоль передней стены (кроме двери), маркиза над дверью, кадки по бокам, коврик.
+	// 2. Фасад: ящики с цветами вдоль передней стены (кроме двери), кадки по бокам от двери, коврик.
 	const flowerBoxDepth = 0.28;
 	const flowerBoxZ = facadeZ + flowerBoxDepth / 2 + 0.02;
 	const flowerSegments: Array<[number, number]> = [];
@@ -324,25 +322,6 @@ export function createEnvironment(level: LevelConfig, materials: DecorMaterials,
 			const flowerZ = flowerBoxZ + (rng.next() - 0.5) * 0.14;
 			kit.sphere(materials.foliage, colors.bush[index % colors.bush.length], 0.07, flowerX, 0.31, flowerZ, { y: 0.7 }, 6);
 			kit.sphere(materials.matte, colors.flowers[Math.floor(rng.next() * colors.flowers.length)], 0.045, flowerX + 0.02, 0.37 + rng.next() * 0.04, flowerZ, undefined, 6);
-		}
-	}
-	// Маркиза в красно-кремовую полоску: наклонное полотно, бахрома полосками и две тонкие тяги к стене.
-	{
-		const awningLeft = door.x - 0.2;
-		const awningRight = doorRight + 0.2;
-		const awningDepth = 0.45;
-		const slope = 0.34;
-		const stripes = Math.round((awningRight - awningLeft) / 0.2);
-		const stripeWidth = (awningRight - awningLeft) / stripes;
-		const topY = 1.0;
-		for (let index = 0; index < stripes; index += 1) {
-			const stripeX = awningLeft + (index + 0.5) * stripeWidth;
-			const color = index % 2 === 0 ? colors.awningRed : colors.awningCream;
-			kit.box(materials.matte, color, stripeWidth, 0.025, awningDepth / Math.cos(slope), stripeX, topY - (Math.tan(slope) * awningDepth) / 2, facadeZ + awningDepth / 2, { x: slope });
-			kit.box(materials.matte, color, stripeWidth, 0.12, 0.02, stripeX, topY - Math.tan(slope) * awningDepth - 0.05, facadeZ + awningDepth + 0.005);
-		}
-		for (const rodX of [awningLeft + 0.06, awningRight - 0.06]) {
-			kit.box(materials.metal, colors.benchIron, 0.02, 0.02, 0.5, rodX, topY - 0.22, facadeZ + 0.22, { x: -0.55 });
 		}
 	}
 	// Кадки с подстриженными кустами-шарами по бокам от двери.

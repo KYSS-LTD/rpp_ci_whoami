@@ -51,7 +51,6 @@ export const coreModelNames = [
 	"kitchencounter_straight_A",
 	"cuttingboard",
 	"stove_single",
-	"pan_A",
 	"pot_A",
 	"pot_A_stew",
 	"lid_A",
@@ -65,6 +64,7 @@ export const coreModelNames = [
 	"wall_low",
 	"wall_doorway_low",
 	"wall_orderwindow",
+	"wall_orderwindow_low",
 	"door_A",
 	// Столы и стулья зала.
 	"kitchentable_B",
@@ -83,6 +83,7 @@ export const reserveModelNames = [
 	"kitchentable_A",
 	"kitchentable_A_large",
 	"stove_multi",
+	"pan_A",
 	"pan_B",
 	"pot_B",
 	"pot_B_stew",
@@ -213,24 +214,23 @@ export const crateModelNames: Readonly<Record<IngredientKind, AssetModelName>> =
 };
 
 // Модель основания станции по её виду (если в данных уровня нет StationConfig.model). Ящик определяется по ингредиенту,
-// урна рисуется примитивом (модели в паке нет), поэтому для trash и crate значение null.
+// урна рисуется примитивом (модели в паке нет), поэтому для trash и crate значение null. Раковина: прилавок, мойку и кран
+// дорисовывает render/stations.ts.
 export const stationBaseModelNames: Readonly<Record<StationKind, AssetModelName | null>> = {
 	crate: null,
 	counter: "kitchencounter_straight_A",
 	cuttingBoard: "kitchencounter_straight_A",
-	pan: "stove_single",
 	stove: "stove_single",
 	oven: "oven",
 	plateStack: "kitchencounter_straight_A",
 	trash: null,
 	servingWindow: "wall_orderwindow",
-	tap: null,
+	tap: "kitchencounter_straight_A",
 };
 
 // Модели-надстройки на станциях.
 export const stationTopModelNames = {
 	cuttingBoard: "cuttingboard",
-	pan: "pan_A",
 	pot: "pot_A",
 	potWithStew: "pot_A_stew",
 	plateStack: "dishrack_plates",

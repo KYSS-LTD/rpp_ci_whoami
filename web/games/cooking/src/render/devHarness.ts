@@ -3,6 +3,7 @@
 // Параметры адреса описаны в harness.html. Тексты здесь отладочные и в файлы текстов не выносятся.
 import "../base.css";
 import { getLevelConfig, isLevelId } from "../config/levels";
+import { applyCampaignDay, LAST_CAMPAIGN_DAY } from "../config/levels/campaign";
 import { isDebugEnabled } from "../config/debug";
 import { EMPTY_INPUT, SIM_STEP_SEC, type FailureInfo, type GameSnapshot, type InputMode, type PortalBridgeApi, type ShiftPhase } from "../contracts";
 import { createBot } from "../bot/bot";
@@ -64,6 +65,8 @@ function readParams() {
 		cam: params.get("cam")?.split(",").map(Number) ?? null,
 		// ?time=секунды: начальное время демо-сценария.
 		time: params.has("time") ? Number(params.get("time")) : 3,
+		// ?day=1..5: рабочий день кампании (меню и мебель кухни этого дня). По умолчанию пятый день: кухня целиком.
+		day: params.has("day") ? Number(params.get("day")) : LAST_CAMPAIGN_DAY,
 	};
 }
 
@@ -73,7 +76,8 @@ async function bootHarness(): Promise<void> {
 		return;
 	}
 	const params = readParams();
-	const level = getLevelConfig(params.levelId);
+	const createLevel = () => applyCampaignDay(getLevelConfig(params.levelId), params.day);
+	const level = createLevel();
 	const bridge = createLoggingBridge();
 	const assets = await prepareAssets({ bridge });
 	if (!assets) {
@@ -127,7 +131,7 @@ async function bootHarness(): Promise<void> {
 		dishIcons: icons,
 		inputMode: input ? input.getMode() : params.mode,
 		tutorialDishes: [],
-		campaignDay: 1,
+		campaignDay: params.day,
 	});
 	hudRef.current = hud;
 	input?.onModeChange((mode) => hud.setInputMode(mode));
@@ -204,7 +208,7 @@ async function bootHarness(): Promise<void> {
 	}
 	// Ищет шаг бота с наибольшей оценкой выразительности кадра. Оценка считается каждые 6 шагов не раньше minSec.
 	function scanBestStep(score: (snapshot: GameSnapshot) => number, minSec: number, maxSec: number, botSec = Number.POSITIVE_INFINITY): { step: number; score: number } {
-		const scanSimulation = createSimulation({ level: getLevelConfig(params.levelId), seed: level.verifiedSeeds[0] });
+		const scanSimulation = createSimulation({ level: createLevel(), seed: level.verifiedSeeds[0] });
 		const scanBot = createBot(scanSimulation);
 		scanSimulation.start();
 		let best = { step: 0, score: Number.NEGATIVE_INFINITY };

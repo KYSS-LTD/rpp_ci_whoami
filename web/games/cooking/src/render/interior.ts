@@ -63,7 +63,6 @@ const colors = {
 	salt: 0xf7f7f2,
 	pepper: 0x3a3a3a,
 	apron: [0xe9e4d8, 0x8fb9c9] as const,
-	extinguisher: 0xd23b2f,
 } as const;
 
 // Свободна ли клетка от станций.
@@ -179,6 +178,7 @@ export function createInterior(level: LevelConfig, assets: LoadedAssets, materia
 	const pictures = new Group();
 	pictures.name = "interior-pictures";
 	const kitchen = level.floors.find((floor) => floor.zone === "kitchen")?.rect ?? null;
+	const garden = level.floors.find((floor) => floor.zone === "garden")?.rect ?? null;
 	const hall = level.floors.find((floor) => floor.zone === "hall")?.rect ?? null;
 
 	// Материалы с текстурами: картины, доска меню, ковры, коврик кухни.
@@ -200,59 +200,42 @@ export function createInterior(level: LevelConfig, assets: LoadedAssets, materia
 
 	// 1. Кухня.
 	if (kitchen) {
+		// Северная стена кухни: здание Г-образное, у кухни своя северная стена (лицевая сторона на верхнем крае пола кухни).
+		const kitchenFaceZ = kitchen.z - wallFaceInset;
 		const kitchenRight = kitchen.x + kitchen.width;
-		// Холодильник в северо-восточном углу кухни, если клетка свободна и закрыта станциями с юга и запада (туда не зайти).
-		const fridgeCell: Rect = { x: kitchenRight - 1, z: kitchen.z, width: 1, depth: 1 };
-		const southCell: Rect = { x: fridgeCell.x, z: fridgeCell.z + 1, width: 1, depth: 1 };
-		const westCell: Rect = { x: fridgeCell.x - 1, z: fridgeCell.z, width: 1, depth: 1 };
-		const hasFridge = assets.has("fridge_A") && isCellFree(fridgeCell, level.stations) && !isCellFree(southCell, level.stations) && !isCellFree(westCell, level.stations);
-		if (hasFridge) {
-			const fridge = new Group();
-			fridge.add(assets.cloneModel("fridge_A"));
-			fridge.scale.setScalar(MODEL_SCALE);
-			// Задняя стенка модели (z = -0.5 после масштаба) прижата к стене.
-			fridge.position.set(fridgeCell.x + 0.5, 0, northFaceZ + 0.5);
-			fridge.name = "decor-fridge";
-			fridge.traverse((node) => {
-				node.castShadow = true;
-				node.receiveShadow = true;
-			});
-			root.add(fridge);
-		}
-
-		// Полки с банками в левой части северной стены (над ящиками).
+		// Полки с банками в левой части северной стены (над прилавком).
 		const shelfX = kitchen.x + 0.85;
-		addShelf(kit, materials, shelfX, 1.02, northFaceZ, 1.2, 0.22);
-		addShelf(kit, materials, shelfX, 1.46, northFaceZ, 1.2, 0.22);
+		addShelf(kit, materials, shelfX, 1.02, kitchenFaceZ, 1.2, 0.22);
+		addShelf(kit, materials, shelfX, 1.46, kitchenFaceZ, 1.2, 0.22);
 		for (let index = 0; index < 4; index += 1) {
 			const jarX = shelfX - 0.42 + index * 0.27;
-			addJar(kit, materials, jarX, 1.04, northFaceZ + 0.11, 0.12 + (index % 2) * 0.04, colors.jarContents[index % colors.jarContents.length]);
+			addJar(kit, materials, jarX, 1.04, kitchenFaceZ + 0.11, 0.12 + (index % 2) * 0.04, colors.jarContents[index % colors.jarContents.length]);
 		}
 		// Верхняя полка: кастрюлька, стопка мисок и две банки.
-		kit.cylinder(materials.metal, colors.steel, 0.1, 0.09, 0.12, shelfX - 0.35, 1.54, northFaceZ + 0.11, undefined, 12);
-		kit.box(materials.metal, colors.darkHandle, 0.12, 0.02, 0.02, shelfX - 0.35 + 0.15, 1.58, northFaceZ + 0.11);
+		kit.cylinder(materials.metal, colors.steel, 0.1, 0.09, 0.12, shelfX - 0.35, 1.54, kitchenFaceZ + 0.11, undefined, 12);
+		kit.box(materials.metal, colors.darkHandle, 0.12, 0.02, 0.02, shelfX - 0.35 + 0.15, 1.58, kitchenFaceZ + 0.11);
 		for (let bowl = 0; bowl < 3; bowl += 1) {
-			kit.cylinder(materials.glossy, 0xf2efe6, 0.085 - bowl * 0.008, 0.06 - bowl * 0.006, 0.035, shelfX + 0.05, 1.5 + bowl * 0.03, northFaceZ + 0.11, undefined, 12);
+			kit.cylinder(materials.glossy, 0xf2efe6, 0.085 - bowl * 0.008, 0.06 - bowl * 0.006, 0.035, shelfX + 0.05, 1.5 + bowl * 0.03, kitchenFaceZ + 0.11, undefined, 12);
 		}
-		addJar(kit, materials, shelfX + 0.3, 1.48, northFaceZ + 0.11, 0.14, colors.jarContents[4]);
-		addJar(kit, materials, shelfX + 0.45, 1.48, northFaceZ + 0.11, 0.1, colors.jarContents[1]);
+		addJar(kit, materials, shelfX + 0.3, 1.48, kitchenFaceZ + 0.11, 0.14, colors.jarContents[4]);
+		addJar(kit, materials, shelfX + 0.45, 1.48, kitchenFaceZ + 0.11, 0.1, colors.jarContents[1]);
 
 		// Часы над полками.
 		{
 			const clockX = shelfX + 0.28;
 			const clockY = 1.83;
-			kit.cylinder(materials.matte, colors.clockRim, 0.14, 0.14, 0.04, clockX, clockY, northFaceZ + 0.02, { x: Math.PI / 2 }, 20);
-			kit.cylinder(materials.matte, colors.clockFace, 0.118, 0.118, 0.02, clockX, clockY, northFaceZ + 0.035, { x: Math.PI / 2 }, 20);
-			kit.box(materials.matte, colors.darkHandle, 0.016, 0.085, 0.008, clockX + 0.02, clockY + 0.035, northFaceZ + 0.05, { z: -0.6 });
-			kit.box(materials.matte, colors.darkHandle, 0.012, 0.11, 0.008, clockX - 0.03, clockY + 0.045, northFaceZ + 0.052, { z: 0.55 });
-			kit.sphere(materials.matte, colors.napkin, 0.012, clockX, clockY, northFaceZ + 0.058, undefined, 6);
+			kit.cylinder(materials.matte, colors.clockRim, 0.14, 0.14, 0.04, clockX, clockY, kitchenFaceZ + 0.02, { x: Math.PI / 2 }, 20);
+			kit.cylinder(materials.matte, colors.clockFace, 0.118, 0.118, 0.02, clockX, clockY, kitchenFaceZ + 0.035, { x: Math.PI / 2 }, 20);
+			kit.box(materials.matte, colors.darkHandle, 0.016, 0.085, 0.008, clockX + 0.02, clockY + 0.035, kitchenFaceZ + 0.05, { z: -0.6 });
+			kit.box(materials.matte, colors.darkHandle, 0.012, 0.11, 0.008, clockX - 0.03, clockY + 0.045, kitchenFaceZ + 0.052, { z: 0.55 });
+			kit.sphere(materials.matte, colors.napkin, 0.012, clockX, clockY, kitchenFaceZ + 0.058, undefined, 6);
 		}
 
-		// Рейлинг с утварью и магнитная планка с ножами в середине северной стены.
+		// Рейлинг с утварью и магнитная планка с ножами в середине северной стены, над раковиной и плитой с кастрюлей (не над духовкой).
 		{
-			const railCenter = kitchen.x + 4.4;
+			const railCenter = kitchen.x + 3;
 			const railY = 1.56;
-			const railZ = northFaceZ + 0.07;
+			const railZ = kitchenFaceZ + 0.07;
 			kit.cylinder(materials.metal, colors.steel, 0.012, 0.012, 1.4, railCenter, railY, railZ, { z: Math.PI / 2 }, 6);
 			for (const side of [-0.66, 0.66]) {
 				kit.box(materials.metal, colors.steel, 0.02, 0.02, 0.08, railCenter + side, railY, railZ - 0.035);
@@ -277,11 +260,11 @@ export function createInterior(level: LevelConfig, assets: LoadedAssets, materia
 				}
 			});
 			const stripY = 1.12;
-			kit.box(materials.matte, colors.knifeStrip, 0.62, 0.05, 0.02, railCenter, stripY, northFaceZ + 0.012);
+			kit.box(materials.matte, colors.knifeStrip, 0.62, 0.05, 0.02, railCenter, stripY, kitchenFaceZ + 0.012);
 			for (let knife = 0; knife < 4; knife += 1) {
 				const x = railCenter - 0.22 + knife * 0.145;
-				kit.box(materials.matte, colors.darkHandle, 0.026, 0.07, 0.022, x, stripY + 0.055, northFaceZ + 0.03);
-				kit.box(materials.metal, colors.steel, 0.032 - knife * 0.003, 0.15 + (knife % 2) * 0.03, 0.006, x, stripY - 0.07, northFaceZ + 0.03);
+				kit.box(materials.matte, colors.darkHandle, 0.026, 0.07, 0.022, x, stripY + 0.055, kitchenFaceZ + 0.03);
+				kit.box(materials.metal, colors.steel, 0.032 - knife * 0.003, 0.15 + (knife % 2) * 0.03, 0.006, x, stripY - 0.07, kitchenFaceZ + 0.03);
 			}
 		}
 
@@ -290,44 +273,40 @@ export function createInterior(level: LevelConfig, assets: LoadedAssets, materia
 			const towelShelf = new Group();
 			towelShelf.add(assets.cloneModel("shelf_papertowel"));
 			towelShelf.scale.setScalar(MODEL_SCALE * 0.8);
-			towelShelf.position.set(kitchenRight - (hasFridge ? 1.55 : 0.8), 1.55, northFaceZ);
+			towelShelf.position.set(kitchenRight - 0.6, 1.55, kitchenFaceZ);
 			towelShelf.traverse((node) => {
 				node.castShadow = true;
 			});
 			root.add(towelShelf);
 		}
 
-		// Западная стена: крючки с фартуками и огнетушитель внизу (выступают от стены не дальше 0.1).
+		// Западная стена: крючки с фартуками над проходом (выше голов, выступают от стены не дальше 0.1).
 		const westFaceX = level.bounds.x + 0.5 - wallFaceInset;
 		{
-			const hookZ = kitchen.z + kitchen.depth * 0.5;
+			const hookZ = kitchen.z + kitchen.depth * 0.5 - 0.2;
 			for (let apron = 0; apron < 2; apron += 1) {
 				const z = hookZ + apron * 0.35;
-				kit.box(materials.metal, colors.steel, 0.05, 0.02, 0.02, westFaceX + 0.025, 1.38, z);
-				kit.box(materials.matte, colors.apron[apron], 0.03, 0.42, 0.24, westFaceX + 0.035, 1.16, z, { z: 0.03 });
+				kit.box(materials.metal, colors.steel, 0.05, 0.02, 0.02, westFaceX + 0.025, 1.48, z);
+				kit.box(materials.matte, colors.apron[apron], 0.03, 0.42, 0.24, westFaceX + 0.035, 1.26, z, { z: 0.03 });
 			}
-			const extinguisherZ = kitchen.z + kitchen.depth - 0.7;
-			kit.cylinder(materials.glossy, colors.extinguisher, 0.055, 0.055, 0.3, westFaceX + 0.06, 0.42, extinguisherZ, undefined, 10);
-			kit.cylinder(materials.metal, colors.darkHandle, 0.025, 0.035, 0.06, westFaceX + 0.06, 0.6, extinguisherZ, undefined, 8);
-			kit.box(materials.metal, colors.darkHandle, 0.05, 0.015, 0.06, westFaceX + 0.07, 0.64, extinguisherZ + 0.03);
 		}
 
-		// Резиновые коврики: перед рядом плит (сковороды, конфорки, духовка) и перед рядом разделочных досок.
-		const addMatInFront = (kinds: ReadonlyArray<StationConfig["kind"]>) => {
-			const row = level.stations.filter((station) => kinds.includes(station.kind));
-			if (row.length === 0) {
-				return;
+		// Резиновые коврики на полу прохода перед рядами плит и духовки у стен (северный ряд: коврик южнее, южный: севернее).
+		const kitchenBottom = kitchen.z + kitchen.depth;
+		const cookers = level.stations.filter((station) => station.kind === "stove" || station.kind === "oven");
+		for (const rowZ of new Set(cookers.map((station) => station.rect.z))) {
+			const sameRow = cookers.filter((station) => station.rect.z === rowZ);
+			const atNorthWall = rowZ <= kitchen.z + 0.01;
+			const atSouthWall = rowZ + 1 >= kitchenBottom - 0.01;
+			if (!atNorthWall && !atSouthWall) {
+				continue;
 			}
-			const rowZ = row[0].rect.z;
-			const sameRow = row.filter((station) => station.rect.z === rowZ);
 			const left = Math.min(...sameRow.map((station) => station.rect.x)) + 0.05;
 			const right = Math.min(kitchenRight, Math.max(...sameRow.map((station) => station.rect.x + station.rect.width))) - 0.05;
-			const matTop = rowZ + 1.06;
-			const matBottom = Math.min(kitchen.z + kitchen.depth - 0.1, matTop + 0.6);
-			// Коврик только на свободном полу перед рядом.
-			const matRect: Rect = { x: left, z: matTop, width: right - left, depth: matBottom - matTop };
+			const matTop = atNorthWall ? rowZ + 1.06 : rowZ - 0.66;
+			const matRect: Rect = { x: left, z: matTop, width: right - left, depth: 0.6 };
 			if (!isCellFree(matRect, level.stations)) {
-				return;
+				continue;
 			}
 			const geometry = new PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
 			const uv = geometry.getAttribute("uv");
@@ -341,18 +320,55 @@ export function createInterior(level: LevelConfig, assets: LoadedAssets, materia
 			mat.receiveShadow = true;
 			root.add(mat);
 			kit.box(materials.matte, colors.matBorder, matRect.width + 0.05, 0.008, matRect.depth + 0.05, left + matRect.width / 2, rugY - 0.002, matTop + matRect.depth / 2);
-		};
-		addMatInFront(["pan", "stove", "oven"]);
-		addMatInFront(["cuttingBoard"]);
+		}
 
-		// Трап в полу у южной стены кухни.
+		// Трап в полу в западном проходе кухни.
 		{
-			const drainX = kitchen.x + kitchen.width * 0.55;
-			const drainZ = kitchen.z + kitchen.depth - 0.9;
+			const drainX = kitchen.x + 0.5;
+			const drainZ = kitchen.z + kitchen.depth * 0.5 + 0.1;
 			kit.box(materials.metal, colors.drain, 0.32, 0.01, 0.32, drainX, 0.004, drainZ);
 			for (let slot = 0; slot < 4; slot += 1) {
 				kit.box(materials.matte, 0x23282c, 0.24, 0.012, 0.025, drainX, 0.006, drainZ - 0.105 + slot * 0.07);
 			}
+		}
+	}
+
+	// 1b. Газон севернее кухни (часть улицы, вдающаяся в Г-образное здание): кусты вдоль наружных стен кухни и зала, кусты по краю
+	// и цветы в траве. Газон за кухней, поэтому кусты не закрывают её от камеры. Декор не препятствие: на газон никто не ходит
+	// (кухня закрыта стенами, клиенты ходят по тротуару с юга).
+	if (garden) {
+		const left = garden.x + 0.45;
+		const top = garden.z + 0.45;
+		const right = garden.x + garden.width - 0.45;
+		const bottom = garden.z + garden.depth - 0.4;
+		const bush = (x: number, z: number, size: number, colorIndex: number): void => {
+			const color = colors.leaves[colorIndex % colors.leaves.length];
+			const colorAlt = colors.leaves[(colorIndex + 1) % colors.leaves.length];
+			kit.icosahedron(materials.foliage, color, 0.38 * size, x, 0.26 * size, z, { y: 0.8 }, 1);
+			kit.icosahedron(materials.foliage, colorAlt, 0.28 * size, x + 0.3 * size, 0.2 * size, z + 0.08 * size, { y: 0.85 }, 0);
+			kit.icosahedron(materials.foliage, color, 0.26 * size, x - 0.28 * size, 0.18 * size, z - 0.05 * size, { y: 0.85 }, 0);
+		};
+		// Живая изгородь вдоль северной стены кухни и наружной стены зала.
+		for (let x = left; x <= right; x += 0.95) {
+			bush(x, bottom, 1.05 + rng.next() * 0.25, Math.floor(rng.next() * 3));
+		}
+		for (let z = top + 0.4; z < bottom - 0.6; z += 1.05) {
+			bush(right, z, 1 + rng.next() * 0.3, Math.floor(rng.next() * 3));
+		}
+		// Кусты поменьше вразброс и цветы в траве.
+		const spots: Array<[number, number, number]> = [
+			[0.15, 0.2, 1.25],
+			[0.42, 0.12, 0.9],
+			[0.2, 0.55, 0.85],
+			[0.62, 0.45, 1.1],
+			[0.38, 0.7, 0.8],
+		];
+		spots.forEach(([fx, fz, size], index) => bush(left + (right - left - 1) * fx, top + (bottom - top - 0.8) * fz, size, index));
+		for (let flower = 0; flower < 14; flower += 1) {
+			const x = left + rng.next() * (right - left - 1);
+			const z = top + rng.next() * (bottom - top - 0.9);
+			kit.cylinder(materials.foliage, colors.leaves[flower % colors.leaves.length], 0.01, 0.01, 0.16, x, 0.08, z, undefined, 5);
+			kit.sphere(materials.matte, colors.flowers[flower % colors.flowers.length], 0.045, x, 0.18, z, undefined, 8);
 		}
 	}
 

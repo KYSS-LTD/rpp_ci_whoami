@@ -107,16 +107,16 @@ function createStations(): StationConfig[] {
 		createStation("counter-1", "counter", 0.5, 2, { rotationDeg: 90 }),
 		createStation("counter-2", "counter", 0.5, 3, { rotationDeg: 90 }),
 		createStation("plates-1", "plateStack", 0.5, 5, { rotationDeg: 90 }),
-		// Стол с кастрюлей (в начале смены на нём пустая кастрюля) и кран для воды.
-		createStation("counter-pot", "counter", 0.5, 6.5, { rotationDeg: 90, startItem: "pot" }),
+		// Прилавок и раковина для воды.
+		createStation("counter-pot", "counter", 0.5, 6.5, { rotationDeg: 90 }),
 		createStation("tap-1", "tap", 6, 6.5, { rotationDeg: 270 }),
 		// Остров: две разделочные доски.
 		createStation("board-1", "cuttingBoard", 3, 4),
 		createStation("board-2", "cuttingBoard", 4, 4),
-		// Южный ряд: две сковороды, кастрюля, духовка, урна.
-		createStation("pan-1", "pan", 2, 7.5, { rotationDeg: 180 }),
-		createStation("pan-2", "pan", 3, 7.5, { rotationDeg: 180 }),
-		createStation("stove-1", "stove", 4, 7.5, { rotationDeg: 180 }),
+		// Южный ряд: две плиты для жарки, плита с кастрюлей, духовка, урна.
+		createStation("pan-1", "stove", 2, 7.5, { rotationDeg: 180 }),
+		createStation("pan-2", "stove", 3, 7.5, { rotationDeg: 180 }),
+		createStation("stove-1", "stove", 4, 7.5, { rotationDeg: 180, startItem: "pot" }),
 		createStation("oven-1", "oven", 5, 7.5, { rotationDeg: 180 }),
 		createStation("trash-1", "trash", 6, 7.5, { rotationDeg: 180 }),
 		// Окно выдачи на разделяющей стене.

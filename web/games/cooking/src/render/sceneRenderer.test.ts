@@ -347,8 +347,8 @@ describe("индикаторы над станциями: зелёная пол�
 	it("готовка: зелёная полоса заполняется по прогрессу, красная пуста", () => {
 		const level = getLevelConfig("easy");
 		const { renderer } = createScene(level);
-		renderer.render(snapshotWithStation(level, "pan-1", { phase: "processing", progress: 0.4, burnProgress: 0, items: [rawPatty] }), 1 / 60);
-		const indicator = renderer.scene.getObjectByName("indicator-pan-1") as Object3D;
+		renderer.render(snapshotWithStation(level, "stove-1", { phase: "processing", progress: 0.4, burnProgress: 0, items: [rawPatty] }), 1 / 60);
+		const indicator = renderer.scene.getObjectByName("indicator-stove-1") as Object3D;
 		expect(indicator.visible).toBe(true);
 		const bars = readBars(indicator);
 		expect(bars.progress).toBeCloseTo(0.4, 5);
@@ -360,8 +360,8 @@ describe("индикаторы над станциями: зелёная пол�
 		const { renderer } = createScene(level);
 		const burnValues: number[] = [];
 		for (const burnProgress of [0, 0.25, 0.5, 0.9, 1]) {
-			renderer.render(snapshotWithStation(level, "pan-1", { phase: "ready", progress: 1, burnProgress, items: [cookedPatty] }), 1 / 60);
-			const bars = readBars(renderer.scene.getObjectByName("indicator-pan-1") as Object3D);
+			renderer.render(snapshotWithStation(level, "stove-1", { phase: "ready", progress: 1, burnProgress, items: [cookedPatty] }), 1 / 60);
+			const bars = readBars(renderer.scene.getObjectByName("indicator-stove-1") as Object3D);
 			expect(bars.progress).toBeCloseTo(1, 5);
 			burnValues.push(bars.burn ?? -1);
 		}
@@ -378,10 +378,10 @@ describe("индикаторы над станциями: зелёная пол�
 		const level = getLevelConfig("easy");
 		const { renderer } = createScene(level);
 		const colors: number[] = [];
-		const state = snapshotWithStation(level, "pan-1", { phase: "ready", progress: 1, burnProgress: 0.85, items: [cookedPatty] });
+		const state = snapshotWithStation(level, "stove-1", { phase: "ready", progress: 1, burnProgress: 0.85, items: [cookedPatty] });
 		for (let frame = 0; frame < 60; frame += 1) {
 			renderer.render(state, 1 / 60);
-			colors.push(readBars(renderer.scene.getObjectByName("indicator-pan-1") as Object3D).burnColor ?? 0);
+			colors.push(readBars(renderer.scene.getObjectByName("indicator-stove-1") as Object3D).burnColor ?? 0);
 		}
 		const distinct = new Set(colors);
 		expect(distinct.size).toBe(2);
@@ -394,10 +394,10 @@ describe("индикаторы над станциями: зелёная пол�
 	it("сгорело и пустая станция: индикаторов нет; у разделочной доски одна полоса резки без красной", () => {
 		const level = getLevelConfig("easy");
 		const { renderer } = createScene(level);
-		renderer.render(snapshotWithStation(level, "pan-1", { phase: "burnt", progress: 0, burnProgress: 0, items: [{ type: "ingredient", kind: "patty", state: "burnt" }] }), 1 / 60);
-		expect((renderer.scene.getObjectByName("indicator-pan-1") as Object3D).visible).toBe(false);
-		renderer.render(snapshotWithStation(level, "pan-2", { phase: "idle", progress: 0, burnProgress: 0, items: [] }), 1 / 60);
-		expect((renderer.scene.getObjectByName("indicator-pan-2") as Object3D).visible).toBe(false);
+		renderer.render(snapshotWithStation(level, "stove-1", { phase: "burnt", progress: 0, burnProgress: 0, items: [{ type: "ingredient", kind: "patty", state: "burnt" }] }), 1 / 60);
+		expect((renderer.scene.getObjectByName("indicator-stove-1") as Object3D).visible).toBe(false);
+		renderer.render(snapshotWithStation(level, "stove-2", { phase: "idle", progress: 0, burnProgress: 0, items: [] }), 1 / 60);
+		expect((renderer.scene.getObjectByName("indicator-stove-2") as Object3D).visible).toBe(false);
 		renderer.render(snapshotWithStation(level, "board-1", { phase: "processing", progress: 0.6, burnProgress: 0, items: [{ type: "ingredient", kind: "steak", state: "raw" }] }), 1 / 60);
 		const board = renderer.scene.getObjectByName("indicator-board-1") as Object3D;
 		expect(board.visible).toBe(true);

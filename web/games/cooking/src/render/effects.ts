@@ -1,4 +1,4 @@
-// Эффекты частиц: пар над кастрюлей, сковородами, духовкой и горячими блюдами, искры от сковороды, пузыри в кипящей воде,
+// Эффекты частиц: пар над кастрюлей, плитами, духовкой и горячими блюдами, искры от жарки на плите, пузыри в кипящей воде,
 // крошки при нарезке, серый дым перед подгоранием и чёрный у сгоревшего, всплески на события (подача блюда, готовность,
 // сгорание, урна, конец нарезки). Две системы точек на всю сцену: мягкие облачка с обычным смешиванием и светящиеся
 // искры со сложением цветов, поэтому эффекты стоят две отрисовки. Частицы только украшают и не влияют на игру.
@@ -255,19 +255,6 @@ export function createEffectsLayer(level: LevelConfig, surfaceHeights: ReadonlyM
 		const key = station.id;
 		const burnRisk = Math.max(0, station.burnProgress - 0.45) / 0.55;
 		switch (station.kind) {
-			case "pan": {
-				const y = surfaceY + 0.05;
-				if (station.phase === "processing") {
-					for (let index = emitCount(`${key}:steam`, 4, frameDtSec); index > 0; index -= 1) steam(center.x, y, center.z, 0.8);
-					for (let index = emitCount(`${key}:spark`, 10, frameDtSec); index > 0; index -= 1) spark(center.x, y, center.z);
-				} else if (station.phase === "ready") {
-					for (let index = emitCount(`${key}:steam`, 4, frameDtSec); index > 0; index -= 1) steam(center.x, y, center.z);
-					for (let index = emitCount(`${key}:smoke`, burnRisk * 9, frameDtSec); index > 0; index -= 1) smoke(center.x, y, center.z, false);
-				} else if (station.phase === "burnt") {
-					for (let index = emitCount(`${key}:smoke`, 6, frameDtSec); index > 0; index -= 1) smoke(center.x, y, center.z, true);
-				}
-				break;
-			}
 			case "oven": {
 				// Пар и дым выходят из вентиляции на крышке духовки.
 				const y = surfaceY + 0.02;
@@ -284,6 +271,20 @@ export function createEffectsLayer(level: LevelConfig, surfaceHeights: ReadonlyM
 			}
 			case "stove": {
 				const pot = station.items.find((item) => item.type === "pot");
+				// Плита без кастрюли жарит продукт прямо на конфорке: искры, пар, дым перед подгоранием.
+				if (!pot) {
+					const y = surfaceY + 0.05;
+					if (station.phase === "processing") {
+						for (let index = emitCount(`${key}:steam`, 4, frameDtSec); index > 0; index -= 1) steam(center.x, y, center.z, 0.8);
+						for (let index = emitCount(`${key}:spark`, 10, frameDtSec); index > 0; index -= 1) spark(center.x, y, center.z);
+					} else if (station.phase === "ready") {
+						for (let index = emitCount(`${key}:steam`, 4, frameDtSec); index > 0; index -= 1) steam(center.x, y, center.z);
+						for (let index = emitCount(`${key}:smoke`, burnRisk * 9, frameDtSec); index > 0; index -= 1) smoke(center.x, y, center.z, false);
+					} else if (station.phase === "burnt") {
+						for (let index = emitCount(`${key}:smoke`, 6, frameDtSec); index > 0; index -= 1) smoke(center.x, y, center.z, true);
+					}
+					break;
+				}
 				const y = surfaceY + 0.2;
 				if (station.phase === "burnt") {
 					for (let index = emitCount(`${key}:smoke`, 6, frameDtSec); index > 0; index -= 1) smoke(center.x, y, center.z, true);

@@ -60,25 +60,21 @@ describe.each(phoneSizes)("телефон в альбомной ориентац
 		expect(metrics.zoneWidthPx).toBeGreaterThan(200);
 	});
 
-	it("шесть столов по четыре заказа: все карточки внутри зоны, вид компактный, две колонки по три строки", () => {
-		const plan = planOrdersLayout({ metrics, orderCounts: new Array(6).fill(MAX_ORDERS_PER_TABLE), previousDensity: "full" });
-		expectPlanInsideZone(plan, `${width}x${height} 6x4`);
-		expect(plan.density).toBe("compact");
-		expect(plan.placements).toHaveLength(6);
-		expect(plan.rows * plan.columns).toBeGreaterThanOrEqual(6);
+	it("окно считается телефоном: вместо карточек столов показана сводка по блюдам", () => {
+		expect(metrics.phone).toBe(true);
 	});
+});
 
-	it("hard: два стола на четыре места и четыре на два (шестнадцать заказов) видны целиком", () => {
-		const plan = planOrdersLayout({ metrics, orderCounts: [4, 4, 2, 2, 2, 2], previousDensity: "full" });
-		expectPlanInsideZone(plan, `${width}x${height} hard`);
-		expect(plan.placements).toHaveLength(6);
-	});
+describe("низкое окно компьютера 1280 x 520", () => {
+	const metrics = computeHudMetrics(createEnvironment(1280, 520, false));
 
-	it("любое число столов от одного до шести помещается в зону", () => {
-		for (let tables = 1; tables <= 6; tables += 1) {
-			const counts = Array.from({ length: tables }, (_, index) => (index % 2 === 0 ? 4 : 2));
-			expectPlanInsideZone(planOrdersLayout({ metrics, orderCounts: counts, previousDensity: "compact" }), `${width}x${height} столов ${tables}`);
-		}
+	it("не телефон: компактные карточки в обычном масштабе, шесть столов по четыре заказа и hard видны целиком", () => {
+		expect(metrics.phone).toBe(false);
+		expect(metrics.compactScale).toBe(1);
+		const heavy = planOrdersLayout({ metrics, orderCounts: new Array(6).fill(MAX_ORDERS_PER_TABLE), previousDensity: "full" });
+		expectPlanInsideZone(heavy, "1280x520 6x4");
+		expect(heavy.density).toBe("compact");
+		expectPlanInsideZone(planOrdersLayout({ metrics, orderCounts: [4, 4, 2, 2, 2, 2], previousDensity: "full" }), "1280x520 hard");
 	});
 });
 

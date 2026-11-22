@@ -6,6 +6,7 @@ export const floorColors = {
 	kitchen: 0xdfe4e8,
 	hall: 0xc89f72,
 	street: 0x78965c,
+	garden: 0x79a94f,
 } as const;
 
 // Цвет фона сцены (за краем улицы).
