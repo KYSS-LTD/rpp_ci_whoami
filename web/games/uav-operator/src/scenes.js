@@ -26,6 +26,42 @@ export function resize_Frame(renderer, stage) {
 	stage.resize?.(width / height);
 }
 
+export function create_GroundShadow(scene, sun, width, groundAt) {
+	const paper = document.createElement('canvas');
+	paper.width = paper.height = 64;
+	const ctx = paper.getContext('2d');
+	const falloff = ctx.createRadialGradient(32, 32, 0, 32, 32, 31);
+	falloff.addColorStop(0, 'rgba(255,255,255,.96)');
+	falloff.addColorStop(.42, 'rgba(255,255,255,.65)');
+	falloff.addColorStop(1, 'rgba(255,255,255,0)');
+	ctx.fillStyle = falloff;
+	ctx.fillRect(0, 0, 64, 64);
+	const material = new THREE.MeshBasicMaterial({
+		color: 0x242825, map: new THREE.CanvasTexture(paper), transparent: true,
+		depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2,
+	});
+	const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), material);
+	const normal = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+	const direction = sun.position.clone().sub(sun.target.position);
+	scene.add(shadow);
+	return {
+		mesh: shadow,
+		update(x, y, z, visible) {
+			const clearance = Math.max(0, y - groundAt(x, z));
+			const reach = 2 + width * 3;
+			shadow.visible = visible && clearance < reach;
+			if (!shadow.visible) return;
+			const sx = x - clearance * direction.x / direction.y;
+			const sz = z - clearance * direction.z / direction.y;
+			shadow.position.set(sx, groundAt(sx, sz) + .025, sz);
+			normal.set(groundAt(sx - .25, sz) - groundAt(sx + .25, sz), .5, groundAt(sx, sz - .25) - groundAt(sx, sz + .25)).normalize();
+			shadow.quaternion.setFromUnitVectors(up, normal);
+			shadow.scale.setScalar(width * 1.25 + clearance * .18);
+			material.opacity = .52 * (1 - clearance / reach);
+		},
+	};
+}
+
 export function create_Home(coast) {
 	const { scene, fieldDrone, seaTime } = coast;
 	const camera = new THREE.PerspectiveCamera(41, 1, .13, 680);

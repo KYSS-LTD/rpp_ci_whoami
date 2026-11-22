@@ -7,7 +7,7 @@ import { bind_DamageDisplay } from './flight-damage-display.js';
 import { bind_Preferences, flightPreferences, preference_Markup } from './flight-preferences.js';
 import { create_Acro, fpvKit } from './fpv.js';
 import { bind_FlightInputs, bind_Joystick } from './inputs.js';
-import { add_Beacon } from './scenes.js';
+import { add_Beacon, create_GroundShadow } from './scenes.js';
 import { dispose_Scene, palette } from './models.js';
 import { create_Field, gate_Crossing } from './training-field.js';
 import { bind_Click, close_StageMenu, query, scene_Frame, set_Status, show_CompletePrompt, stage_OverlayOpen, stage_Shell, toggle_StageMenu, vibrate_Device } from './ui.js';
@@ -17,6 +17,7 @@ import { create_AnalogFeed } from './video.js';
 const launchHeading = -Math.PI * .34;
 const directionArrows = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
 const groundHeight = .72;
+const modelOffset = .66;
 
 function draw_Map(context, x, z, heading, scanned, { limits, points, beach }) {
 	const width = context.canvas.width;
@@ -88,7 +89,11 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	if (droneKey && beach) coast.fieldDrone.drone.visible = false;
 	let chase = (restoredState?.camera ?? practice?.camera ?? storyCamera) === 'chase';
 	let cameraChanged = true;
-	const droneCenter = fieldDrone.drone.worldToLocal(new THREE.Box3().setFromObject(fieldDrone.drone).getCenter(new THREE.Vector3()));
+	const droneBounds = new THREE.Box3().setFromObject(fieldDrone.drone);
+	const droneCenter = fieldDrone.drone.worldToLocal(droneBounds.getCenter(new THREE.Vector3()));
+	const bodyOffset = droneCenter.y - modelOffset;
+	const groundShadow = create_GroundShadow(scene, world.sun, droneBounds.max.x - droneBounds.min.x, groundAt);
+	fieldDrone.drone.traverse(object => { object.castShadow = false; });
 	const chaseDistance = Math.max(1.4, (kit.length ?? .32) * 5.5);
 	const updateChase = create_ChaseCamera(fieldDrone.drone, droneCenter, chaseDistance, touchesTree, groundAt);
 	const camera = new THREE.PerspectiveCamera(flightPreferences.fov, 1, .07, 620);
@@ -341,6 +346,8 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		photoCamera.lookAt(target.x, 0, target.z);
 		const visibility = markers.map(marker => marker.ring.visible);
 		const droneVisible = fieldDrone.drone.visible;
+		const shadowVisible = groundShadow.mesh.visible;
+		groundShadow.mesh.visible = false;
 		for (const marker of markers) marker.ring.visible = false;
 		fieldDrone.drone.visible = false;
 		try {
@@ -350,6 +357,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		} finally {
 			renderer.setDrawingBufferSize(screenSize.x, screenSize.y, pixelRatio);
 			fieldDrone.drone.visible = droneVisible;
+			groundShadow.mesh.visible = shadowVisible;
 			markers.forEach((marker, index) => { marker.ring.visible = visibility[index]; });
 		}
 		query('#photo-caption').textContent = `${copy.capture} · ${target.label}`;
@@ -428,6 +436,8 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	}, signal);
 	signal.addEventListener('abort', () => {
 		video.dispose();
+		groundShadow.mesh.removeFromParent();
+		dispose_Scene(groundShadow.mesh);
 		fieldDrone.drone.visible = true;
 		for (const propeller of fieldDrone.propellers) propeller.visible = true;
 		if (beach && fieldDrone !== coast.fieldDrone) {
@@ -486,7 +496,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			const timeAlongPath = sample / samples;
 			obstacle = touchesTree(
 				THREE.MathUtils.lerp(previous.x, motion.x, timeAlongPath),
-				THREE.MathUtils.lerp(previous.y, motion.y, timeAlongPath),
+				THREE.MathUtils.lerp(previous.y, motion.y, timeAlongPath) + bodyOffset,
 				THREE.MathUtils.lerp(previous.z, motion.z, timeAlongPath),
 			);
 		}
@@ -525,7 +535,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 
 	function advance_Course() {
 		const gate = sectors[nextGate];
-		if (!gate_Crossing(gate, previous, motion)) return;
+		if (!gate_Crossing(gate, previous, motion, bodyOffset)) return;
 		nextGate++;
 		scanned.add(gate);
 		query(`#sector-${gate.label}`).classList.add('captured');
@@ -636,7 +646,8 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			const backX = Math.sin(heading);
 			const backZ = Math.cos(heading);
 			fieldDrone.drone.visible = chase;
-			fieldDrone.drone.position.set(x, y - .66, z);
+			fieldDrone.drone.position.set(x, y - modelOffset, z);
+			groundShadow.update(x, y + bodyOffset, z, chase);
 			const grounded = on_Ground();
 			if (stabilized) {
 				const forwardSpeed = -(motion.vx * backX + motion.vz * backZ);

@@ -11,7 +11,11 @@ const cubes = new Map();
 const cylinders = new Map();
 
 export function material(color) {
-	if (!materials.has(color)) materials.set(color, new THREE.MeshStandardMaterial({ color, roughness: .78 }));
+	if (!materials.has(color)) {
+		const surface = new THREE.MeshStandardMaterial({ color, roughness: .78 });
+		surface.userData.sceneryPalette = true;
+		materials.set(color, surface);
+	}
 	return materials.get(color);
 }
 
@@ -47,6 +51,7 @@ export function dispose_Scene(scene) {
 	const sharedMaterials = new Set(materials.values());
 	const textures = new Set();
 	scene.traverse(object => {
+		if (object.isInstancedMesh) object.dispose();
 		if (object.geometry && !sharedGeometry.has(object.geometry)) object.geometry.dispose();
 		if (object.material && !sharedMaterials.has(object.material)) {
 			for (const texture of [object.material.map, object.material.normalMap]) {

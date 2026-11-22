@@ -18,11 +18,14 @@ export function mount_FreeMenu({ mount, signal, screen, select, start, exit, has
 			<span class="free-glyph" aria-hidden="true">${glyphs[stage.id]}</span><span><strong>${item.title}</strong><small>${item.detail}</small></span>
 			<span class="free-chevron" aria-hidden="true">›</span></button>`;
 	}).join('');
-	const radio = (name, id, label, detail, selected, icon) => `<label class="free-option"><input type="radio" name="${name}" value="${id}" ${id === selected ? 'checked' : ''}>
-		<span aria-hidden="true">${icon}</span><span><strong>${label}</strong>${detail ? `<small>${detail}</small>` : ''}</span></label>`;
+	const radio = (name, id, label, detail, selected, visual) => `<label class="free-option"><input type="radio" name="${name}" value="${id}" ${id === selected ? 'checked' : ''}>
+		<span aria-hidden="true">${visual}</span><span><strong>${label}</strong>${detail ? `<small>${detail}</small>` : ''}</span></label>`;
 	const aircraft = Object.entries(fleet).map(([id, drone]) => `<option value="${id}" ${id === freeOptions.drone ? 'selected' : ''}>${drone.name}</option>`).join('');
 	const optionsMarkup = `<div class="free-setup"><fieldset class="free-maps"><legend>${copy.map}</legend>
-		${Object.entries(copy.maps).map(([id, map]) => radio('map', id, map.title, map.detail, freeOptions.map, map.icon)).join('')}
+		${Object.entries(copy.maps).map(([id, map]) => {
+			const capture = new URL(`./assets/map-${id}.webp`, import.meta.url).href;
+			return radio('map', id, map.title, map.detail, freeOptions.map, `<img src="${capture}" alt="" width="320" height="208">`);
+		}).join('')}
 		</fieldset><div class="free-aircraft">
 			<label class="free-select">${copy.drone}<select id="free-drone">${aircraft}</select></label>
 			<div class="free-model" aria-hidden="true"><div class="canvas-slot" id="canvas-slot"></div></div>

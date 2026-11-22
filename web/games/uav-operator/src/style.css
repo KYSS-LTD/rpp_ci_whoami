@@ -260,6 +260,11 @@ h1, h2, p { margin: 0; }
 .free-setup { display: grid; gap: 1rem; align-items: start; }
 .free-setup fieldset, .free-difficulties { border: 0; margin: 0; padding: 0; min-inline-size: 0; }
 .free-setup legend { padding: 0; margin-bottom: .45rem; font-weight: 750; }
+.free-maps .free-option {
+	grid-template-columns: clamp(4.75rem, 14cqi, 7.25rem) minmax(0, 1fr);
+	padding: .45rem .75rem .45rem .45rem;
+}
+.free-maps img { display: block; inline-size: 100%; block-size: auto; border-radius: .4rem; }
 .free-aircraft { border: 1px solid #45584a; border-radius: 12px; background: #1b2721; overflow: hidden; }
 .free-aircraft .free-select, .free-drone-detail { padding: .75rem; }
 .free-model { height: clamp(110px, 25cqi, 190px); position: relative; background: radial-gradient(ellipse, #3b5148, #1b2823 75%); }
