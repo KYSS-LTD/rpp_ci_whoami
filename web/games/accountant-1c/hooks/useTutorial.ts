@@ -65,7 +65,13 @@ function measureTarget(element: HTMLElement, width: number, height: number) {
 	let right = Math.min(width, bounds.right);
 	let bottom = Math.min(height, bounds.bottom);
 
-	for (let parent = element.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+	// Развёрнутое окно позиционируется относительно всего рабочего места и выходит за границы коридора.
+	function clippingParent(node: HTMLElement) {
+		return node.matches('[data-accounting-app][data-open="true"]')
+			? node.offsetParent as HTMLElement | null
+			: node.parentElement;
+	}
+	for (let parent = clippingParent(element); parent && parent !== document.body; parent = clippingParent(parent)) {
 		const style = window.getComputedStyle(parent);
 		if (style.overflowX === "visible" && style.overflowY === "visible") {
 			continue;

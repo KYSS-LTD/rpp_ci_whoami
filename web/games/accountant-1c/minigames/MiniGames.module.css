@@ -741,7 +741,7 @@
 
 /* ---------- Узкие экраны ---------- */
 
-@container (max-width: 1120px) {
+@container desk (max-width: 1120px) {
 	.stampTray {
 		position: relative;
 		left: auto;

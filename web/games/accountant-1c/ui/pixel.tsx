@@ -167,7 +167,7 @@ export function getCharacterLook(character: CharacterId, variant = 0): Character
 interface PixelCharacterProps {
 	character: CharacterId;
 	variant?: number;
-	label: string;
+	label?: string;
 	className?: string;
 }
 
@@ -180,8 +180,9 @@ export function PixelCharacter({ character, variant = 0, label, className }: Pix
 			viewBox="0 0 16 18"
 			className={`${styles.character} ${className ?? ""}`}
 			shapeRendering="crispEdges"
-			role="img"
+			role={label ? "img" : undefined}
 			aria-label={label}
+			aria-hidden={label ? undefined : true}
 			data-character={character}
 		>
 			{look.sprite.map((row, rowIndex) =>

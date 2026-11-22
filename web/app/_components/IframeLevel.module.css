@@ -145,3 +145,13 @@
 	border-radius: 0;
 	margin-block-end: env(safe-area-inset-bottom);
 }
+
+@media (pointer: coarse) and (max-width: 900px), (pointer: coarse) and (max-height: 600px) {
+	.level[data-game="uav-operator"][data-expanded="true"] .header {
+		display: none;
+	}
+
+	.level[data-game="uav-operator"][data-expanded="true"] {
+		padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+	}
+}

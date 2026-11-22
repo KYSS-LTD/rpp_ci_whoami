@@ -40,7 +40,34 @@
 	transform-origin: top left;
 }
 
-.window[data-open="false"] { visibility: hidden; pointer-events: none; }
+.surface {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-block-size: 0;
+}
+
+.window[data-open="false"] {
+	position: relative;
+	inset: auto;
+	z-index: auto;
+	grid-area: screen;
+	contain: size;
+	pointer-events: none;
+}
+
+.window[data-open="false"] .surface {
+	position: absolute;
+	inset: 0 auto auto 0;
+	inline-size: 160%;
+	block-size: 160%;
+	transform: scale(0.625);
+	transform-origin: top left;
+}
+
+.window[data-open="false"] :is(.menuToggle, .closeWindow) {
+	display: none;
+}
 
 .window h2,
 .window h3 {
@@ -267,12 +294,12 @@
 
 .notifications {
 	position: absolute;
-	inset: 3.75rem 12px auto auto;
+	inset: auto 12px 12px auto;
 	z-index: 40;
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
-	width: min(21rem, 36%);
+	width: min(23rem, calc(100% - 24px));
 	pointer-events: none;
 }
 
@@ -280,14 +307,24 @@
 	display: none;
 }
 
+@container workplace (min-width: 1024px) {
+	:global([data-app-open="false"]) > .notifications {
+		inset-inline: 12px auto;
+		width: calc(var(--scene-width) - 24px);
+	}
+}
+
 .toast {
-	display: flex;
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
 	gap: 8px;
-	align-items: flex-start;
-	padding: 4px;
-	color: #fffdf6;
-	font-family: var(--acc-font-paper, monospace);
-	text-shadow: 0 1px 3px #241a13, 0 0 4px #241a13, 1px 1px #241a13;
+	align-items: start;
+	padding: 8px;
+	color: var(--ink);
+	background: #fffaf0;
+	border: 2px solid var(--wood-dark);
+	border-inline-start: 5px solid var(--yellow);
+	box-shadow: 4px 4px 0 rgb(0 0 0 / 0.35);
 }
 
 .toast:nth-last-child(n + 3) { display: none; }
@@ -301,14 +338,23 @@
 }
 
 .toastBody {
-	flex: 1;
-	font-size: 0.82rem;
+	padding-block: 3px;
+	font: 0.875rem/1.45 var(--mono);
+	overflow-wrap: anywhere;
+}
+
+.toast .toastPortrait {
+	width: 38px;
+	height: 44px;
+	background: var(--paper-shade);
+	border: 1px solid var(--paper-line);
+	animation: none;
 }
 
 .toastAuthor {
-	font-size: 0.72rem;
+	margin-block-end: 3px;
 	font-weight: 700;
-	color: #fff0ad;
+	color: var(--ink-red);
 }
 
 .notifications .toastClose {
@@ -316,12 +362,12 @@
 	min-block-size: 44px;
 	padding: 0;
 	color: inherit;
-	text-shadow: inherit;
 	pointer-events: auto;
 	font-size: 1rem;
 	line-height: 1;
-	background: transparent;
-	border-color: transparent;
+	background: var(--paper);
+	border: 1px solid var(--paper-line);
+	border-radius: 0;
 }
 
 /* ---------- Узкий монитор: разделы в меню, сообщения шторкой ---------- */
@@ -360,8 +406,6 @@
 	.workspace { grid-row: 2; }
 
 	.form button, .form input, .form select, .window .messagesToggle { min-block-size: 44px; }
-
-	.notifications { width: min(16rem, 58%); }
 
 	.form {
 		max-height: none;

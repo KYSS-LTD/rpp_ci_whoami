@@ -1,9 +1,8 @@
 "use client";
 
 // Рабочее место бухгалтера (design.md, D11): своя раскладка.
-// Сверху полоса дня (день, часы, фикус, очки, «Уйти домой пораньше»), под ней окошко в коридор с персонажем
-// и монитор с программой, ниже во всю ширину стол с бумагами, калькулятором, справочником и замечаниями.
-import { useEffect, useRef, useState, type ReactNode } from "react";
+// Под полосой дня расположены окошко в коридор, монитор и стол с бумагами.
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { TutorialOverlay } from "../components/TutorialOverlay";
 import type { TutorialController } from "../hooks/useTutorial";
 import { tutorialTexts } from "../texts/tutorial";
@@ -58,7 +57,7 @@ function SlipStack() {
 	// Показываем последние три листка: старые уходят под низ стопки.
 	const visibleSlips = chrome.slips.slice(-3);
 	return (
-		<aside className={styles.slips} aria-label={texts.regionLabel}>
+		<aside className={styles.slips} aria-label={texts.regionLabel} hidden={visibleSlips.length === 0}>
 			<ul>
 				{visibleSlips.map((slip, index) => (
 					<li key={slip.id} className={styles.slip} style={{ "--slip-index": visibleSlips.length - 1 - index } as React.CSSProperties}>
@@ -106,13 +105,19 @@ export function Workplace({ booth, monitorSection, monitorTitle, monitor, desk, 
 	const rootRef = useRef<HTMLElement>(null);
 	const deskRef = useRef<HTMLDivElement>(null);
 	const launcherRef = useRef<HTMLButtonElement>(null);
+	const returnFocusRef = useRef<HTMLButtonElement>(null);
 	const [isAppOpen, setIsAppOpen] = useState(false);
 	const ficusState = getFicusState(chrome.share);
 	const texts = accountantTexts.workplace;
 
+	function openApp(event: MouseEvent<HTMLButtonElement>) {
+		returnFocusRef.current = event.currentTarget;
+		setIsAppOpen(true);
+	}
+
 	return (
 		<AmountTargetProvider>
-			<section ref={rootRef} className={`${styles.workplace} ${fontVariables}`} aria-label={texts.deskLabel}>
+			<section ref={rootRef} className={`${styles.workplace} ${fontVariables}`} aria-label={texts.deskLabel} data-app-open={isAppOpen}>
 				<header className={styles.dayBar} inert={isAppOpen}>
 					<p className={styles.dayLabel}>
 						{fillTemplate(texts.dayLabel, { day: String(chrome.dayNumber) })}
@@ -125,7 +130,7 @@ export function Workplace({ booth, monitorSection, monitorTitle, monitor, desk, 
 					<p className={styles.dayScore}>
 						{texts.scoreLabel}: <strong>{chrome.scoreText}</strong>
 					</p>
-					<button type="button" className={styles.tutorialHelp} data-tutorial-switch onClick={() => setIsAppOpen(true)}>{accountantTexts.window.openShort}</button>
+					<button type="button" className={styles.tutorialHelp} data-tutorial-switch onClick={openApp}>{accountantTexts.window.openShort}</button>
 					{tutorial?.enabled ? (
 						<button type="button" className={styles.tutorialHelp} data-tutorial-help aria-label={tutorialTexts.replay} onClick={tutorial.replay}>?</button>
 					) : null}
@@ -135,10 +140,11 @@ export function Workplace({ booth, monitorSection, monitorTitle, monitor, desk, 
 					</button>
 				</header>
 
-				<div className={styles.desktop} inert={isAppOpen}>
+				<div className={styles.desktop}>
 					<div className={styles.upper}>
-						<section className={styles.booth} data-tutorial-id="booth" aria-label={texts.boothLabel}>
+						<section className={styles.booth} data-tutorial-id="booth" aria-label={texts.boothLabel} inert={isAppOpen}>
 							<div className={styles.boothWindow}>
+								<p className={styles.boothName}>{booth.name}</p>
 								<PixelCharacter
 									key={`${booth.character}-${booth.variant ?? 0}-${booth.name}`}
 									character={booth.character}
@@ -146,7 +152,6 @@ export function Workplace({ booth, monitorSection, monitorTitle, monitor, desk, 
 									label={booth.name}
 									className={styles.boothCharacter}
 								/>
-								<p className={styles.boothName}>{booth.name}</p>
 								{/* Подоконник окошка: сюда кладут бумаги, которые отдают посетителю. */}
 								<div className={styles.boothCounter}>{booth.counter}</div>
 							</div>
@@ -156,28 +161,28 @@ export function Workplace({ booth, monitorSection, monitorTitle, monitor, desk, 
 						</section>
 
 						<div className={styles.monitorFrame}>
+							<AppWindow activeSection={monitorSection} formTitle={monitorTitle} messages={chrome.messages}
+								open={isAppOpen} launcherRef={launcherRef} returnFocusRef={returnFocusRef} onClose={() => setIsAppOpen(false)}>
+								{monitor}
+							</AppWindow>
 							<button ref={launcherRef} type="button" className={styles.monitorLauncher} data-tutorial-id="monitor" data-tutorial-switch
-								aria-label={accountantTexts.window.open} onClick={() => setIsAppOpen(true)}>
-								<span className={styles.monitorIcon} aria-hidden="true">▤</span>
-								<strong>{accountantTexts.window.appTitle}</strong>
-								<span>{monitorTitle ?? accountantTexts.window.homeTab}</span>
+								aria-label={accountantTexts.window.open} inert={isAppOpen} onClick={openApp}>
+								<span>{accountantTexts.window.openShort}</span>
 							</button>
 						</div>
 					</div>
 
-					<DeskLayoutProvider deskRef={deskRef}>
-						<div className={styles.desk} data-tutorial-id="desk" ref={deskRef} style={{ "--desk-height": `${deskHeight}px` } as React.CSSProperties}>
-							{desk}
-							{rulebookTab ? <Rulebook defaultPosition={{ x: 850, y: 374 }} initialTab={rulebookTab} /> : null}
-							<Calculator defaultPosition={{ x: 830, y: 16 }} />
-							<SlipStack />
-						</div>
-					</DeskLayoutProvider>
+					<div className={styles.deskArea} inert={isAppOpen}>
+						<DeskLayoutProvider deskRef={deskRef}>
+							<div className={styles.desk} data-tutorial-id="desk" ref={deskRef} style={{ "--desk-height": `${deskHeight}px` } as React.CSSProperties}>
+								{desk}
+								{rulebookTab ? <Rulebook defaultPosition={{ x: 850, y: 374 }} initialTab={rulebookTab} /> : null}
+								<Calculator defaultPosition={{ x: 830, y: 16 }} />
+								<SlipStack />
+							</div>
+						</DeskLayoutProvider>
+					</div>
 				</div>
-				<AppWindow activeSection={monitorSection} formTitle={monitorTitle} messages={chrome.messages}
-					open={isAppOpen} launcherRef={launcherRef} onClose={() => setIsAppOpen(false)}>
-					{monitor}
-				</AppWindow>
 				<DirectorNotices notifications={chrome.notifications} hidden={!!tutorial?.current} onClose={chrome.closeNotification} />
 				{tutorial?.current ? <TutorialOverlay rootRef={rootRef} tutorial={tutorial} step={tutorial.current} appOpen={isAppOpen} onShowApp={setIsAppOpen} /> : null}
 			</section>

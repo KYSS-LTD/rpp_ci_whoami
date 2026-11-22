@@ -11,6 +11,7 @@ import {
 	type CalculatorState,
 } from "../logic/calculator";
 import { accountantTexts } from "../texts";
+import { DirectorNotices } from "../ui/AppWindow";
 import { AmountInput } from "./AmountInput";
 import { Calculator } from "./Calculator";
 import { AmountTargetProvider, LevelChromeProvider, type LevelChrome } from "./contexts";
@@ -146,6 +147,22 @@ function renderWorkplace(chrome: LevelChrome) {
 }
 
 describe("рабочее место", () => {
+	it("сообщение директора остаётся доступным после длинного обучения", () => {
+		vi.useFakeTimers();
+		const notifications = [{ id: 1, text: accountantTexts.notifications.easy.start }];
+		const onClose = vi.fn();
+		const { rerender } = render(<DirectorNotices notifications={notifications} hidden onClose={onClose} />);
+		act(() => {
+			vi.advanceTimersByTime(15_000);
+		});
+		expect(onClose).not.toHaveBeenCalled();
+		rerender(<DirectorNotices notifications={notifications} hidden={false} onClose={onClose} />);
+		act(() => {
+			vi.advanceTimersByTime(9_000);
+		});
+		expect(onClose).toHaveBeenCalledWith(1);
+	});
+
 	it("полоса дня, окошко с персонажем, монитор с программой и стол с инструментами", () => {
 		const chrome = makeChrome();
 		renderWorkplace(chrome);

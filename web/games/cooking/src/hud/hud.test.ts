@@ -533,9 +533,7 @@ describe("раскладка (7.7)", () => {
 		const hudRoot = root.querySelector<HTMLElement>(".cooking-hud");
 		expect(hudRoot?.getAttribute("data-input-mode")).toBe("touch");
 		expect(hudRoot?.getAttribute("data-screen")).toBe("low");
-		expect(hudRoot?.getAttribute("data-orientation-blocked")).toBeNull();
 		expect(root.querySelector(".hud-orders")?.getAttribute("data-zone")).toBe("top-right");
-		expect(getDialog(root, "orientation").hasAttribute("open")).toBe(false);
 		// Нет блоков HUD в нижних зонах.
 		const zones = collectZones(root);
 		expect(zones.length).toBeGreaterThan(0);
@@ -630,18 +628,14 @@ describe("сводка заказов на телефоне", () => {
 		});
 	});
 
-	it("в портретной ориентации предлагает повернуть телефон до начала смены", () => {
+	it("в портретной ориентации смену можно начать прямо со стартового экрана", () => {
 		setWindowSize(390, 794);
 		const { root, hud, callbacks } = setupHud("touch");
 		hud.update(createSnapshot({ phase: "ready" }), 0);
-		const dialog = getDialog(root, "orientation");
-		expect(dialog.hasAttribute("open")).toBe(true);
-		expect(callbacks.onStartPressed).not.toHaveBeenCalled();
-		setWindowSize(844, 390);
-		expect(dialog.hasAttribute("open")).toBe(false);
-		setWindowSize(390, 794);
-		dialog.querySelector("button")?.click();
-		expect(dialog.hasAttribute("open")).toBe(false);
+		const start = getDialog(root, "start");
+		expect(Array.from(root.querySelectorAll("dialog[open]"))).toEqual([start]);
+		start.querySelector<HTMLButtonElement>(".hud-button--primary")?.click();
+		expect(callbacks.onStartPressed).toHaveBeenCalledTimes(1);
 	});
 
 	it("стиль: блок карточек не скрывает переполнение и не обрезает колонки", async () => {

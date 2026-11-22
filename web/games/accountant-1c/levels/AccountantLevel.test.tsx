@@ -93,6 +93,7 @@ describe("сценарий уровня", () => {
 		expect(screen.getByText(tutorialTexts.steps.overviewWindow)).toBeTruthy();
 		clickButton(tutorialTexts.next);
 		expect(screen.getByText(tutorialTexts.steps.overviewDesk)).toBeTruthy();
+		expect(screen.queryByRole("button", { name: tutorialTexts.skip })).toBeNull();
 		clickButton(tutorialTexts.next);
 		expect(screen.getByText(`fake-${kindA}`)).toBeTruthy();
 		clickButton("fake-complete");

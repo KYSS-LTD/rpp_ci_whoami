@@ -37,7 +37,7 @@
 
 .finalReport { max-block-size: calc(100% - 24px); overflow: auto; }
 
-@media (max-width: 1120px) {
+@container desk (max-width: 1120px) {
 	.finalReport { grid-column: 1 / -1; max-block-size: none; overflow: visible; }
 }
 
@@ -89,6 +89,9 @@
 	flex-direction: column;
 	gap: 8px;
 	padding: 10px 12px 12px;
+	font-size: 0.875rem;
+	line-height: 1.5;
+	overflow-wrap: anywhere;
 }
 
 .letterSubject {

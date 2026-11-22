@@ -93,7 +93,7 @@ export function Calculator({ defaultPosition }: CalculatorProps) {
 	const recentTape = state.tape.slice(-8);
 
 	return (
-		<Paper id="calculator" defaultPosition={defaultPosition} variant="device" title={texts.title} width={196} ariaLabel={texts.title}>
+		<Paper id="calculator" defaultPosition={defaultPosition} variant="device" title={texts.title} width={196} ariaLabel={texts.title} anchorRight>
 			<div className={styles.calculator} tabIndex={0} onKeyDown={handleKeyDown} data-testid="calculator">
 				<output className={styles.calculatorDisplay} aria-label={texts.display} aria-live="polite">
 					<span className={styles.calculatorOperator}>{state.operator ? markFaces[state.operator] : ""}</span>

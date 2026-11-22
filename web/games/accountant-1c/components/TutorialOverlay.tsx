@@ -128,6 +128,7 @@ export function TutorialOverlay({ rootRef, tutorial, step, appOpen, onShowApp }:
 
 	const lastShown = step.targets.indexOf(lastShownId);
 	const missing = [...targets.slice(lastShown + 1), ...targets.slice(0, lastShown + 1)].find(({ hidden }) => hidden);
+	const isFinalConfirmation = step.action === "next" && tutorial.index + 1 === tutorial.count;
 
 	function showTarget(id: string) {
 		const root = rootRef.current;
@@ -178,7 +179,7 @@ export function TutorialOverlay({ rootRef, tutorial, step, appOpen, onShowApp }:
 				<p>{tutorialTexts.steps[step.textKey]}</p>
 				{tutorial.failed ? <p className={styles.retry} role="status">{tutorialTexts.retry}</p> : null}
 				<div className={styles.buttons}>
-					<button type="button" onClick={tutorial.skip}>{tutorialTexts.skip}</button>
+					{!isFinalConfirmation ? <button type="button" onClick={tutorial.skip}>{tutorialTexts.skip}</button> : null}
 					{missing ? (
 						<button type="button" onClick={() => showTarget(missing.id)}>
 							{step.showArrow && missing.id === step.targets[0] ? tutorialTexts.showSource : tutorialTexts.showTarget}

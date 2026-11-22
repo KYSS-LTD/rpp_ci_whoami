@@ -228,7 +228,7 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 	}
 
 	return (
-		<section ref={levelRef} className={styles.level} data-expanded={expanded} aria-label={gameTitle}>
+		<section ref={levelRef} className={styles.level} data-game={gameId} data-expanded={expanded} aria-label={gameTitle}>
 			<div className={styles.header}>
 				<div className={styles.titles}>
 					<p className={styles.gameTitle}>{gameTitle}</p>

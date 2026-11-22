@@ -26,6 +26,7 @@ export function Rulebook({ defaultPosition, initialTab = "accounts" }: RulebookP
 	return (
 		<Paper
 			id="rulebook"
+			anchorRight
 			defaultPosition={defaultPosition}
 			variant="pad"
 			width={isOpen ? 360 : 150}

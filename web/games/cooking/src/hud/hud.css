@@ -594,38 +594,6 @@
 	outline-offset: 2px;
 }
 
-/* Просьба повернуть экран: значок телефона, который поворачивается. */
-.hud-dialog--orientation {
-	text-align: center;
-}
-
-.hud-orientation__icon {
-	display: block;
-	box-sizing: border-box;
-	inline-size: 2.4rem;
-	block-size: 4rem;
-	margin: 0 auto 0.75rem;
-	border: 0.25rem solid var(--hud-fg);
-	border-radius: 0.5rem;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-	.hud-orientation__icon {
-		animation: hud-rotate-hint 2.4s ease-in-out infinite;
-	}
-}
-
-@keyframes hud-rotate-hint {
-	0%,
-	25% {
-		transform: rotate(0deg);
-	}
-	65%,
-	100% {
-		transform: rotate(-90deg);
-	}
-}
-
 /* --- Компактные карточки: одна строка на стол (номер и ряд значков блюд, под каждым значком полоса терпения) --- */
 
 .hud-orders[data-density="compact"] {

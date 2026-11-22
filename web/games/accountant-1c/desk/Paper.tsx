@@ -30,6 +30,7 @@ interface PaperProps {
 	className?: string;
 	// Бумага развёрнута (открытый справочник): CSS удерживает её целиком в пределах стола.
 	isExpanded?: boolean;
+	anchorRight?: boolean;
 	children?: ReactNode;
 }
 
@@ -44,15 +45,21 @@ export function Paper({
 	ariaLabel,
 	className,
 	isExpanded = false,
+	anchorRight = false,
 	children,
 }: PaperProps) {
 	const layout = useDeskLayout();
 	const position = layout?.getPosition(id, defaultPosition) ?? defaultPosition;
+	const anchored = anchorRight && position === defaultPosition;
 	const drag = useDrag({
 		resolveTarget: noTarget,
 		getMovingElement: findMovingPaper,
 		onDrop(event) {
-			layout?.moveBy(id, defaultPosition, event.offset.dx, event.offset.dy);
+			const { element, offset } = event;
+			const origin = anchored && element.offsetParent === layout?.deskRef.current
+				? { x: element.offsetLeft, y: element.offsetTop }
+				: defaultPosition;
+			layout?.moveBy(id, origin, offset.dx, offset.dy);
 		},
 	});
 
@@ -71,6 +78,7 @@ export function Paper({
 			data-tutorial-id={id}
 			data-variant={variant}
 			data-expanded={isExpanded ? "true" : undefined}
+			data-anchor-right={anchored ? "true" : undefined}
 			style={style}
 			aria-label={ariaLabel}
 			onPointerDownCapture={() => layout?.bringToFront(id)}
