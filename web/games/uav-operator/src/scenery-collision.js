@@ -1,6 +1,7 @@
 import { Box3, Matrix4, Triangle, Vector3 } from 'three';
 
 const cellSize = 8;
+const facesPerBlock = 16;
 const epsilon = 1e-10;
 const direction = new Vector3();
 const offset = new Vector3();
@@ -59,31 +60,34 @@ function triangle_Time(triangle, start, radius, limit) {
 	return edge_Time(start, c, a, radius, time);
 }
 
-// Запоминаем статичную геометрию после расстановки, до объединения мешей.
-// В ячейках хранятся отдельные треугольники в мировых координатах.
+// В сетке храним границы небольших групп граней. Вершины одного экземпляра
+// лежат в общем массиве, точный треугольник собираем только у самого дрона.
 export function create_SceneryCollision() {
 	const grid = new Map();
 	const result = { time: 0, normal: new Vector3() };
+	const face = new Triangle(), nearest = new Triangle();
+	face.normal = new Vector3();
+	const vertex = new Vector3(), faceBounds = new Box3();
 	let queryId = 0;
 
-	function insert(geometry, matrix) {
+	function insert(geometry, matrix, indices) {
 		const { position } = geometry.attributes;
-		const vertices = Array.from({ length: position.count }, (_, i) =>
-			new Vector3().fromBufferAttribute(position, i).applyMatrix4(matrix));
-		const indices = geometry.index;
-		const count = indices?.count ?? position.count;
-		const vertex = i => vertices[indices ? indices.getX(i) : i];
-		for (let i = 0; i + 2 < count; i += 3) {
-			const triangle = new Triangle(vertex(i), vertex(i + 1), vertex(i + 2));
-			triangle.normal = triangle.getNormal(new Vector3());
-			if (!triangle.normal.lengthSq()) continue;
-			triangle.bounds = new Box3().setFromPoints([triangle.a, triangle.b, triangle.c]);
-			const { min, max } = triangle.bounds;
+		const vertices = new Float64Array(position.count * 3);
+		for (let i = 0; i < position.count; i++)
+			vertex.fromBufferAttribute(position, i).applyMatrix4(matrix).toArray(vertices, i * 3);
+		const count = indices?.length ?? position.count;
+		for (let first = 0; first + 2 < count; first += facesPerBlock * 3) {
+			const end = Math.min(count, first + facesPerBlock * 3);
+			const box = new Box3();
+			for (let i = first; i < end; i++)
+				box.expandByPoint(vertex.fromArray(vertices, (indices ? indices[i] : i) * 3));
+			const block = { box, vertices, indices, first, end, queryId: 0 };
+			const { min, max } = box;
 			for (let x = Math.floor(min.x / cellSize); x <= Math.floor(max.x / cellSize); x++) {
 				for (let z = Math.floor(min.z / cellSize); z <= Math.floor(max.z / cellSize); z++) {
 					const key = x + '/' + z;
 					if (!grid.has(key)) grid.set(key, []);
-					grid.get(key).push(triangle);
+					grid.get(key).push(block);
 				}
 			}
 		}
@@ -94,41 +98,53 @@ export function create_SceneryCollision() {
 			root.updateWorldMatrix(true, true);
 			root.traverse(mesh => {
 				if (!mesh.isMesh) return;
+				const indices = mesh.geometry.index?.array.slice();
 				if (!mesh.isInstancedMesh) {
-					insert(mesh.geometry, mesh.matrixWorld);
+					insert(mesh.geometry, mesh.matrixWorld, indices);
 					return;
 				}
 				const matrix = new Matrix4();
 				for (let i = 0; i < mesh.count; i++) {
 					mesh.getMatrixAt(i, matrix);
-					insert(mesh.geometry, matrix.premultiply(mesh.matrixWorld));
+					insert(mesh.geometry, matrix.premultiply(mesh.matrixWorld), indices);
 				}
 			});
 		},
 		// Следующая проверка переиспользует результат. Столкновение учитывается с обеих сторон грани.
 		sweep(start, end, radius) {
 			direction.subVectors(end, start);
+			if (direction.lengthSq() === 0) return null;
 			bounds.makeEmpty().expandByPoint(start).expandByPoint(end).expandByScalar(radius);
 			const { min, max } = bounds;
-			let nearest = null, time = 1;
+			let found = false, time = 1;
 			queryId++;
 			for (let x = Math.floor(min.x / cellSize); x <= Math.floor(max.x / cellSize); x++) {
 				for (let z = Math.floor(min.z / cellSize); z <= Math.floor(max.z / cellSize); z++) {
-					const triangles = grid.get(x + '/' + z);
-					if (!triangles) continue;
-					for (const triangle of triangles) {
-						if (triangle.queryId === queryId) continue;
-						triangle.queryId = queryId;
-						if (!bounds.intersectsBox(triangle.bounds)) continue;
-						const t = triangle_Time(triangle, start, radius, time);
-						if (t <= time) {
-							time = t;
-							nearest = triangle;
+					const blocks = grid.get(x + '/' + z);
+					if (!blocks) continue;
+					for (const block of blocks) {
+						if (block.queryId === queryId) continue;
+						block.queryId = queryId;
+						if (!bounds.intersectsBox(block.box)) continue;
+						const { vertices, indices, first, end } = block;
+						for (let i = first; i + 2 < end; i += 3) {
+							face.a.fromArray(vertices, (indices ? indices[i] : i) * 3);
+							face.b.fromArray(vertices, (indices ? indices[i + 1] : i + 1) * 3);
+							face.c.fromArray(vertices, (indices ? indices[i + 2] : i + 2) * 3);
+							faceBounds.set(face.a, face.a).expandByPoint(face.b).expandByPoint(face.c);
+							if (!bounds.intersectsBox(faceBounds)) continue;
+							if (!face.getNormal(face.normal).lengthSq()) continue;
+							const t = triangle_Time(face, start, radius, time);
+							if (t <= time) {
+								time = t;
+								nearest.copy(face);
+								found = true;
+							}
 						}
 					}
 				}
 			}
-			if (!nearest) return null;
+			if (!found) return null;
 			result.time = time;
 			contact.copy(start).addScaledVector(direction, time);
 			nearest.closestPointToPoint(contact, closest);

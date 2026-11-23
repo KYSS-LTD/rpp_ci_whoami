@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { create_BoughGeometry, pine_Material, seeded_Random } from './coast.js';
 import { create_FlightAtmosphere } from './atmosphere.js';
-import { create_Landscape } from './landscape.js';
+import { create_Landscape, ground_Plane } from './landscape.js';
+import { compactGraphics } from './graphics-quality.js';
 import { batch_Scenery } from './scenery-batches.js';
 import { create_SceneryCollision } from './scenery-collision.js';
 import { box, cylinder, group, ring } from './models.js';
@@ -45,8 +46,7 @@ function ground_Texture(asset, repeat, colorSpace) {
 }
 
 function add_Terrain(scene, waypoints, race) {
-	const geometry = new THREE.PlaneGeometry(830, 830, 252, 252);
-	geometry.rotateX(-Math.PI / 2);
+	const geometry = ground_Plane(830, 830, 252, 252, bounds);
 	const points = geometry.attributes.position;
 	const color = new THREE.Color();
 	const colors = [];
@@ -71,15 +71,15 @@ function add_Terrain(scene, waypoints, race) {
 	// Grass Ground (Poly Haven, CC0): https://polyhaven.com/a/grass_ground
 	const land = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
 		map: ground_Texture(new URL('./assets/field-grass.webp', import.meta.url).href, 92, THREE.SRGBColorSpace),
-		normalMap: ground_Texture(new URL('./assets/field-grass-normal.webp', import.meta.url).href, 92, THREE.NoColorSpace),
+		normalMap: compactGraphics ? null : ground_Texture(new URL('./assets/field-grass-normal.webp', import.meta.url).href, 92, THREE.NoColorSpace),
 		normalScale: new THREE.Vector2(.6, .6), vertexColors: true, roughness: .94,
 	}));
 	// Gravel Floor, фотограмметрия Poly Haven (CC0): https://polyhaven.com/a/gravel_floor
 	const gravel = ground_Texture(new URL('./assets/gravel-color.webp', import.meta.url).href, 1, THREE.SRGBColorSpace);
-	const gravelNormal = ground_Texture(new URL('./assets/gravel-normal.webp', import.meta.url).href, 1, THREE.NoColorSpace);
+	const gravelNormal = compactGraphics ? null : ground_Texture(new URL('./assets/gravel-normal.webp', import.meta.url).href, 1, THREE.NoColorSpace);
 	land.material.addEventListener('dispose', () => {
 		gravel.dispose();
-		gravelNormal.dispose();
+		gravelNormal?.dispose();
 	});
 	land.material.onBeforeCompile = shader => {
 		shader.uniforms.gravel = { value: gravel };
@@ -103,7 +103,8 @@ function add_Terrain(scene, waypoints, race) {
 			float grain = (1.-smoothstep(9.8,10.2,parcel.x))*(1.-smoothstep(12.7,13.1,parcel.y));
 			diffuseColor.rgb = mix(diffuseColor.rgb,vec3(.31,.23,.095)*(.85+.13*cut),grain*.84);`}
 			diffuseColor.rgb = mix(diffuseColor.rgb,aggregate*vec3(1.12,.97,.81), roadMix);
-		`).replace('#include <normal_fragment_maps>', `
+		`);
+		if (gravelNormal) shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `
 			#include <normal_fragment_maps>
 			vec3 gravelRelief = texture2D(gravelNormal,gravelUv).xyz * 2.0 - 1.0;
 			normal = normalize(mix(normal, normalize(tbn * vec3(gravelRelief.xy*.63,gravelRelief.z)), roadMix));
@@ -118,7 +119,7 @@ function add_Windbreak(scene, random, obstacles) {
 	const count = 112;
 	const branches = new THREE.InstancedMesh(new THREE.CylinderGeometry(.12, .31, 4.8, 6),
 		new THREE.MeshStandardMaterial({ color: 0x78604a }), count);
-	const boughs = new THREE.InstancedMesh(create_BoughGeometry(74), pine_Material(true), count);
+	const boughs = compactGraphics ? null : new THREE.InstancedMesh(create_BoughGeometry(74), pine_Material(true), count);
 	const silhouettes = new THREE.InstancedMesh(new THREE.PlaneGeometry(3.8, 6.1), pine_Material(), count * 2);
 	const instance = new THREE.Object3D();
 	const leaf = new THREE.Color();
@@ -139,9 +140,9 @@ function add_Windbreak(scene, random, obstacles) {
 		branches.setMatrixAt(index, instance.matrix);
 		instance.position.y = y;
 		instance.updateMatrix();
-		boughs.setMatrixAt(index, instance.matrix);
+		boughs?.setMatrixAt(index, instance.matrix);
 		leaf.setRGB(.58 + random() * .35, .72 + random() * .25, .43 + random() * .37);
-		boughs.setColorAt(index, leaf);
+		boughs?.setColorAt(index, leaf);
 		for (let plane = 0; plane < 2; plane++) {
 			const id = index * 2 + plane;
 			instance.position.y = y + 2.92 * scale;
@@ -152,7 +153,8 @@ function add_Windbreak(scene, random, obstacles) {
 		}
 	}
 	branches.castShadow = true;
-	scene.add(branches, boughs, silhouettes);
+	scene.add(branches, silhouettes);
+	if (boughs) scene.add(boughs);
 }
 
 function add_Shed(scene, x, z, collision) {
@@ -253,7 +255,7 @@ function add_FieldLandmarks(scene, obstacles, waypoints, race, collision) {
 
 function add_Bales(scene, details, obstacles, collision) {
 	const paper = document.createElement('canvas');
-	paper.width = 256;
+	paper.width = 512;
 	paper.height = 256;
 	const context = paper.getContext('2d');
 	const random = seeded_Random(509);
@@ -268,10 +270,25 @@ function add_Bales(scene, details, obstacles, collision) {
 		context.lineTo(x + 4 + random() * 12, y + (random() - .5) * 9);
 		context.stroke();
 	}
+	// Два участка атласа: боковая солома и концентрические витки на обоих торцах.
+	context.drawImage(paper, 0, 0, 256, 256, 256, 0, 256, 256);
+	context.strokeStyle = '#937a39';
+	context.lineWidth = 3;
+	for (let radius = .2; radius < .82; radius += .145) {
+		context.beginPath();
+		context.arc(384, 128, radius / .86 * 126, 0, Math.PI * 2);
+		context.stroke();
+	}
 	const texture = new THREE.CanvasTexture(paper);
 	texture.colorSpace = THREE.SRGBColorSpace;
 	const straw = new THREE.MeshStandardMaterial({ map: texture, color: 0xd4c47f, roughness: 1 });
 	const drum = new THREE.CylinderGeometry(.83, .86, 1.28, 18);
+	const uv = drum.attributes.uv;
+	for (let i = 0; i < uv.count; i++) {
+		// Боковина и крышки CylinderGeometry имеют раздельные вершины.
+		const cap = Math.abs(drum.attributes.normal.getY(i)) === 1;
+		uv.setX(i, ((cap ? 257 : 1) + uv.getX(i) * 254) / 512);
+	}
 	for (const [x, z] of details) {
 		const bale = group(scene, x, elevation(x, z) + .76, z);
 		bale.rotation.y = (x - z) * .06;
@@ -280,12 +297,6 @@ function add_Bales(scene, details, obstacles, collision) {
 		shape.castShadow = true;
 		bale.add(shape);
 		collision.add(shape);
-		for (const side of [-1, 1]) {
-			for (let radius = .2; radius < .82; radius += .145) {
-				const stripe = ring(bale, 0x937a39, radius, .015, side * .646, 0, 0);
-				stripe.rotation.set(0, Math.PI / 2, 0);
-			}
-		}
 		obstacles.push({ x, z, radius: .9 });
 	}
 }
@@ -330,7 +341,7 @@ function add_GrainField(scene) {
 	const grain = new THREE.CanvasTexture(canvas);
 	grain.colorSpace = THREE.SRGBColorSpace;
 	const straw = new THREE.MeshLambertMaterial({ map: grain, side: THREE.DoubleSide, alphaTest: .37, alphaToCoverage: true });
-	const rows = matchMedia('(pointer: coarse)').matches ? 21 : 30, columns = 32;
+	const rows = compactGraphics ? 18 : 30, columns = 32;
 	const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.5,.91), straw, rows*columns*2);
 	const blade = new THREE.Object3D();
 	let index = 0;
@@ -583,10 +594,10 @@ export function create_Field(race) {
 			if (land.touches(x,y,z)) return true;
 			return windbreak.some(obstacle => {
 				const dx = Math.abs(x - obstacle.x), dz = Math.abs(z - obstacle.z);
-				const distance = Math.hypot(dx, dz);
-				if (distance > obstacle.radius) return false;
+				const distance2 = dx * dx + dz * dz;
+				if (distance2 > obstacle.radius * obstacle.radius) return false;
 				const localY = y - elevation(obstacle.x, obstacle.z);
-				return localY > 0 && localY < obstacle.height && (localY > obstacle.height * .47 || distance < .42);
+				return localY > 0 && localY < obstacle.height && (localY > obstacle.height * .47 || distance2 < .42 * .42);
 			});
 		},
 	};

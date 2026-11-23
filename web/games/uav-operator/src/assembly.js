@@ -346,8 +346,14 @@ export function start_Assembly({ mount, signal, settings, sound, logAction, free
 
 	// Линия от выбранного модуля к пальцу или курсору во время перетаскивания.
 	const animateBench = bench.update.bind(bench);
+	let wireVisible = false;
 	bench.update = (delta, time) => {
 		animateBench(delta, time);
+		if (!dragging || !bench.selected) {
+			if (wireVisible) ink.clearRect(0, 0, wires.width, wires.height);
+			wireVisible = false;
+			return;
+		}
 		const width = canvas.clientWidth;
 		const height = canvas.clientHeight;
 		if (wires.width !== width || wires.height !== height) {
@@ -355,7 +361,7 @@ export function start_Assembly({ mount, signal, settings, sound, logAction, free
 			wires.height = height;
 		}
 		ink.clearRect(0, 0, width, height);
-		if (!dragging || !bench.selected) return;
+		wireVisible = true;
 		const start = bench.projected_Part(bench.selected);
 		const startX = (1 + start.x) * width / 2;
 		const startY = (1 - start.y) * height / 2;

@@ -340,7 +340,7 @@ export function create_Bench({ parts, preinstalled }) {
 		lid_Settled() {
 			return lidProgress === (this.lidOpen ? 1 : 0);
 		},
-		rotate() { angle += Math.PI / 4; lastAngle = null; },
+		rotate() { angle += Math.PI / 4; this.resize(camera.aspect); },
 		// Ищет объект под указателем. Если луч не попал в подходящий объект, берём ближайший на экране:
 		// так на телефоне легче попасть пальцем по мелким винтам и разъёмам.
 		nearest_Screw(x, y, radiusX, radiusY) {

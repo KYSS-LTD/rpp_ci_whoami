@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
+import { compactGraphics } from './graphics-quality.js';
 
 const waterShader = {
 	name: 'Open water',
@@ -10,14 +11,18 @@ const waterShader = {
 	},
 	vertexShader: `
 		attribute float waterDepth;
-		uniform mat4 textureMatrix;
 		varying float depth;
 		varying vec3 world;
+		#ifndef PANORAMA_WATER
+		uniform mat4 textureMatrix;
 		varying vec4 mirror;
+		#endif
 		void main() {
 			depth = waterDepth;
 			vec4 point = vec4(position, 1.);
+			#ifndef PANORAMA_WATER
 			mirror = textureMatrix * point;
+			#endif
 			world = (modelMatrix * point).xyz;
 			gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.);
 		}`,
@@ -27,12 +32,20 @@ const waterShader = {
 		uniform vec3 sunlight;
 		varying float depth;
 		varying vec3 world;
+		#ifndef PANORAMA_WATER
 		varying vec4 mirror;
+		#endif
 		void main() {
 			vec2 p = world.xz;
 			vec3 view = normalize(cameraPosition - world);
 			float range = distance(world, cameraPosition);
 			float calm = (.42 + .58 * shoreline) * (1. - smoothstep(32.,180.,range));
+			#ifdef PANORAMA_WATER
+			float swell = sin(p.y*.42 + clock);
+			float chop = sin(p.x*.78 - clock);
+			vec2 ripples = texture2D(wavelets,p*.14+clock*vec2(.009,-.012)).rg - .5;
+			vec3 n = normalize(vec3((.042*swell+.35*ripples.x)*calm, 1., (.04*chop+.35*ripples.y)*calm));
+			#else
 			float swell = sin(dot(p, vec2(.78,.42)) + clock * 1.15 + sin(p.y*.24)*1.3);
 			float chop = sin(dot(p, vec2(1.36,-2.07)) - clock * 1.67 + 1.3*swell);
 			float fine = sin(dot(p, vec2(5.32,.93)) + clock * 2.8 + sin(p.x*.83) + chop);
@@ -40,17 +53,20 @@ const waterShader = {
 			vec2 ripples = texture2D(wavelets,p*.13+clock*vec2(.009,-.012)).rg
 				+ texture2D(wavelets,p.yx*.29+clock*vec2(-.019,.01)).gr - 1.;
 			vec3 n = normalize(vec3((.045*swell+.038*chop+.018*micro+.22*ripples.x)*calm, 1., (.054*chop-.028*swell+.025*micro+.22*ripples.y)*calm));
+			#endif
 			float grazing = 1.-clamp(dot(n,view),0.,1.);
 			float fresnel = .045+.91*pow(grazing,4.);
 			vec3 ray = reflect(-view,n);
 			vec2 skyUv = vec2(.5+(atan(ray.z,ray.x)+skyTurn)/6.2831853,.5+asin(clamp(ray.y,0.,1.))/3.14159);
 			vec3 reflection = textureLod(sky,vec2(fract(skyUv.x),skyUv.y),2.).rgb;
+			#ifndef PANORAMA_WATER
 			if(useMirror>.5 && mirror.w>0.) {
 				vec2 uv = mirror.xy/mirror.w + n.xz*(.026+.019*grazing);
 				vec2 edges = min(uv,1.-uv);
 				float inside = smoothstep(0.,.03,min(edges.x,edges.y));
 				reflection = mix(reflection,texture2D(tDiffuse,clamp(uv,0.,1.)).rgb,inside);
 			}
+			#endif
 			float silt = .5+.5*sin(p.x*.38 + sin(p.y*.24)*2.)*cos(p.y*.47);
 			vec3 shallow = mix(vec3(.10,.29,.21),vec3(.21,.40,.30),silt);
 			vec3 body = mix(shallow,vec3(.013,.105,.126),1.-exp(-max(depth,0.)*.91));
@@ -76,7 +92,14 @@ export function add_Water(scene, sun, geometry, center, groundAt, ocean) {
 	const depths = Float32Array.from({ length: p.count }, (_, i) =>
 		center.y - groundAt(center.x + p.getX(i), center.z - p.getY(i)));
 	geometry.setAttribute('waterDepth', new THREE.BufferAttribute(depths, 1));
-	const water = new Reflector(geometry, { textureWidth: 512, textureHeight: 384, multisample: 0, shader: waterShader });
+	const water = compactGraphics
+		? new THREE.Mesh(geometry, new THREE.ShaderMaterial({
+			uniforms: THREE.UniformsUtils.clone(waterShader.uniforms),
+			vertexShader: waterShader.vertexShader,
+			fragmentShader: waterShader.fragmentShader,
+			defines: { PANORAMA_WATER: 1 },
+		}))
+		: new Reflector(geometry, { textureWidth: 512, textureHeight: 384, multisample: 0, shader: waterShader });
 	water.position.copy(center);
 	water.rotation.x = -Math.PI / 2;
 	water.name = ocean ? 'Tidal water' : 'Glacial tarn';
@@ -92,11 +115,10 @@ export function add_Water(scene, sun, geometry, center, groundAt, ocean) {
 	uniforms.shoreline.value = Number(ocean);
 	uniforms.sunlight.value.copy(sun.position).sub(sun.target.position).normalize();
 	const renderReflection = water.onBeforeRender;
-	const coarse = matchMedia('(pointer: coarse)').matches;
 	let nextReflection = 0, lastCamera;
 	// На телефоне вода отражает панораму. На ПК обновляем отражения берегов отдельным редким проходом.
-	water.onBeforeRender = (renderer, scene, camera) => {
-		const enabled = !coarse && camera.isPerspectiveCamera && renderer.extensions.has('EXT_color_buffer_float');
+	if (!compactGraphics) water.onBeforeRender = (renderer, scene, camera) => {
+		const enabled = camera.isPerspectiveCamera && renderer.extensions.has('EXT_color_buffer_float');
 		uniforms.useMirror.value = Number(enabled);
 		const now = performance.now();
 		if (enabled && (now >= nextReflection || camera !== lastCamera)) {
@@ -107,7 +129,7 @@ export function add_Water(scene, sun, geometry, center, groundAt, ocean) {
 	};
 	material.addEventListener('dispose', () => {
 		wavelets.dispose();
-		water.getRenderTarget().dispose();
+		water.getRenderTarget?.().dispose();
 	});
 	scene.add(water);
 	return uniforms.clock;

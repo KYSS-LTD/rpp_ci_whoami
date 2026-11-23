@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
+import { compactGraphics } from './graphics-quality.js';
 
 // Панорамы Poly Haven (CC0). Азимут и высота солнца измерены по исходным HDRI.
 // Яркое солнечное пятно убрано из уменьшенной карты освещения: его даёт источник с тенями.
@@ -17,7 +18,7 @@ function add_Ridgelines(scene, map) {
 	const phase = beach ? 3.6 : map === 'race' ? 1.9 : .3;
 	const positions = [], colors = [], indices = [];
 	const tint = new THREE.Color();
-	const steps = 384, bands = 19;
+	const steps = compactGraphics ? 144 : 384, bands = compactGraphics ? 8 : 19;
 	for (let layer = 0; layer < 2; layer++) {
 		const start = positions.length / 3;
 		const base = new THREE.Color(layer ? 0x667783 : beach ? 0x4e6455 : 0x536547);
@@ -56,11 +57,13 @@ function add_Ridgelines(scene, map) {
 
 export function create_FlightAtmosphere(scene, map) {
 	const light = daylight[map];
-	const sky = new THREE.TextureLoader().load(new URL(`./assets/sky-${map}.webp`, import.meta.url).href);
+	const skyUrl = compactGraphics ? new URL(`./assets/mobile/sky-${map}.webp`, import.meta.url)
+		: new URL(`./assets/sky-${map}.webp`, import.meta.url);
+	const sky = new THREE.TextureLoader().load(skyUrl.href);
 	sky.mapping = THREE.EquirectangularReflectionMapping;
 	sky.colorSpace = THREE.SRGBColorSpace;
 	scene.background = sky;
-	new HDRLoader().load(new URL(`./assets/light-${map}.hdr`, import.meta.url).href, probe => {
+	if (!compactGraphics) new HDRLoader().load(new URL(`./assets/light-${map}.hdr`, import.meta.url).href, probe => {
 		if (scene.background !== sky) {
 			probe.dispose();
 			return;
@@ -73,14 +76,14 @@ export function create_FlightAtmosphere(scene, map) {
 	scene.environmentRotation.copy(scene.backgroundRotation);
 	scene.fog = new THREE.FogExp2(light.haze, light.density);
 	if (map === 'beach' || map === 'race') add_Ridgelines(scene, map);
-	scene.add(new THREE.HemisphereLight(0xd1e1f9, light.bounce, .89));
+	scene.add(new THREE.HemisphereLight(0xd1e1f9, light.bounce, compactGraphics ? 1.48 : .89));
 	const sun = new THREE.DirectionalLight(light.sun, light.power);
 	sun.target.position.set(map === 'beach' ? -12 : 0, 0, -46);
 	const altitude = light.capture[1];
 	sun.position.set(Math.cos(light.azimuth), Math.tan(altitude), Math.sin(light.azimuth)).normalize().multiplyScalar(255).add(sun.target.position);
 	const span = map === 'beach' ? 145 : 174;
 	sun.castShadow = true;
-	const resolution = matchMedia('(pointer: coarse)').matches ? 1024 : 2048;
+	const resolution = compactGraphics ? 1024 : 2048;
 	sun.shadow.mapSize.set(resolution, resolution);
 	Object.assign(sun.shadow.camera, { left: -span, right: span, bottom: -span, top: span, near: 5, far: 535 });
 	sun.shadow.normalBias = .045;

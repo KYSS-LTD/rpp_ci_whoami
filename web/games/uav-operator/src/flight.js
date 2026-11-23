@@ -25,19 +25,26 @@ function relief_Image(context, { limits, groundAt, map }) {
 	const dz = (limits.maxZ - limits.minZ) / (height - 22);
 	const image = context.createImageData(width, height);
 	const terrain = map === 'canyon' ? [149,105,75] : map === 'alpine' ? [112,123,115] : [100,117,83];
+	const waterColor = [53,95,101];
+	const previousRow = new Float64Array(width);
+	for (let col = 0; col < width; col++)
+		previousRow[col] = groundAt(limits.minX + (col - 11) * dx, limits.minZ - 12 * dz);
 	for (let row = 0; row < height; row++) {
 		const z = limits.minZ + (row - 11) * dz;
+		const coastline = map === 'beach' ? shore(z) : Infinity;
+		let west = groundAt(limits.minX - 12 * dx, z);
 		for (let col = 0; col < width; col++) {
 			const x = limits.minX + (col - 11) * dx;
 			const h = groundAt(x, z);
-			const west = groundAt(x - dx, z), north = groundAt(x, z - dz);
-			const water = map === 'beach' ? x > shore(z) : map === 'alpine' && h < -.7;
+			const north = previousRow[col];
+			const water = x > coastline || (map === 'alpine' && h < -.7);
 			const shade = THREE.MathUtils.clamp(.85 + .22 * (h - west) / dx + .27 * (h - north) / dz, .51, 1.25);
 			const contour = Math.floor(h / 4) !== Math.floor(north / 4) || Math.floor(h / 4) !== Math.floor(west / 4);
 			const i = 4 * (row * width + col);
-			const color = water ? [53,95,101] : terrain;
+			const color = water ? waterColor : terrain;
 			for (let k = 0; k < 3; k++) image.data[i + k] = color[k] * (water ? 1 : shade * (contour ? .74 : 1));
 			image.data[i + 3] = 255;
+			previousRow[col] = west = h;
 		}
 	}
 	return image;
@@ -669,6 +676,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	}
 
 	return { scene, camera, focus, motion, damage, points, limits, restart: request_Restart,
+		get paused() { return paused; },
 		checkpoint: () => ({
 			motion, flightSeconds, battery, armed, hasLaunched, signalLost, landing, landed, errors, hasLifted,
 			raceStart, raceFinish, impactCooldown, previousObstacle, nextGate, completion, cameraStarted,
@@ -704,7 +712,9 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			if (!moving) delta = 0;
 			if (moving && armed && !signalLost) flightSeconds += elapsed;
 			if (moving) {
-				Object.assign(previous, { x: motion.x, y: motion.y, z: motion.z });
+				previous.x = motion.x;
+				previous.y = motion.y;
+				previous.z = motion.z;
 				update_Motion(delta, axes);
 			}
 			const stamp = race ? lapStamp(raceFinish ?? (raceStart === null ? 0 : flightSeconds - raceStart))
@@ -762,12 +772,16 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 				const { point, label, ring } = marker;
 				const visible = beach ? profile.markers && !scanned.has(point) : point === sectors[nextGate];
 				if (ring) ring.visible = visible;
-				label.hidden = !visible;
-				if (label.hidden) continue;
-				trackedPosition.set(point.x, ring ? ring.position.y + 1.7 : point.y + (geology ? point.height * .52 : point.height + .95), point.z).project(camera);
-				label.hidden = scanned.has(point) || Math.abs(trackedPosition.x) > .92 || Math.abs(trackedPosition.y) > .83 || Math.abs(trackedPosition.z) > 1;
-				label.style.left = `${50 + trackedPosition.x * 50}%`;
-				label.style.top = `${50 - trackedPosition.y * 50}%`;
+				let hidden = !visible || scanned.has(point);
+				if (!hidden) {
+					trackedPosition.set(point.x, ring ? ring.position.y + 1.7 : point.y + (geology ? point.height * .52 : point.height + .95), point.z).project(camera);
+					hidden = Math.abs(trackedPosition.x) > .92 || Math.abs(trackedPosition.y) > .83 || Math.abs(trackedPosition.z) > 1;
+					if (!hidden) {
+						label.style.left = `${50 + trackedPosition.x * 50}%`;
+						label.style.top = `${50 - trackedPosition.y * 50}%`;
+					}
+				}
+				if (label.hidden !== hidden) label.hidden = hidden;
 			}
 			telemetry -= delta;
 			if (telemetry <= 0) {

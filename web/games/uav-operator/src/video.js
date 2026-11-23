@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
+import { compactGraphics } from './graphics-quality.js';
 
 export function create_AnalogFeed(renderer) {
 	const type = renderer.extensions.has('EXT_color_buffer_float') ? THREE.HalfFloatType : THREE.UnsignedByteType;
 	const target = new THREE.WebGLRenderTarget(1, 1, { type });
 	const size = new THREE.Vector2();
 	const uniforms = {
-		image: { value: target.texture }, pixels: { value: new THREE.Vector2() },
+		image: { value: target.texture }, pixels: { value: new THREE.Vector2(1, 1) },
 		clock: { value: 0 }, signalLoss: { value: 0 }, noise: { value: 0 }, dropout: { value: 0 },
 	};
 	const material = new THREE.ShaderMaterial({
@@ -64,16 +65,17 @@ export function create_AnalogFeed(renderer) {
 	const quad = new FullScreenQuad(material);
 	return {
 		render(scene, camera, time, signalLoss, noise, dropout = false) {
-			renderer.getDrawingBufferSize(size);
-			const height = Math.max(1, Math.min(size.y, 480));
-			const width = Math.max(1, Math.min(size.x, Math.round(height * size.x / size.y)));
-			if (target.width !== width || target.height !== height) target.setSize(width, height);
-			uniforms.pixels.value.set(width, height);
 			uniforms.clock.value = time;
 			uniforms.signalLoss.value = signalLoss;
 			uniforms.noise.value = noise;
 			uniforms.dropout.value = Number(dropout);
 			if (!dropout) {
+				renderer.getDrawingBufferSize(size);
+				const scale = compactGraphics ? Math.min(1, 360 / size.y, 720 / size.x) : Math.min(1, 480 / size.y);
+				const width = Math.max(1, Math.round(size.x * scale));
+				const height = Math.max(1, Math.round(size.y * scale));
+				if (target.width !== width || target.height !== height) target.setSize(width, height);
+				uniforms.pixels.value.set(width, height);
 				renderer.setRenderTarget(target);
 				try { renderer.render(scene, camera); }
 				finally { renderer.setRenderTarget(null); }

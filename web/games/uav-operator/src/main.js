@@ -8,6 +8,7 @@ import { create_Coast } from './coast.js';
 import { difficultySettings, normalize_Difficulty, retryPenalty } from './difficulty.js';
 import { start_Flight } from './flight.js';
 import { freeOptions, mount_FreeMenu } from './free-menu.js';
+import { create_FlightResolution } from './graphics-quality.js';
 import { dispose_Scene } from './models.js';
 import { debugEnabled, debug_Message } from './progress.js';
 import { bind_Report, read_Record, report_Markup, track_Practice } from './report.js';
@@ -79,13 +80,21 @@ let page = { kind: 'loading' };
 let lastFrame = null;
 let frame = 0;
 let dirty = true;
+let needsResize = true;
+let flightResolution;
+let nextPausedRender = 0;
 let graphicsLost = false;
 let sceneVisible = true;
 document.title = `${text.game} · ${text.brand}`;
 
 app.innerHTML = `<main id="screen"><p class="boot-status" role="status">${text.loading}</p></main>`;
 const screen = query('#screen');
-const observation = new ResizeObserver(() => request_Frame());
+function request_Resize() {
+	needsResize = true;
+	request_Frame();
+}
+const observation = new ResizeObserver(request_Resize);
+window.addEventListener('resize', request_Resize);
 const viewportObservation = new IntersectionObserver(([entry]) => {
 	if (entry.target !== canvas.parentElement) return;
 	sceneVisible = entry.isIntersecting;
@@ -102,12 +111,23 @@ function render_Loop(time) {
 	const activeMode = mode;
 	const animate = mode.update;
 	if (animate || dirty) {
+		const redraw = dirty;
 		dirty = false;
-		resize_Frame(renderer, mode);
+		if (needsResize) {
+			resize_Frame(renderer, mode, flightResolution?.scale ?? 1);
+			needsResize = false;
+		}
 		mode.update?.(delta, time / 1000, elapsed);
 		if (activeMode !== mode) return;
-		if (mode.render) mode.render(time / 1000);
-		else renderer.render(mode.scene, mode.camera);
+		if (!mode.paused || redraw || time >= nextPausedRender) {
+			if (mode.render) mode.render(time / 1000);
+			else renderer.render(mode.scene, mode.camera);
+			nextPausedRender = time + 200;
+		}
+		if (flightResolution) {
+			if (mode.paused || elapsed === 0) flightResolution.resetSample();
+			else if (flightResolution.sample(elapsed)) needsResize = true;
+		}
 	}
 	if (time >= nextCheckpoint) {
 		nextCheckpoint = time + 750;
@@ -137,6 +157,9 @@ function stop_Mode() {
 	cancelAnimationFrame(frame);
 	frame = 0;
 	lastFrame = null;
+	flightResolution = null;
+	needsResize = true;
+	nextPausedRender = 0;
 }
 
 function mount(markup) {
@@ -170,6 +193,7 @@ function focus_Heading() {
 
 function show_Stage(index, showTutorial = true, resetMessage = '', restoredState) {
 	const signal = open_Screen({ kind: 'stage', index });
+	if (index === 1) flightResolution = create_FlightResolution();
 	const sound = create_Sound(signal);
 	const restart = message => show_Stage(index, false, typeof message === 'string' ? message : '');
 	const record = run.records[index] ??= read_Record({}, index);

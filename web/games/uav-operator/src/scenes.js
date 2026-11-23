@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { terrain_Height } from './coast.js';
+import { compactGraphics } from './graphics-quality.js';
 import { group, ring } from './models.js';
 
 export function create_Renderer(canvas) {
-	const touch = matchMedia('(pointer: coarse)').matches;
-	const renderer = new THREE.WebGLRenderer({ canvas, antialias: !touch, powerPreference: touch ? 'default' : 'high-performance' });
+	const renderer = new THREE.WebGLRenderer({ canvas, antialias: !compactGraphics, powerPreference: compactGraphics ? 'default' : 'high-performance' });
 	renderer.shadowMap.enabled = true;
 	renderer.shadowMap.type = THREE.PCFShadowMap;
 	renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -14,15 +14,15 @@ export function create_Renderer(canvas) {
 
 const renderSize = new THREE.Vector2();
 
-export function resize_Frame(renderer, stage) {
+export function resize_Frame(renderer, stage, scale) {
 	const { clientWidth: width, clientHeight: height } = renderer.domElement;
 	if (!width || !height) return;
-	const touch = matchMedia('(pointer: coarse)').matches;
-	const pixelBudget = touch ? 800000 : 2000000;
-	const ratio = Math.min(window.devicePixelRatio || 1, touch ? 1.25 : 1.65, Math.sqrt(pixelBudget / (width * height)));
+	const pixelBudget = compactGraphics ? 480000 : 2000000;
+	const ratio = Math.min(window.devicePixelRatio || 1, compactGraphics ? 1 : 1.65, Math.sqrt(pixelBudget / (width * height))) * scale;
 	const currentSize = renderer.getSize(renderSize);
-	if (renderer.getPixelRatio() !== ratio) renderer.setPixelRatio(ratio);
-	if (currentSize.x !== width || currentSize.y !== height) renderer.setSize(width, height, false);
+	if (renderer.getPixelRatio() !== ratio || currentSize.x !== width || currentSize.y !== height) {
+		renderer.setDrawingBufferSize(width, height, ratio);
+	}
 	stage.resize?.(width / height);
 }
 
@@ -47,9 +47,13 @@ export function create_GroundShadow(scene, sun, width, groundAt) {
 	return {
 		mesh: shadow,
 		update(x, y, z, visible) {
+			if (!visible) {
+				shadow.visible = false;
+				return;
+			}
 			const clearance = Math.max(0, y - groundAt(x, z));
 			const reach = 2 + width * 3;
-			shadow.visible = visible && clearance < reach;
+			shadow.visible = clearance < reach;
 			if (!shadow.visible) return;
 			const sx = x - clearance * direction.x / direction.y;
 			const sz = z - clearance * direction.z / direction.y;

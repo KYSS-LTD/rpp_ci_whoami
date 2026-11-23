@@ -1,15 +1,18 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { compactGraphics } from './graphics-quality.js';
 
 // Собираем доски, стойки и разметку по участкам. Камера отсекает целые участки за спиной.
 export function batch_Scenery(scene) {
 	scene.updateMatrixWorld(true);
 	const cells = new Map();
 	const center = new THREE.Vector3();
+	const cellSize = compactGraphics ? 84 : 42;
+	const offset = compactGraphics ? .5 : 0;
 	scene.traverse(mesh => {
 		if (!mesh.isMesh || mesh.isInstancedMesh || !mesh.material.userData?.sceneryPalette) return;
 		center.setFromMatrixPosition(mesh.matrixWorld);
-		const key = [Math.floor(center.x / 42), Math.floor(center.z / 42), mesh.castShadow, mesh.receiveShadow].join('/');
+		const key = [Math.floor(center.x / cellSize + offset), Math.floor(center.z / cellSize + offset), mesh.castShadow, mesh.receiveShadow].join('/');
 		if (!cells.has(key)) cells.set(key, []);
 		cells.get(key).push(mesh);
 	});

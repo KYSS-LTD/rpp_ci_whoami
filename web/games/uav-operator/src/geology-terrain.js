@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { add_Water } from './water.js';
+import { compactGraphics } from './graphics-quality.js';
 
 const clamp = THREE.MathUtils.clamp;
 const smooth = THREE.MathUtils.smoothstep;
@@ -110,11 +111,9 @@ export function create_StrataMaterial(plate, stone, alpine, cliffMap = null) {
 	texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
 	texture.colorSpace = THREE.SRGBColorSpace;
 	texture.anisotropy = 4;
-	const material = new THREE.MeshStandardMaterial({
-		map: texture,
-		roughness: 0.89,
-		vertexColors: true,
-	});
+	const surface = { map: texture, vertexColors: true };
+	const material = compactGraphics ? new THREE.MeshLambertMaterial(surface) :
+		new THREE.MeshStandardMaterial({ ...surface, roughness: .89 });
 	const cracks = stone && !alpine ? new THREE.TextureLoader().load(plates.marble) : null;
 	if (stone) material.userData.cliffPhoto = cracks ?? texture;
 	const gravel =
@@ -152,15 +151,24 @@ export function create_StrataMaterial(plate, stone, alpine, cliffMap = null) {
 		`,
 			);
 		shader.fragmentShader =
-			'varying vec3 rockPoint; varying vec3 rockNormal; uniform sampler2D cliffPhoto, fracturePhoto, gravelPhoto;\n' +
+			`
+			varying vec3 rockPoint; varying vec3 rockNormal;
+			uniform sampler2D cliffPhoto, fracturePhoto, gravelPhoto;
+			vec4 sampleStone(sampler2D photo, vec3 p, vec3 axes) {
+				${compactGraphics ? `
+					vec2 plane = axes.y >= max(axes.x,axes.z) ? p.xz : (axes.x > axes.z ? p.zy : p.xy);
+					return texture2D(photo, plane);` : `
+					return texture2D(photo,p.zy)*axes.x + texture2D(photo,p.xz)*axes.y + texture2D(photo,p.xy)*axes.z;`}
+			}
+			` +
 			shader.fragmentShader
 				.replace(
 					'#include <map_fragment>',
 					`
-			vec3 axes = pow(abs(normalize(rockNormal)),vec3(5.));
-			axes /= max(.001,axes.x+axes.y+axes.z);
+			${compactGraphics ? 'vec3 axes = abs(rockNormal);' : `vec3 axes = pow(abs(normalize(rockNormal)),vec3(5.));
+			axes /= max(.001,axes.x+axes.y+axes.z);`}
 			vec3 p = rockPoint * ${stone ? '.22' : '.34'};
-			vec4 grain = texture2D(map, p.zy) * axes.x + texture2D(map,p.xz)*axes.y + texture2D(map,p.xy)*axes.z;
+			vec4 grain = sampleStone(map,p,axes);
 			${
 				cliffMap
 					? `
@@ -169,10 +177,11 @@ export function create_StrataMaterial(plate, stone, alpine, cliffMap = null) {
 				float exposed = smoothstep(.08,.43,planeTilt + smoothstep(15.,41.,rockPoint.y)*.22);
 				vec3 stoneP = rockPoint*.072;
 				stoneP.xz += vec2(sin(rockPoint.z*.047 + .034*rockPoint.y),cos(rockPoint.x*.031+.04*rockPoint.z))*.20;
-				vec4 cliff = texture2D(cliffPhoto,stoneP.zy)*axes.x + texture2D(cliffPhoto,stoneP.xz)*axes.y + texture2D(cliffPhoto,stoneP.xy)*axes.z;
-				vec2 macroUV = vec2(dot(rockPoint,vec3(.012,.009,.003)),dot(rockPoint,vec3(-.005,.016,.012)));
+				vec4 cliff = sampleStone(cliffPhoto,stoneP,axes);
+				${compactGraphics ? '' : `vec2 macroUV = vec2(dot(rockPoint,vec3(.012,.009,.003)),dot(rockPoint,vec3(-.005,.016,.012)));
 				vec4 macro = texture2D(cliffPhoto,macroUV);
-				cliff.rgb = (cliff.rgb*.64 + macro.rgb*.36) * ${alpine ? '.29' : '.42'};
+				cliff.rgb = cliff.rgb*.64 + macro.rgb*.36;`}
+				cliff.rgb *= ${alpine ? '.29' : '.42'};
 				grain = mix(grain,cliff,exposed);
 			`
 					: ''
@@ -186,7 +195,7 @@ export function create_StrataMaterial(plate, stone, alpine, cliffMap = null) {
 					? `
 				// Неровные трещины крупнее песчинок и сохраняются на дальнем плане.
 				vec3 seam = rockPoint * vec3(.072,.126,.075);
-				vec4 fracture = texture2D(fracturePhoto,seam.zy)*axes.x + texture2D(fracturePhoto,seam.xz)*axes.y + texture2D(fracturePhoto,seam.xy)*axes.z;
+				vec4 fracture = sampleStone(fracturePhoto,seam,axes);
 				float crust = dot(fracture.rgb,vec3(.26,.57,.17));
 				diffuseColor.rgb *= clamp(.10+1.72*crust,.22,1.18);
 				grain.a = grain.a*.48 + fracture.a*.78;
@@ -250,7 +259,7 @@ export function create_StrataMaterial(plate, stone, alpine, cliffMap = null) {
 }
 
 export function create_Valley(scene, alpine, cliffMap) {
-	const distantStep = matchMedia('(pointer: coarse)').matches ? 9 : 4;
+	const distantStep = compactGraphics ? 12 : 4;
 	const xs = axis_Grid(-122, 122, distantStep),
 		zs = axis_Grid(-184, 90, distantStep);
 	const cols = xs.length,
@@ -266,16 +275,20 @@ export function create_Valley(scene, alpine, cliffMap) {
 		slate = new THREE.Color(0x85858a),
 		snow = new THREE.Color(0xf0f5f6);
 	const surface = alpine ? alpine_Surface : canyon_Surface;
+	// Дорогую процедурную высоту считаем один раз. Наклон берём из соседних узлов того же рельефа.
+	for (let row = 0; row < rows; row++)
+		for (let col = 0; col < cols; col++) heights[row * cols + col] = surface(xs[col], zs[row]);
 	for (let row = 0; row < rows; row++)
 		for (let col = 0; col < cols; col++) {
 			const x = xs[col],
 				z = zs[row],
-				h = surface(x, z),
-				index = row * cols + col;
+				index = row * cols + col,
+				h = heights[index];
 			positions.push(x, h, z);
-			heights[index] = h;
-			const nx = (surface(x + 1, z) - surface(x - 1, z)) * 0.5,
-				nz = (surface(x, z + 1) - surface(x, z - 1)) * 0.5;
+			const left = Math.max(0, col - 1), right = Math.min(cols - 1, col + 1);
+			const back = Math.max(0, row - 1), front = Math.min(rows - 1, row + 1);
+			const nx = (heights[row * cols + right] - heights[row * cols + left]) / (xs[right] - xs[left]);
+			const nz = (heights[front * cols + col] - heights[back * cols + col]) / (zs[front] - zs[back]);
 			const slope = Math.hypot(nx, nz);
 			const noise = undulation(x * 0.82, z * 0.82);
 			if (alpine) {
@@ -317,7 +330,6 @@ export function create_Valley(scene, alpine, cliffMap) {
 		geometry,
 		create_StrataMaterial(alpine ? 'meadow' : 'sand', false, alpine, cliffMap),
 	);
-	terrain.material.shadowSide = THREE.FrontSide;
 	terrain.castShadow = terrain.receiveShadow = true;
 	terrain.name = alpine ? 'Moraine and cirque headwall' : 'Wash and sandstone mesas';
 	scene.add(terrain);

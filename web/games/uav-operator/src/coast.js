@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { add_Water } from './water.js';
 import { box, cylinder, group, ring, palette, create_Drone } from './models.js';
 import { create_FlightAtmosphere } from './atmosphere.js';
-import { create_Landscape } from './landscape.js';
+import { create_Landscape, ground_Plane } from './landscape.js';
+import { compactGraphics } from './graphics-quality.js';
 import { batch_Scenery } from './scenery-batches.js';
 import { create_SceneryCollision } from './scenery-collision.js';
 
@@ -57,21 +58,21 @@ export function beach_Texture(repeatX, repeatY) {
 }
 
 function create_Terrain(scene) {
-	const geometry = new THREE.PlaneGeometry(320, 690, 128, 244);
-	geometry.rotateX(-Math.PI / 2);
+	const geometry = ground_Plane(320, 690, 128, 244, limits);
 	const position = geometry.attributes.position;
 	const colors = [];
 	const sand = new THREE.Color(0xfff1d7);
 	const wet = new THREE.Color(0xe2d5c0);
 	const scrub = new THREE.Color(0x88a27b);
 	const forest = new THREE.Color(0x4f815d);
+	const color = new THREE.Color();
 	const random = seeded_Random(21);
 	for (let index = 0; index < position.count; index++) {
 		const x = position.getX(index);
 		const z = position.getZ(index);
 		const inland = shore(z) - x;
 		position.setY(index, terrain_Height(x, z));
-		const color = wet.clone().lerp(sand, THREE.MathUtils.smoothstep(inland, 0, 8));
+		color.copy(wet).lerp(sand, THREE.MathUtils.smoothstep(inland, 0, 8));
 		color.lerp(scrub, THREE.MathUtils.smoothstep(inland + 3 * Math.sin(.24 * z + .44 * x), 17, 32));
 		color.lerp(forest, THREE.MathUtils.smoothstep(inland, 33, 80));
 		color.multiplyScalar(.89 + random() * .20);
@@ -79,10 +80,12 @@ function create_Terrain(scene) {
 	}
 	geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 	geometry.computeVertexNormals();
-	const normalMap = new THREE.TextureLoader().load(new URL('./assets/coast-sand-normal.webp', import.meta.url).href);
-	normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
-	normalMap.repeat.set(65, 144);
-	normalMap.anisotropy = 4;
+	const normalMap = compactGraphics ? null : new THREE.TextureLoader().load(new URL('./assets/coast-sand-normal.webp', import.meta.url).href);
+	if (normalMap) {
+		normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
+		normalMap.repeat.set(65, 144);
+		normalMap.anisotropy = 4;
+	}
 	const terrain = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
 		vertexColors: true, roughness: .87, map: beach_Texture(65, 144), normalMap, normalScale: new THREE.Vector2(.65, .65),
 	}));
@@ -106,7 +109,7 @@ function create_Terrain(scene) {
 }
 
 function create_Sea(scene, sun) {
-	return add_Water(scene, sun, new THREE.PlaneGeometry(740, 800, 128, 152),
+	return add_Water(scene, sun, new THREE.PlaneGeometry(740, 800, compactGraphics ? 72 : 128, compactGraphics ? 96 : 152),
 		new THREE.Vector3(200, -.012, 0), terrain_Height, true);
 }
 
@@ -172,17 +175,32 @@ function create_Vegetation(scene, collision) {
 	}
 	const trunkGeometry = new THREE.CylinderGeometry(.025, .14, 5.4, 6);
 	const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x574332, roughness: 1 });
-	const needles = pine_Material(true);
+	const needles = compactGraphics ? null : pine_Material(true);
 	const silhouette = pine_Material();
-	const variants = [create_BoughGeometry(586), create_BoughGeometry(643), create_BoughGeometry(787)];
+	const variants = compactGraphics ? [] : [create_BoughGeometry(586), create_BoughGeometry(643), create_BoughGeometry(787)];
 	const crownGeometry = new THREE.PlaneGeometry(3.8, 6.1);
 	const green = new THREE.Color();
-	for (const trees of cells.values()) {
-		const cell = trees[0];
+	const drawCells = new Map();
+	for (const occupants of cells.values()) {
+		const cell = occupants[0];
 		const detailed = cell.x > limits.minX - 16;
+		const variant = detailed ? Math.floor(random() * 3) : 0;
+		if (!compactGraphics) {
+			drawCells.set(cell, { trees: occupants, detailed, variant });
+			continue;
+		}
+		// За границами полёта деревья видны только издали. Сетка столкновений остаётся полной.
+		const key = Math.floor(cell.x / 69) + '/' + Math.floor(cell.z / 69) + '/' + detailed;
+		if (!drawCells.has(key)) drawCells.set(key, { trees: [], detailed });
+		const batch = drawCells.get(key);
+		for (const [i, tree] of occupants.entries()) {
+			if (tree.x >= limits.minX - 10 || i % 3 === 0) batch.trees.push(tree);
+		}
+	}
+	for (const { trees, detailed, variant } of drawCells.values()) {
 		const crowns = new THREE.InstancedMesh(crownGeometry, silhouette, trees.length * 2);
 		const bark = detailed ? new THREE.InstancedMesh(trunkGeometry, trunkMaterial, trees.length) : null;
-		const branches = detailed ? new THREE.InstancedMesh(variants[Math.floor(random() * variants.length)], needles, trees.length) : null;
+		const branches = detailed && !compactGraphics ? new THREE.InstancedMesh(variants[variant], needles, trees.length) : null;
 		for (const [index, tree] of trees.entries()) {
 			const { x, y, z, scale, width, angle, lean, hue } = tree;
 			stock.scale.set(scale * width, scale, scale * width);
@@ -191,8 +209,8 @@ function create_Vegetation(scene, collision) {
 			if (detailed) {
 				stock.position.set(x, y, z);
 				stock.updateMatrix();
-				branches.setMatrixAt(index, stock.matrix);
-				branches.setColorAt(index, green);
+				branches?.setMatrixAt(index, stock.matrix);
+				branches?.setColorAt(index, green);
 				stock.position.y += 2.68 * scale;
 				stock.updateMatrix();
 				bark.setMatrixAt(index, stock.matrix);
@@ -210,8 +228,12 @@ function create_Vegetation(scene, collision) {
 		scene.add(crowns);
 		if (detailed) {
 			bark.castShadow = true;
-			bark.receiveShadow = branches.receiveShadow = true;
-			scene.add(bark, branches);
+			bark.receiveShadow = true;
+			scene.add(bark);
+			if (branches) {
+				branches.receiveShadow = true;
+				scene.add(branches);
+			}
 		}
 	}
 	const rocks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0x9d9b87, flatShading: true }), 66);
@@ -232,13 +254,19 @@ function create_Vegetation(scene, collision) {
 	scene.add(rocks);
 	collision.add(rocks);
 	return (x, y, z) => {
-		for (let dx = -1; dx <= 1; dx++) {
-			for (let dz = -1; dz <= 1; dz++) {
-				for (const tree of cells.get(cellId(x + dx * cellSize, z + dz * cellSize)) ?? []) {
+		// Радиус самой широкой сосны с запасом для корпуса меньше шести метров.
+		const maxX = Math.floor((x + 6) / cellSize), maxZ = Math.floor((z + 6) / cellSize);
+		for (let ix = Math.floor((x - 6) / cellSize); ix <= maxX; ix++) {
+			for (let iz = Math.floor((z - 6) / cellSize); iz <= maxZ; iz++) {
+				const trees = cells.get(ix + ':' + iz);
+				if (!trees) continue;
+				for (const tree of trees) {
+					const dx = x - tree.x, dz = z - tree.z;
+					if (Math.abs(dx) > 6 || Math.abs(dz) > 6) continue;
 					const above = (y - tree.y) / tree.scale;
 					if (above < 0 || above > 5.8) continue;
 					const radius = above < .9 ? .22 : Math.max(.2, 1.34 * (5.8 - above) / 4.9);
-					if (Math.hypot(x - tree.x, z - tree.z) < radius * tree.scale * tree.width + .16) return true;
+					if (dx * dx + dz * dz < (radius * tree.scale * tree.width + .16) ** 2) return true;
 				}
 			}
 		}
@@ -479,7 +507,7 @@ export function create_Lighting(scene, span = 42) {
 	const sun = new THREE.DirectionalLight(0xffedd1, 2.45);
 	sun.position.set(-38, 52, -27);
 	sun.castShadow = true;
-	const shadowSize = matchMedia('(pointer: coarse)').matches ? 1024 : 2048;
+	const shadowSize = compactGraphics ? 512 : 2048;
 	sun.shadow.mapSize.set(shadowSize, shadowSize);
 	Object.assign(sun.shadow.camera, { left: -span, right: span, top: span, bottom: -span, near: .5, far: 180 });
 	sun.shadow.normalBias = span * .0013;
