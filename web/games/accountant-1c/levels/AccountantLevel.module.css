@@ -1,17 +1,15 @@
 /* Уровень: заголовок над рабочим местом, утренняя газета, письмо, перерыв на чай. */
 
 .level {
-	position: fixed;
-	inset: 0;
-	z-index: 100;
-	block-size: 100dvh;
-	padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-	background: #2f241e;
+	--game-viewport-background: #2f241e;
 }
 
-.level > div { block-size: 100%; }
+.gameBody {
+	flex: 1;
+	min-block-size: 0;
+}
 
-:global(html):has(.level) { overflow: hidden; }
+.gameBody > div { block-size: 100%; }
 
 /* Название уровня видно на полосе дня, заголовок остаётся для экранных дикторов и не занимает место на экране. */
 .levelTitle {

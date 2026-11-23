@@ -8,6 +8,7 @@ import { useCallback, useRef, useState, type ComponentType } from "react";
 import type { LevelComponentProps, LevelId } from "@/core/contract/types";
 import { commonTexts } from "@/texts/common";
 import { debugLog } from "@/core/debug";
+import { GameViewport } from "@/app/_components/GameViewport";
 import { LevelChromeProvider, type LevelChrome, type Slip } from "../desk/contexts";
 import { Paper } from "../desk/Paper";
 import { Workplace } from "../desk/Workplace";
@@ -345,11 +346,13 @@ function AccountantRun({ level, onFinish, onPause, random }: AccountantLevelProp
 	}
 
 	return (
-		<section className={styles.level} data-phase={phase} aria-label={level.title}>
+		<GameViewport className={styles.level} title={level.title} alwaysExpanded>
 			<h1 className={styles.levelTitle}>
 				{accountantTexts.title}: {level.title}
 			</h1>
-			<LevelChromeProvider value={chrome}>{renderPhase()}</LevelChromeProvider>
-		</section>
+			<div className={styles.gameBody} data-phase={phase}>
+				<LevelChromeProvider value={chrome}>{renderPhase()}</LevelChromeProvider>
+			</div>
+		</GameViewport>
 	);
 }

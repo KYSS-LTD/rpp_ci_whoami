@@ -9,8 +9,9 @@ import { defaultReadyTimeoutSec, type IframeRuntime, type LevelDefinition, type 
 import type { Checkpoint } from "@/core/progress/checkpoints";
 import { debugLog } from "@/core/debug";
 import { commonTexts } from "@/texts/common";
+import { GameViewport } from "./GameViewport";
 import { LevelFallback } from "./LevelFallback";
-import styles from "./IframeLevel.module.css";
+import styles from "./GameViewport.module.css";
 
 interface IframeLevelProps {
 	gameId: string;
@@ -37,52 +38,6 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 	const exitTimer = useRef<number | undefined>(undefined);
 	const [checkpointFailed, setCheckpointFailed] = useState(false);
 	const frameRef = useRef<HTMLIFrameElement>(null);
-	const levelRef = useRef<HTMLElement>(null);
-	const [nativeFullscreen, setNativeFullscreen] = useState(false);
-	const [expanded, setExpanded] = useState(() => typeof window !== "undefined"
-		&& window.matchMedia?.("(pointer: coarse) and (max-width: 900px), (pointer: coarse) and (max-height: 600px)").matches === true);
-	const isFullscreen = nativeFullscreen || expanded;
-
-	useEffect(() => {
-		function syncFullscreen() {
-			setNativeFullscreen(Boolean(document.fullscreenElement && document.fullscreenElement === levelRef.current));
-		}
-		document.addEventListener("fullscreenchange", syncFullscreen);
-		return () => document.removeEventListener("fullscreenchange", syncFullscreen);
-	}, []);
-
-	useEffect(() => {
-		if (!expanded) return;
-		const overflow = document.documentElement.style.overflow;
-		document.documentElement.style.overflow = "hidden";
-		function onKeyDown(event: KeyboardEvent) {
-			if (event.key === "Escape") setExpanded(false);
-		}
-		document.addEventListener("keydown", onKeyDown);
-		return () => {
-			document.documentElement.style.overflow = overflow;
-			document.removeEventListener("keydown", onKeyDown);
-		};
-	}, [expanded]);
-
-	async function toggleFullscreen() {
-		if (expanded) {
-			setExpanded(false);
-		} else if (document.fullscreenElement === levelRef.current) {
-			await document.exitFullscreen();
-		} else {
-			try {
-				if (document.fullscreenEnabled && levelRef.current?.requestFullscreen && !matchMedia("(pointer: coarse)").matches) {
-					await levelRef.current.requestFullscreen();
-				} else {
-					setExpanded(true);
-				}
-			} catch {
-				setExpanded(true);
-			}
-		}
-		frameRef.current?.focus();
-	}
 	const [phase, setPhase] = useState<LevelPhase>("loading");
 	// Номер попытки: повтор после сбоя пересоздаёт фрейм через key.
 	const [attempt, setAttempt] = useState({ number: 0, automatic: false });
@@ -194,7 +149,7 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 				debugLog("bridge", "игра сообщила об ошибке", message.message);
 				phaseRef.current = "failed";
 				setPhase("failed");
-				setExpanded(false);
+
 				return;
 			}
 			debugLog("bridge", `сообщение ${message.type} не подходит этапу ${currentPhase}`);
@@ -256,7 +211,7 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 			}
 			phaseRef.current = "failed";
 			setPhase("failed");
-			setExpanded(false);
+
 		}, timeoutMs);
 		return () => window.clearTimeout(timerId);
 	}, [phase, attempt, runtime.readyTimeoutSec]);
@@ -273,27 +228,18 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 	}
 
 	return (
-		<section ref={levelRef} className={styles.level} data-game={gameId} data-expanded={expanded} aria-label={gameTitle}>
-			<div className={styles.header}>
-				<div className={styles.titles}>
-					<p className={styles.gameTitle}>{gameTitle}</p>
-					<h1>{level.title}</h1>
-				</div>
-				<div className={styles.actions}>
-					<button type="button" className={styles.fullscreenButton} onClick={toggleFullscreen}
-						aria-label={isFullscreen ? commonTexts.fullscreenExit : commonTexts.fullscreenEnter}
-						title={isFullscreen ? commonTexts.fullscreenExit : commonTexts.fullscreenEnter}>
-						<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-							<path d={isFullscreen ? "M3 8h5V3m8 0v5h5M3 16h5v5m8 0v-5h5" : "M3 9V3h6m6 0h6v6M3 15v6h6m6 0h6v-6"} />
-						</svg>
-					</button>
-					<Link href="/games" className={`button-secondary ${styles.fullscreenButton}`}
-						aria-label={onCheckpoint ? commonTexts.saveAndExit : commonTexts.levelExit} title={onCheckpoint ? commonTexts.saveAndExit : commonTexts.levelExit} onNavigate={(event) => {
-							event.preventDefault();
-							exitToGames();
-						}}><span aria-hidden="true">×</span></Link>
-				</div>
-			</div>
+		<GameViewport
+			title={gameTitle}
+			heading={level.title}
+			afterToggle={() => frameRef.current?.focus()}
+			actions={
+				<Link href="/games" className={`button-secondary ${styles.fullscreenButton}`}
+					aria-label={onCheckpoint ? commonTexts.saveAndExit : commonTexts.levelExit} title={onCheckpoint ? commonTexts.saveAndExit : commonTexts.levelExit} onNavigate={(event) => {
+						event.preventDefault();
+						exitToGames();
+					}}><span aria-hidden="true">×</span></Link>
+			}
+		>
 			{checkpointFailed ? <p role="alert">{commonTexts.levelSaveError}</p> : null}
 			<div className={styles.stage} data-phase={phase}>
 				<iframe
@@ -311,6 +257,6 @@ export function IframeLevel({ gameId, gameTitle, level, runtime, onFinish, onPra
 					</div>
 				) : null}
 			</div>
-		</section>
+		</GameViewport>
 	);
 }

@@ -57,7 +57,68 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup();
+	vi.unstubAllGlobals();
+	vi.restoreAllMocks();
 	vi.useRealTimers();
+});
+
+describe("iframe-уровень: полноэкранный режим", () => {
+	beforeEach(() => {
+		vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
+			matches: query.includes("pointer: coarse"),
+			addEventListener: vi.fn(),
+			removeEventListener: vi.fn(),
+		})));
+	});
+
+	it("на телефоне запрашивает полноэкранный режим для плеера и сохраняет текущий iframe", async () => {
+		const { frame } = renderLevel();
+		const section = screen.getByRole("region", { name: "Город будущего" });
+		let fullscreenElement: Element | null = null;
+		function changeFullscreen(element: Element | null) {
+			fullscreenElement = element;
+			document.dispatchEvent(new Event("fullscreenchange"));
+		}
+		const requestFullscreen = vi.fn(async () => changeFullscreen(section));
+		const exitFullscreen = vi.fn(async () => changeFullscreen(null));
+		Object.defineProperties(document, {
+			fullscreenEnabled: { configurable: true, value: true },
+			fullscreenElement: { configurable: true, get: () => fullscreenElement },
+			exitFullscreen: { configurable: true, value: exitFullscreen },
+		});
+		section.requestFullscreen = requestFullscreen;
+		try {
+			expect(section.getAttribute("data-expanded")).toBe("true");
+			await act(async () => fireEvent.click(screen.getByRole("button", { name: commonTexts.fullscreenEnter })));
+			expect(requestFullscreen).toHaveBeenCalledWith({ navigationUI: "hide" });
+			await act(async () => fireEvent.click(screen.getByRole("button", { name: commonTexts.fullscreenExit })));
+			expect(exitFullscreen).toHaveBeenCalledTimes(1);
+			expect(screen.getByRole("button", { name: commonTexts.fullscreenEnter })).toBeTruthy();
+			expect(screen.getByTitle("Город будущего")).toBe(frame);
+
+			requestFullscreen.mockRejectedValueOnce(new Error("Fullscreen denied"));
+			await act(async () => fireEvent.click(screen.getByRole("button", { name: commonTexts.fullscreenEnter })));
+			expect(document.fullscreenElement).toBeNull();
+			expect(section.getAttribute("data-expanded")).toBe("true");
+			fireEvent.click(screen.getByRole("button", { name: commonTexts.fullscreenExit }));
+			expect(section.getAttribute("data-expanded")).toBe("false");
+		} finally {
+			for (const property of ["fullscreenEnabled", "fullscreenElement", "exitFullscreen"]) {
+				Reflect.deleteProperty(document, property);
+			}
+		}
+	});
+
+	it("на iPhone без Fullscreen API предлагает запуск с экрана «Домой»", () => {
+		vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPhone) Safari");
+		const { frame, frameWindow } = renderLevel();
+		sendFromGame(frameWindow, "ready");
+		fireEvent.click(screen.getByRole("button", { name: commonTexts.fullscreenEnter }));
+		expect(screen.getByRole("status").textContent).toBe(commonTexts.fullscreenHomeScreen);
+		fireEvent.click(screen.getByRole("button", { name: commonTexts.fullscreenHintDismiss }));
+		expect(screen.queryByRole("status")).toBeNull();
+		expect(document.activeElement).toBe(frame);
+	});
 });
 
 describe("iframe-уровень: запуск", () => {
