@@ -146,7 +146,7 @@ export function createKitchenKit(paramsOverrides: DeepPartial<LevelParams> = {})
 export function chopFromCrate(kit: KitchenKit, crateId: StationId, boardId: StationId): void {
 	kit.tap(crateId);
 	kit.tap(boardId);
-	kit.advance(2.1, boardId);
+	kit.advance(1.6, boardId);
 	kit.tap(boardId);
 }
 
@@ -154,7 +154,7 @@ export function chopFromCrate(kit: KitchenKit, crateId: StationId, boardId: Stat
 export function startPatty(kit: KitchenKit, panId: StationId): void {
 	chopFromCrate(kit, "crate-steak", "board-1");
 	kit.tap(panId);
-	kit.advance(6.1);
+	kit.advance(4.8);
 }
 
 // Собирает на тарелке в руке готовый бургер (рука пуста). Занимает прилавок counter-1 и сковороду pan-1.

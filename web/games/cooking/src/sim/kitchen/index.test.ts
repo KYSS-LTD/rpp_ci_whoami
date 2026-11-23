@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import type { IngredientItem, PlateItem } from "../../contracts";
+import type { IngredientItem, AssemblyItem } from "../../contracts";
 import { assembleBurger, chopFromCrate, createKitchenKit, startPatty } from "./kitchenTestKit";
 
 // Ожидаемый ингредиент.
@@ -25,9 +25,9 @@ describe("рука повара, ящики и прилавки (2.4)", () => {
 		kit.tap("counter-1");
 		kit.tap("plates-1");
 		kit.tap("counter-1");
-		expect(kit.hand()).toMatchObject({ type: "plate", contents: [ingredient("bun", "raw")] });
+		expect(kit.hand()).toMatchObject({ type: "assembly", plated: true, contents: [ingredient("bun", "raw")] });
 		expect(kit.tap("crate-steak")).toEqual({ ok: false, reason: "handBusy" });
-		expect(kit.hand()).toMatchObject({ type: "plate" });
+		expect(kit.hand()).toMatchObject({ type: "assembly", plated: true });
 	});
 
 	it("Взять из ящика: в руке сырой стейк, ящик остаётся полным", () => {
@@ -84,13 +84,13 @@ describe("разделочная доска (2.5)", () => {
 		kit.tap("crate-carrot");
 		expect(kit.tap("board-1")).toEqual({ ok: true });
 		expect(kit.station("board-1")).toMatchObject({ phase: "holding", progress: 0 });
-		kit.advance(1, "board-1");
+		kit.advance(0.8, "board-1");
 		const halfway = kit.station("board-1");
 		expect(halfway.phase).toBe("processing");
 		expect(halfway.progress).toBeCloseTo(0.5, 1);
 		expect(kit.kitchen.isWorking()).toBe(true);
-		kit.advance(1.1, "board-1");
-		expect(kit.station("board-1")).toMatchObject({ phase: "ready", progress: 1, items: [ingredient("carrot", "chopped")] });
+		kit.advance(0.9, "board-1");
+		expect(kit.station("board-1")).toMatchObject({ phase: "holding", progress: 1, items: [ingredient("carrot", "chopped")] });
 		expect(kit.eventsOf("cuttingDone")).toHaveLength(1);
 		expect(kit.kitchen.isWorking()).toBe(false);
 		// Дальше резать нечего: время идёт, ничего не меняется.
@@ -100,10 +100,14 @@ describe("разделочная доска (2.5)", () => {
 		expect(kit.hand()).toEqual(ingredient("carrot", "chopped"));
 	});
 
-	it("Не нарезаемый предмет: булочка на доску не кладётся", () => {
+	it("Булочка лежит на доске, рабочее действие её не меняет", () => {
 		const kit = createKitchenKit();
 		kit.tap("crate-bun");
-		expect(kit.tap("board-1")).toEqual({ ok: false, reason: "itemNotAccepted" });
+		expect(kit.tap("board-1")).toEqual({ ok: true });
+		kit.advance(2, "board-1");
+		expect(kit.station("board-1")).toMatchObject({ phase: "holding", progress: 0, items: [ingredient("bun", "raw")] });
+		expect(kit.eventsOf("cuttingDone")).toHaveLength(0);
+		expect(kit.tap("board-1")).toEqual({ ok: true });
 		expect(kit.hand()).toEqual(ingredient("bun", "raw"));
 		expect(kit.station("board-1").items).toEqual([]);
 	});
@@ -112,7 +116,7 @@ describe("разделочная доска (2.5)", () => {
 		const kit = createKitchenKit();
 		kit.tap("crate-steak");
 		kit.tap("board-1");
-		kit.advance(1, "board-1");
+		kit.advance(0.8, "board-1");
 		kit.advance(3, null);
 		const paused = kit.station("board-1");
 		expect(paused.phase).toBe("holding");
@@ -122,7 +126,7 @@ describe("разделочная доска (2.5)", () => {
 		// Работа над другой станцией доску не режет.
 		kit.advance(3, "board-2");
 		expect(kit.station("board-1").progress).toBeCloseTo(0.5, 1);
-		kit.advance(1.1, "board-1");
+		kit.advance(0.9, "board-1");
 		expect(kit.station("board-1").items).toEqual([ingredient("steak", "chopped")]);
 	});
 
@@ -137,15 +141,18 @@ describe("разделочная доска (2.5)", () => {
 		expect(kit.station("board-1").progress).toBe(0);
 	});
 
-	it("сгоревшее и тарелка на доску не кладутся, занятая доска занята", () => {
+	it("доска хранит тарелку, посторонний ингредиент не вытесняет предмет с доски", () => {
 		const kit = createKitchenKit();
 		kit.tap("plates-1");
-		expect(kit.tap("board-1")).toEqual({ ok: false, reason: "itemNotAccepted" });
+		expect(kit.tap("board-1")).toEqual({ ok: true });
+		expect(kit.station("board-1").items).toEqual([{ type: "assembly", plated: true, contents: [], dish: null }]);
+		expect(kit.tap("board-1")).toEqual({ ok: true });
 		kit.tap("trash-1");
 		kit.tap("crate-onion");
 		kit.tap("board-1");
 		kit.tap("crate-carrot");
 		expect(kit.tap("board-1")).toEqual({ ok: false, reason: "stationOccupied" });
+		expect(kit.station("board-1").items).toEqual([ingredient("onion", "raw")]);
 	});
 
 	it("режутся все четыре нарезаемых предмета", () => {
@@ -166,11 +173,11 @@ describe("сковорода на плите (2.6)", () => {
 		expect(kit.hand()).toBeNull();
 		expect(kit.eventsOf("cookingStarted")[0]).toMatchObject({ stationId: "pan-1", recipe: "patty" });
 		expect(kit.station("pan-1")).toMatchObject({ phase: "processing", items: [ingredient("patty", "raw")], progress: 0 });
-		kit.advance(3);
+		kit.advance(2.4);
 		const halfway = kit.station("pan-1");
 		expect(halfway.phase).toBe("processing");
 		expect(halfway.progress).toBeCloseTo(0.5, 1);
-		kit.advance(3.1);
+		kit.advance(2.5);
 		expect(kit.station("pan-1")).toMatchObject({ phase: "ready", items: [ingredient("patty", "cooked")], progress: 1 });
 		expect(kit.eventsOf("cookingDone")).toHaveLength(1);
 	});
@@ -181,7 +188,7 @@ describe("сковорода на плите (2.6)", () => {
 		kit.advance(3);
 		expect(kit.station("pan-1").burnProgress).toBeCloseTo(0.5, 1);
 		kit.advance(3.1);
-		expect(kit.station("pan-1")).toMatchObject({ phase: "burnt", items: [ingredient("patty", "burnt")], burnProgress: 0 });
+		expect(kit.station("pan-1")).toMatchObject({ phase: "burnt", items: [ingredient("patty", "burnt")], burnProgress: 1 });
 		expect(kit.eventsOf("itemBurnt")).toHaveLength(1);
 		// Сгоревшее не горит снова и не готовится дальше.
 		kit.advance(20);
@@ -193,7 +200,7 @@ describe("сковорода на плите (2.6)", () => {
 		startPatty(kit, "pan-1");
 		kit.tap("plates-1");
 		expect(kit.tap("pan-1")).toEqual({ ok: true });
-		expect(kit.hand()).toEqual({ type: "plate", contents: [ingredient("patty", "cooked")], dish: null });
+		expect(kit.hand()).toEqual({ type: "assembly", plated: true, contents: [ingredient("patty", "cooked")], dish: null });
 		expect(kit.station("pan-1")).toMatchObject({ phase: "idle", items: [] });
 	});
 
@@ -221,8 +228,9 @@ describe("сковорода на плите (2.6)", () => {
 		kit.tap("counter-1");
 		kit.tap("pan-1");
 		expect(kit.hand()).toEqual(ingredient("patty", "burnt"));
-		expect(kit.tap("counter-1")).toEqual({ ok: false, reason: "burntItem" });
+		expect(kit.tap("counter-1")).toEqual({ ok: false, reason: "stationOccupied" });
 		expect(kit.hand()).toEqual(ingredient("patty", "burnt"));
+		expect(kit.station("counter-1").items).toEqual([{ type: "assembly", plated: true, contents: [], dish: null }]);
 	});
 
 	it("сырую котлету, занятую и неподходящую сковороду не трогаем: причины отказа понятны", () => {
@@ -263,81 +271,98 @@ describe("сковорода на плите (2.6)", () => {
 	});
 });
 
-describe("кастрюля для рагу и духовка (2.7)", () => {
-	// Кладёт в кастрюлю три нарезанных овоща.
-	function fillPot(kit: ReturnType<typeof createKitchenKit>): void {
-		chopFromCrate(kit, "crate-carrot", "board-1");
-		kit.tap("pot-1");
-		chopFromCrate(kit, "crate-potato", "board-1");
-		kit.tap("pot-1");
-		chopFromCrate(kit, "crate-onion", "board-1");
-		kit.tap("pot-1");
-	}
+function addWater(kit: ReturnType<typeof createKitchenKit>, destination = "stove-1"): void {
+	expect(kit.tap("stove-1")).toEqual({ ok: true });
+	expect(kit.tap("tap-1")).toEqual({ ok: true });
+	expect(kit.tap(destination)).toEqual({ ok: true });
+}
 
-	it("Полный набор: после третьего овоща начинается варка с прогрессом", () => {
+function fillPot(kit: ReturnType<typeof createKitchenKit>, stationId = "stove-1"): void {
+	addWater(kit, stationId);
+	for (const crateId of ["crate-carrot", "crate-potato", "crate-onion"]) {
+		chopFromCrate(kit, crateId, "board-1");
+		expect(kit.tap(stationId)).toEqual({ ok: true });
+	}
+}
+
+describe("кастрюля для рагу и духовка (2.7)", () => {
+	it("Вода и три нарезанных овоща запускают варку на плите", () => {
 		const kit = createKitchenKit();
+		addWater(kit);
 		chopFromCrate(kit, "crate-carrot", "board-1");
-		kit.tap("pot-1");
+		kit.tap("stove-1");
 		chopFromCrate(kit, "crate-potato", "board-1");
-		kit.tap("pot-1");
-		expect(kit.station("pot-1")).toMatchObject({ phase: "holding" });
-		expect(kit.station("pot-1").items).toHaveLength(2);
+		kit.tap("stove-1");
+		kit.advance(1);
+		expect(kit.station("stove-1")).toMatchObject({
+			phase: "holding",
+			isHeating: false,
+			items: [{ type: "pot", hasWater: true, contents: [ingredient("carrot", "chopped"), ingredient("potato", "chopped")] }],
+		});
 		expect(kit.eventsOf("cookingStarted")).toHaveLength(0);
 		chopFromCrate(kit, "crate-onion", "board-1");
-		kit.tap("pot-1");
-		expect(kit.station("pot-1")).toMatchObject({ phase: "processing", progress: 0 });
-		expect(kit.station("pot-1").items).toHaveLength(3);
-		expect(kit.eventsOf("cookingStarted")[0]).toMatchObject({ stationId: "pot-1", recipe: "stew" });
-		kit.advance(5);
-		expect(kit.station("pot-1").progress).toBeCloseTo(0.5, 1);
-		kit.advance(5.1);
-		expect(kit.station("pot-1")).toMatchObject({ phase: "ready", items: [ingredient("stew", "cooked")], portions: 2 });
+		expect(kit.tap("stove-1")).toEqual({ ok: true });
+		kit.advance(4);
+		expect(kit.station("stove-1")).toMatchObject({ phase: "processing", isHeating: true });
+		expect(kit.station("stove-1").progress).toBeCloseTo(0.5, 1);
+		expect(kit.eventsOf("cookingStarted")[0]).toMatchObject({ stationId: "stove-1", recipe: "stew" });
+		kit.advance(4.1);
+		expect(kit.station("stove-1")).toMatchObject({ phase: "ready", isHeating: false, portions: 2 });
 	});
 
-	it("Неподходящий предмет: сырая морковь и повтор овоща не принимаются", () => {
+	it("Кастрюле нужна вода, сырая морковь и повтор овоща отклоняются", () => {
 		const kit = createKitchenKit();
+		chopFromCrate(kit, "crate-carrot", "board-1");
+		expect(kit.tap("stove-1")).toEqual({ ok: false, reason: "needsWater" });
+		expect(kit.hand()).toEqual(ingredient("carrot", "chopped"));
+		kit.tap("trash-1");
+		addWater(kit);
 		kit.tap("crate-carrot");
-		expect(kit.tap("pot-1")).toEqual({ ok: false, reason: "itemNotAccepted" });
+		expect(kit.tap("stove-1")).toEqual({ ok: false, reason: "itemNotAccepted" });
 		expect(kit.hand()).toEqual(ingredient("carrot", "raw"));
 		kit.tap("board-1");
 		kit.advance(2.1, "board-1");
 		kit.tap("board-1");
-		expect(kit.tap("pot-1")).toEqual({ ok: true });
+		expect(kit.tap("stove-1")).toEqual({ ok: true });
 		chopFromCrate(kit, "crate-carrot", "board-1");
-		expect(kit.tap("pot-1")).toEqual({ ok: false, reason: "itemNotAccepted" });
-		expect(kit.station("pot-1").items).toHaveLength(1);
+		expect(kit.tap("stove-1")).toEqual({ ok: false, reason: "itemNotAccepted" });
+		expect(kit.station("stove-1").items).toMatchObject([{ type: "pot", contents: [ingredient("carrot", "chopped")] }]);
 	});
 
 	it("порции рагу берутся только на тарелку, по одной, потом кастрюля пуста", () => {
 		const kit = createKitchenKit();
 		fillPot(kit);
-		kit.advance(10.1);
-		// Пустой рукой порцию не взять.
-		expect(kit.tap("pot-1")).toEqual({ ok: false, reason: "plateRequired" });
+		kit.advance(8.1);
+		// Пустой рукой повар забирает всю кастрюлю.
+		expect(kit.tap("stove-1")).toEqual({ ok: true });
+		expect(kit.hand()).toMatchObject({ type: "pot", portions: 2 });
+		expect(kit.tap("counter-pot")).toEqual({ ok: true });
 		kit.tap("plates-1");
-		expect(kit.tap("pot-1")).toEqual({ ok: true });
-		expect(kit.hand()).toEqual({ type: "plate", contents: [ingredient("stew", "cooked")], dish: "stew" });
+		expect(kit.tap("counter-pot")).toEqual({ ok: true });
+		expect(kit.hand()).toEqual({ type: "assembly", plated: true, contents: [ingredient("stew", "cooked")], dish: "stew" });
 		expect(kit.eventsOf("dishAssembled").map((event) => event.dish)).toEqual(["stew"]);
-		expect(kit.station("pot-1")).toMatchObject({ phase: "ready", portions: 1 });
+		expect(kit.station("counter-pot").items).toMatchObject([{ type: "pot", portions: 1 }]);
 		kit.tap("counter-1");
 		kit.tap("plates-1");
-		kit.tap("pot-1");
-		expect((kit.hand() as PlateItem).dish).toBe("stew");
-		expect(kit.station("pot-1")).toMatchObject({ phase: "idle", portions: 0, items: [] });
+		expect(kit.tap("counter-pot")).toEqual({ ok: true });
+		expect(kit.hand()).toMatchObject({ type: "assembly", plated: true, dish: "stew" });
+		expect(kit.station("counter-pot").items).toEqual([{ type: "pot", hasWater: false, contents: [], cookProgressSec: 0, portions: 0 }]);
 	});
 
-	it("рагу подгорает целиком, сгоревшее берётся в руку и выбрасывается", () => {
+	it("кастрюля варит только на плите, готовое рагу не подгорает", () => {
 		const kit = createKitchenKit();
-		fillPot(kit);
-		kit.advance(10.1);
-		kit.advance(10.1);
-		expect(kit.station("pot-1")).toMatchObject({ phase: "burnt", items: [ingredient("stew", "burnt")], portions: 0 });
+		fillPot(kit, "counter-pot");
+		kit.advance(9);
+		expect(kit.eventsOf("cookingStarted")).toHaveLength(0);
+		expect(kit.tap("counter-pot")).toEqual({ ok: true });
+		expect(kit.tap("stove-1")).toEqual({ ok: true });
+		kit.advance(8.1);
+		kit.advance(20);
+		expect(kit.station("stove-1")).toMatchObject({ phase: "ready", isHeating: false, portions: 2 });
+		expect(kit.eventsOf("itemBurnt")).toHaveLength(0);
 		kit.tap("plates-1");
-		expect(kit.tap("pot-1")).toEqual({ ok: false, reason: "burntItem" });
-		kit.tap("trash-1");
-		expect(kit.tap("pot-1")).toEqual({ ok: true });
-		expect(kit.hand()).toEqual(ingredient("stew", "burnt"));
-		expect(kit.station("pot-1").phase).toBe("idle");
+		expect(kit.tap("stove-1")).toEqual({ ok: true });
+		expect(kit.hand()).toMatchObject({ type: "assembly", plated: true, dish: "stew" });
 	});
 
 	it("Ветчина в духовке: по окончании времени в духовке готовая ветчина, потом сгорает", () => {
@@ -346,7 +371,7 @@ describe("кастрюля для рагу и духовка (2.7)", () => {
 		expect(kit.tap("oven-1")).toEqual({ ok: true });
 		expect(kit.eventsOf("cookingStarted")[0]).toMatchObject({ stationId: "oven-1", recipe: "ham" });
 		expect(kit.station("oven-1")).toMatchObject({ phase: "processing", items: [ingredient("ham", "raw")] });
-		kit.advance(7.9);
+		kit.advance(6.3);
 		expect(kit.station("oven-1").phase).toBe("processing");
 		kit.advance(0.3);
 		expect(kit.station("oven-1")).toMatchObject({ phase: "ready", items: [ingredient("ham", "cooked")] });
@@ -358,10 +383,10 @@ describe("кастрюля для рагу и духовка (2.7)", () => {
 		const kit = createKitchenKit();
 		kit.tap("crate-ham");
 		kit.tap("oven-1");
-		kit.advance(8.1);
+		kit.advance(6.5);
 		kit.tap("plates-1");
 		expect(kit.tap("oven-1")).toEqual({ ok: true });
-		expect(kit.hand()).toMatchObject({ type: "plate", dish: "ham" });
+		expect(kit.hand()).toMatchObject({ type: "assembly", plated: true, dish: "ham" });
 	});
 
 	it("сырую ветчину можно положить в духовку, булочку нельзя", () => {
@@ -374,7 +399,9 @@ describe("кастрюля для рагу и духовка (2.7)", () => {
 		const kit = createKitchenKit({ kitchen: { cooking: { ham: { cookSec: 2, burnSec: 3 } } } });
 		kit.tap("crate-ham");
 		kit.tap("oven-1");
-		kit.advance(2.1);
+		kit.advance(1.5);
+		expect(kit.station("oven-1").phase).toBe("processing");
+		kit.advance(0.2);
 		expect(kit.station("oven-1").phase).toBe("ready");
 		kit.advance(3.1);
 		expect(kit.station("oven-1").phase).toBe("burnt");
@@ -385,7 +412,7 @@ describe("стопка тарелок, сборка блюда и урна (2.8)
 	it("Взять тарелку: в руке пустая тарелка", () => {
 		const kit = createKitchenKit();
 		expect(kit.tap("plates-1")).toEqual({ ok: true });
-		expect(kit.hand()).toEqual({ type: "plate", contents: [], dish: null });
+		expect(kit.hand()).toEqual({ type: "assembly", plated: true, contents: [], dish: null });
 		// Стопка бесконечна.
 		kit.tap("trash-1");
 		expect(kit.tap("plates-1")).toEqual({ ok: true });
@@ -398,20 +425,27 @@ describe("стопка тарелок, сборка блюда и урна (2.8)
 		expect(kit.hand()).toBeNull();
 	});
 
-	it("Тарелка с содержимым в стопку: тарелка не принимается", () => {
+	it("Повторное действие у стопки сохраняет тарелку с содержимым", () => {
 		const kit = createKitchenKit();
 		kit.tap("crate-bun");
 		kit.tap("counter-1");
 		kit.tap("plates-1");
 		kit.tap("counter-1");
-		expect(kit.tap("plates-1")).toEqual({ ok: false, reason: "itemNotAccepted" });
-		expect(kit.hand()).toMatchObject({ type: "plate", contents: [ingredient("bun", "raw")] });
+		const plate = kit.hand();
+		expect(plate).toMatchObject({ type: "assembly", plated: true, contents: [ingredient("bun", "raw")] });
+		expect(kit.tap("plates-1")).toEqual({ ok: true });
+		expect(kit.hand()).toEqual(plate);
 	});
 
-	it("ингредиент в стопку не принимается", () => {
+	it("стопка подаёт тарелку для подходящего ингредиента и отклоняет сырой стейк", () => {
 		const kit = createKitchenKit();
+		kit.tap("crate-steak");
+		expect(kit.tap("plates-1")).toEqual({ ok: false, reason: "plateNotAccepted" });
+		expect(kit.hand()).toEqual(ingredient("steak", "raw"));
+		kit.tap("trash-1");
 		kit.tap("crate-bun");
-		expect(kit.tap("plates-1")).toEqual({ ok: false, reason: "itemNotAccepted" });
+		expect(kit.tap("plates-1")).toEqual({ ok: true });
+		expect(kit.hand()).toEqual({ type: "assembly", plated: true, contents: [ingredient("bun", "raw")], dish: null });
 	});
 
 	it("Сборка бургера: булочка и жареная котлета превращают тарелку в бургер", () => {
@@ -421,9 +455,9 @@ describe("стопка тарелок, сборка блюда и урна (2.8)
 		startPatty(kit, "pan-1");
 		kit.tap("plates-1");
 		kit.tap("counter-1");
-		expect((kit.hand() as PlateItem).dish).toBeNull();
+		expect((kit.hand() as AssemblyItem).dish).toBeNull();
 		kit.tap("pan-1");
-		const plate = kit.hand() as PlateItem;
+		const plate = kit.hand() as AssemblyItem;
 		expect(plate.dish).toBe("burger");
 		expect(plate.contents).toHaveLength(2);
 		expect(kit.eventsOf("dishAssembled").map((event) => event.dish)).toEqual(["burger"]);
@@ -438,9 +472,9 @@ describe("стопка тарелок, сборка блюда и урна (2.8)
 		kit.tap("crate-bun");
 		expect(kit.tap("counter-2")).toEqual({ ok: true });
 		expect(kit.hand()).toBeNull();
-		expect(kit.station("counter-2").items[0]).toMatchObject({ type: "plate", dish: "burger" });
+		expect(kit.station("counter-2").items[0]).toMatchObject({ type: "assembly", plated: true, dish: "burger" });
 		kit.tap("counter-2");
-		expect((kit.hand() as PlateItem).dish).toBe("burger");
+		expect((kit.hand() as AssemblyItem).dish).toBe("burger");
 	});
 
 	it("овощной бургер собирается из булочки и овощной котлеты", () => {
@@ -455,7 +489,7 @@ describe("стопка тарелок, сборка блюда и урна (2.8)
 		kit.tap("plates-1");
 		kit.tap("counter-1");
 		kit.tap("pan-1");
-		expect((kit.hand() as PlateItem).dish).toBe("veggieBurger");
+		expect((kit.hand() as AssemblyItem).dish).toBe("veggieBurger");
 	});
 
 	it("Лишний ингредиент: к тарелке с булочкой нарезанный лук не добавляется", () => {
@@ -466,17 +500,20 @@ describe("стопка тарелок, сборка блюда и урна (2.8)
 		kit.tap("counter-1");
 		kit.tap("counter-2");
 		chopFromCrate(kit, "crate-onion", "board-1");
-		expect(kit.tap("counter-2")).toEqual({ ok: false, reason: "plateNotAccepted" });
+		expect(kit.tap("counter-2")).toEqual({ ok: false, reason: "stationOccupied" });
 		expect(kit.hand()).toEqual(ingredient("onion", "chopped"));
-		expect(kit.station("counter-2").items[0]).toMatchObject({ type: "plate", contents: [ingredient("bun", "raw")] });
+		expect(kit.station("counter-2").items[0]).toMatchObject({ type: "assembly", plated: true, contents: [ingredient("bun", "raw")] });
 	});
 
 	it("готовый бургер не принимает ещё одну булочку", () => {
 		const kit = createKitchenKit();
 		assembleBurger(kit);
+		const burger = kit.hand();
 		kit.tap("counter-2");
 		kit.tap("crate-bun");
-		expect(kit.tap("counter-2")).toEqual({ ok: false, reason: "plateNotAccepted" });
+		expect(kit.tap("counter-2")).toEqual({ ok: false, reason: "stationOccupied" });
+		expect(kit.hand()).toEqual(ingredient("bun", "raw"));
+		expect(kit.station("counter-2").items).toEqual([burger]);
 	});
 
 	it("тарелка принимает только ингредиенты рецептов меню уровня", () => {
@@ -488,7 +525,9 @@ describe("стопка тарелок, сборка блюда и урна (2.8)
 		kit.advance(6.1);
 		kit.tap("plates-1");
 		// Овощной бургер вне меню: овощная котлета на тарелку не кладётся.
-		expect(kit.tap("pan-1")).toEqual({ ok: false, reason: "plateNotAccepted" });
+		expect(kit.tap("pan-1")).toEqual({ ok: false, reason: "itemNotAccepted" });
+		expect(kit.station("pan-1").items).toEqual([ingredient("veggiePatty", "cooked")]);
+		expect(kit.hand()).toEqual({ type: "assembly", plated: true, contents: [], dish: null });
 	});
 
 	it("Выбросить сгоревшее: рука пуста", () => {
@@ -507,7 +546,7 @@ describe("стопка тарелок, сборка блюда и урна (2.8)
 		expect(kit.tap("trash-1")).toEqual({ ok: true });
 		expect(kit.hand()).toBeNull();
 		expect(kit.tap("plates-1")).toEqual({ ok: true });
-		expect(kit.hand()).toEqual({ type: "plate", contents: [], dish: null });
+		expect(kit.hand()).toEqual({ type: "assembly", plated: true, contents: [], dish: null });
 	});
 
 	it("урна с пустой рукой: нечего положить", () => {
@@ -539,16 +578,25 @@ describe("окно выдачи (2.9)", () => {
 		kit.tap("plates-1");
 		kit.tap("counter-1");
 		expect(kit.tap("window-1")).toEqual({ ok: false, reason: "dishNotReady" });
-		expect(kit.hand()).toMatchObject({ type: "plate", contents: [ingredient("bun", "raw")] });
+		expect(kit.hand()).toMatchObject({ type: "assembly", plated: true, contents: [ingredient("bun", "raw")] });
 		expect(kit.kitchen.window.getDishes()).toHaveLength(0);
 		expect(kit.eventsOf("actionRejected").at(-1)).toMatchObject({ stationId: "window-1", reason: "dishNotReady" });
 	});
 
-	it("ингредиент в окно не сдаётся, с пустой рукой нечего положить", () => {
+	it("окно отклоняет пустую руку, ингредиент и готовое блюдо без тарелки", () => {
 		const kit = createKitchenKit();
 		expect(kit.tap("window-1")).toEqual({ ok: false, reason: "handEmpty" });
 		kit.tap("crate-bun");
 		expect(kit.tap("window-1")).toEqual({ ok: false, reason: "dishNotReady" });
+		kit.tap("trash-1");
+		const order = kit.orders.addOrder("ham");
+		kit.tap("crate-ham");
+		kit.tap("oven-1");
+		kit.advance(6.5);
+		expect(kit.tap("oven-1")).toEqual({ ok: true });
+		expect(kit.tap("window-1")).toEqual({ ok: false, reason: "dishNotPlated" });
+		expect(kit.hand()).toEqual(ingredient("ham", "cooked"));
+		expect(order.status).toBe("waiting");
 	});
 
 	it("Нет такого заказа: блюдо остаётся в руке, заказ не затронут", () => {
@@ -556,7 +604,7 @@ describe("окно выдачи (2.9)", () => {
 		const hamOrder = kit.orders.addOrder("ham");
 		assembleBurger(kit);
 		expect(kit.tap("window-1")).toEqual({ ok: false, reason: "noOpenOrder" });
-		expect((kit.hand() as PlateItem).dish).toBe("burger");
+		expect((kit.hand() as AssemblyItem).dish).toBe("burger");
 		expect(hamOrder.status).toBe("waiting");
 		expect(kit.kitchen.window.getDishes()).toHaveLength(0);
 	});
@@ -572,14 +620,14 @@ describe("окно выдачи (2.9)", () => {
 		expect(second.status).toBe("waiting");
 		expect(kit.kitchen.window.getDishes()[0].orderId).toBe(first.id);
 		// Второй бургер уходит ко второму заказу.
-		const accepted = kit.kitchen.window.tryAccept({ type: "plate", contents: [ingredient("bun", "raw"), ingredient("patty", "cooked")], dish: "burger" });
+		const accepted = kit.kitchen.window.tryAccept({ type: "assembly", plated: true, contents: [ingredient("bun", "raw"), ingredient("patty", "cooked")], dish: "burger" });
 		expect(accepted.ok).toBe(true);
 		expect(second.status).toBe("delivering");
 	});
 
 	it("слоты заполняются по порядку, полное окно отказывает, освободившийся слот занимается снова", () => {
 		const kit = createKitchenKit();
-		const ham: PlateItem = { type: "plate", contents: [ingredient("ham", "cooked")], dish: "ham" };
+		const ham: AssemblyItem = { type: "assembly", plated: true, contents: [ingredient("ham", "cooked")], dish: "ham" };
 		for (let index = 0; index < 4; index += 1) {
 			kit.orders.addOrder("ham");
 		}
@@ -597,15 +645,16 @@ describe("окно выдачи (2.9)", () => {
 
 	it("tryAccept с неготовой тарелкой возвращает dishNotReady, без заказов noOpenOrder", () => {
 		const kit = createKitchenKit();
-		expect(kit.kitchen.window.tryAccept({ type: "plate", contents: [], dish: null })).toEqual({ ok: false, reason: "dishNotReady" });
-		expect(kit.kitchen.window.tryAccept({ type: "plate", contents: [ingredient("ham", "cooked")], dish: "ham" })).toEqual({ ok: false, reason: "noOpenOrder" });
+		expect(kit.kitchen.window.tryAccept({ type: "assembly", plated: true, contents: [], dish: null })).toEqual({ ok: false, reason: "dishNotReady" });
+		expect(kit.kitchen.window.tryAccept({ type: "assembly", plated: true, contents: [ingredient("ham", "cooked")], dish: "ham" })).toEqual({ ok: false, reason: "noOpenOrder" });
 	});
 });
 
-describe("полные цепочки четырёх блюд на кухне", () => {
+describe("полные цепочки пяти блюд на кухне", () => {
 	it("каждое блюдо готовится от ящиков до окна и привязывается к заказу", () => {
-		const kit = createKitchenKit();
-		const orders = (["burger", "ham", "veggieBurger", "stew"] as const).map((dish) => kit.orders.addOrder(dish));
+		const menu = ["burger", "ham", "veggieBurger", "steak", "stew"] as const;
+		const kit = createKitchenKit({ menu: [...menu] });
+		const orders = menu.map((dish) => kit.orders.addOrder(dish));
 
 		// Бургер.
 		assembleBurger(kit);
@@ -614,7 +663,7 @@ describe("полные цепочки четырёх блюд на кухне", 
 		// Окорок.
 		kit.tap("crate-ham");
 		kit.tap("oven-1");
-		kit.advance(8.1);
+		kit.advance(6.5);
 		kit.tap("plates-1");
 		kit.tap("oven-1");
 		expect(kit.tap("window-1").ok).toBe(true);
@@ -632,18 +681,25 @@ describe("полные цепочки четырёх блюд на кухне", 
 		kit.tap("pan-1");
 		expect(kit.tap("window-1").ok).toBe(true);
 
-		// Рагу. Окно вмещает три блюда: официант забирает первое, освобождая слот.
+		// Стейк. Окно вмещает три блюда: официант забирает бургер, освобождая слот.
 		expect(kit.kitchen.window.takeDish("wd-1")).not.toBeNull();
-		["crate-carrot", "crate-potato", "crate-onion"].forEach((crateId) => {
-			chopFromCrate(kit, crateId, "board-1");
-			kit.tap("pot-1");
-		});
-		kit.advance(10.1);
+		kit.tap("crate-steak");
+		kit.tap("pan-1");
+		kit.advance(4.8);
 		kit.tap("plates-1");
-		kit.tap("pot-1");
+		expect(kit.tap("pan-1")).toEqual({ ok: true });
 		expect(kit.tap("window-1").ok).toBe(true);
 
-		expect(orders.map((order) => order.status)).toEqual(["delivering", "delivering", "delivering", "delivering"]);
-		expect(kit.eventsOf("dishAssembled").map((event) => event.dish)).toEqual(["burger", "ham", "veggieBurger", "stew"]);
+		// Рагу.
+		expect(kit.kitchen.window.takeDish("wd-2")).not.toBeNull();
+		fillPot(kit);
+		kit.advance(8.1);
+		kit.tap("plates-1");
+		expect(kit.tap("stove-1")).toEqual({ ok: true });
+		expect(kit.tap("window-1").ok).toBe(true);
+
+		expect(orders.map((order) => order.status)).toEqual(menu.map(() => "delivering"));
+		expect(kit.eventsOf("dishAssembled").map((event) => event.dish)).toEqual(menu);
+		expect(kit.eventsOf("dishAccepted").map((event) => event.orderId)).toEqual(orders.map((order) => order.id));
 	});
 });

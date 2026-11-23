@@ -17,7 +17,7 @@ import {
 } from "./contracts";
 
 // Допустимые виды и состояния: тип проверяет, что каталог не использует лишнего.
-const knownKinds: readonly IngredientKind[] = ["steak", "bun", "ham", "potato", "carrot", "onion", "patty", "veggiePatty", "stew"];
+const knownKinds: readonly IngredientKind[] = ["steak", "bun", "ham", "potato", "carrot", "onion", "patty", "veggiePatty", "friedSteak", "stew"];
 const knownStates: readonly ItemState[] = ["raw", "chopped", "cooked", "burnt"];
 
 describe("контракты игры", () => {
@@ -53,7 +53,7 @@ describe("контракты игры", () => {
 		expect(FACING_VECTORS).toHaveLength(FACING_COUNT);
 		FACING_VECTORS.forEach((vector) => expect(Math.hypot(vector.x, vector.z)).toBeCloseTo(1));
 		expect(LEVEL_IDS).toEqual(["easy", "medium", "hard"]);
-		expect(DISH_IDS).toHaveLength(4);
+		expect(DISH_IDS).toEqual(["ham", "steak", "burger", "veggieBurger", "stew"]);
 	});
 
 	it("каталог предметов не содержит повторов и только известные виды и состояния", () => {

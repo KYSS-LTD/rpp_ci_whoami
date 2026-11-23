@@ -106,10 +106,10 @@ function createStations(): StationConfig[] {
 		// Западная сторона: два прилавка и стопка тарелок.
 		createStation("counter-1", "counter", 0.5, 2, { rotationDeg: 90 }),
 		createStation("counter-2", "counter", 0.5, 3, { rotationDeg: 90 }),
+		createStation("tap-1", "tap", 0.5, 4, { rotationDeg: 90 }),
 		createStation("plates-1", "plateStack", 0.5, 5, { rotationDeg: 90 }),
-		// Прилавок и раковина для воды.
+		// Прилавок для кастрюли.
 		createStation("counter-pot", "counter", 0.5, 6.5, { rotationDeg: 90 }),
-		createStation("tap-1", "tap", 6, 6.5, { rotationDeg: 270 }),
 		// Остров: две разделочные доски.
 		createStation("board-1", "cuttingBoard", 3, 4),
 		createStation("board-2", "cuttingBoard", 4, 4),

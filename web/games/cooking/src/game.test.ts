@@ -1,8 +1,9 @@
 // Тесты сборки игры (задачи 9.1 и 9.2) с подменой моста, моделей, сцены, HUD, ввода и цикла кадров:
 // готовность после загрузки, уровень из сообщения старта, один результат, провал, выход, пауза, скрытая вкладка.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { EMPTY_INPUT, type GameSnapshot, type HudOptions, type LevelId, type PortalBridgeApi, type ShiftPhase, type ShiftResult, type Simulation } from "./contracts";
+import { EMPTY_INPUT, GAME_PROGRESS_VERSION, type DishId, type GameSnapshot, type HudOptions, type LevelId, type PortalBridgeApi, type ShiftPhase, type ShiftResult, type Simulation } from "./contracts";
 import { createResultReporter } from "./hud/reporter";
+import { createEmptyProgress } from "./progress";
 import { createSimulation } from "./sim/simulation";
 import { startGame, type GameModules } from "./game";
 
@@ -306,41 +307,50 @@ describe("результат и выход", () => {
 });
 
 describe("прогресс блюд и подсказки", () => {
-	const dishAccepted = (dish: string) => ({ type: "dishAccepted", windowDishId: "wd-1", orderId: "o-1", dish, t: 1 });
+	const dishAccepted = (dish: DishId) => ({ type: "dishAccepted", windowDishId: "wd-1", orderId: "o-1", dish, t: 1 });
 
 	it("сценарий 'Первое приготовление': первое принятое окном блюдо отправляется порталу один раз, повтор не отправляется", async () => {
 		const scripted = createScriptedSimulation();
-		const game = await launch("easy", { createSimulation: vi.fn(() => scripted.simulation) as unknown as GameModules["createSimulation"] });
+		const empty = createEmptyProgress();
+		const progress = { ...empty, completedDays: { ...empty.completedDays, easy: 2 } };
+		const game = await launch("easy", { createSimulation: vi.fn(() => scripted.simulation) as unknown as GameModules["createSimulation"] }, progress);
 		scripted.emit(dishAccepted("burger"));
 		expect(game.bridge.saveProgress).toHaveBeenCalledTimes(1);
-		expect(game.bridge.saveProgress).toHaveBeenLastCalledWith({ version: 1, cookedDishes: ["burger"] });
+		expect(game.bridge.saveProgress).toHaveBeenLastCalledWith({ ...progress, cookedDishes: ["burger"] });
 		scripted.emit(dishAccepted("burger"));
 		expect(game.bridge.saveProgress).toHaveBeenCalledTimes(1);
 		scripted.emit(dishAccepted("ham"));
 		expect(game.bridge.saveProgress).toHaveBeenCalledTimes(2);
-		expect(game.bridge.saveProgress).toHaveBeenLastCalledWith({ version: 1, cookedDishes: ["burger", "ham"] });
+		expect(game.bridge.saveProgress).toHaveBeenLastCalledWith({ ...progress, cookedDishes: ["burger", "ham"] });
 	});
 
 	it("сценарий 'Прогресс из старта': знакомые блюда не попадают в список подсказок и не отправляются повторно", async () => {
 		const scripted = createScriptedSimulation();
+		const empty = createEmptyProgress();
+		const progress = {
+			version: GAME_PROGRESS_VERSION,
+			cookedDishes: ["burger", "ham", "steak"],
+			completedDays: { ...empty.completedDays, medium: 3 },
+			weekScores: { ...empty.weekScores, medium: { score: 80, maxScore: 100 } },
+		};
 		const game = await launch(
 			"medium",
 			{ createSimulation: vi.fn(() => scripted.simulation) as unknown as GameModules["createSimulation"] },
-			{ version: 1, cookedDishes: ["burger", "ham"] },
+			progress,
 		);
-		// Сценарий 'Список блюд для подсказок': в меню medium остаётся только овощной бургер.
+		// На четвёртый день появляется подсказка по новому блюду.
 		expect(game.state.hudOptions?.tutorialDishes).toEqual(["veggieBurger"]);
 		scripted.emit(dishAccepted("burger"));
 		expect(game.bridge.saveProgress).not.toHaveBeenCalled();
 		scripted.emit(dishAccepted("veggieBurger"));
-		expect(game.bridge.saveProgress).toHaveBeenLastCalledWith({ version: 1, cookedDishes: ["burger", "ham", "veggieBurger"] });
+		expect(game.bridge.saveProgress).toHaveBeenLastCalledWith({ ...progress, cookedDishes: ["burger", "ham", "steak", "veggieBurger"] });
 	});
 
 	it("сценарий 'Битый блок' и старт без блока: подсказки по всем блюдам меню", async () => {
 		const withoutBlock = await launch("hard");
-		expect(withoutBlock.state.hudOptions?.tutorialDishes).toEqual(["burger", "ham", "veggieBurger", "stew"]);
+		expect(withoutBlock.state.hudOptions?.tutorialDishes).toEqual(["ham"]);
 		const broken = await launch("easy", {}, { version: 99, cookedDishes: "бургер" });
-		expect(broken.state.hudOptions?.tutorialDishes).toEqual(["burger", "ham"]);
+		expect(broken.state.hudOptions?.tutorialDishes).toEqual(["ham"]);
 	});
 
 	it("все блюда меню знакомы: список подсказок пуст", async () => {

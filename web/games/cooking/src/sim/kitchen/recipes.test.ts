@@ -18,6 +18,7 @@ import {
 	isSameMultiset,
 	isSameSpec,
 	isSubMultiset,
+	potRecipe,
 } from "./recipes";
 
 // Один шаг цепочки: чем и на какой станции получен предмет.
@@ -37,23 +38,25 @@ function expandChain(target: ItemSpec): ChainStep[] | null {
 		return before ? [...before, { producer: "cuttingBoard", output: target }] : null;
 	}
 	const cook = cookTransitions.find((transition) => isSameSpec(transition.cooked, target));
-	if (cook) {
+	const isStew = isSameSpec(potRecipe.portion, target);
+	const inputs = cook?.inputs ?? (isStew ? potRecipe.inputs : null);
+	if (inputs) {
 		const steps: ChainStep[] = [];
-		for (const input of cook.inputs) {
+		for (const input of inputs) {
 			const before = expandChain(input);
 			if (!before) {
 				return null;
 			}
 			steps.push(...before);
 		}
-		steps.push({ producer: cook.stationKind, output: target });
+		steps.push({ producer: cook?.stationKind ?? "pot", output: target });
 		return steps;
 	}
 	return null;
 }
 
 describe("таблицы рецептов и переходов", () => {
-	it("для каждого из четырёх блюд цепочка переходов приводит от ящиков к готовому блюду", () => {
+	it("для каждого блюда цепочка переходов приводит от ящиков к готовому блюду", () => {
 		DISH_IDS.forEach((dish) => {
 			const recipe = dishRecipes[dish];
 			expect(recipe.dish).toBe(dish);
@@ -76,6 +79,7 @@ describe("таблицы рецептов и переходов", () => {
 		expect([...producersOf("burger")].sort()).toEqual(["crate", "cuttingBoard", "stove"]);
 		expect([...producersOf("veggieBurger")].sort()).toEqual(["crate", "cuttingBoard", "stove"]);
 		expect([...producersOf("ham")].sort()).toEqual(["crate", "oven"]);
+		expect([...producersOf("steak")].sort()).toEqual(["crate", "stove"]);
 		expect([...producersOf("stew")].sort()).toEqual(["crate", "cuttingBoard", "pot"]);
 	});
 
