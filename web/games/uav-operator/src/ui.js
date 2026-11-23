@@ -91,6 +91,10 @@ export function stage_Shell(index, scene, panel, controls = '', tutorial = '', t
 	const submitNotice = override.freeMode ? text.free.finishNotice : text.submitNotice;
 	const completeNotice = override.freeMode ? text.free.completeNotice : text.completeNotice;
 	const statusPrefix = '<span id="stage-status-prefix" aria-hidden="true"></span>';
+	const menuTools = [
+		['mute','♫',text.mute], ['tutorial-again','?',text.tutorial], ['restart','↻',text.restart],
+		['stage-exit','↗',override.exit ?? (override.freeMode ? text.free.back : text.toHub)],
+	];
 	return `<section class="mission-view ${mission.id}-view" aria-label="${title}">
 		${scene}${controls}
 		<p class="stage-status" id="stage-status" role="status">${statusPrefix}<span id="stage-status-text"></span></p>
@@ -103,12 +107,12 @@ export function stage_Shell(index, scene, panel, controls = '', tutorial = '', t
 		</div>
 		<aside id="stage-menu" class="stage-menu" popover aria-labelledby="stage-menu-title">
 			<div class="overlay-heading"><h2 id="stage-menu-title">${title}</h2><button class="button button-quiet close-overlay" type="button" id="close-menu" aria-label="${text.close}">×</button></div>
-			<div class="actions-row"><button class="button button-quiet icon-button" id="mute" type="button" title="${text.mute}" aria-label="${text.mute}">♫</button><button class="button button-quiet icon-button" id="tutorial-again" type="button" title="${text.tutorial}" aria-label="${text.tutorial}">?</button><button class="button button-quiet icon-button" id="restart" type="button" title="${text.restart}" aria-label="${text.restart}">↻</button><button class="button button-quiet icon-button" id="stage-exit" type="button" title="${override.exit ?? text.toHub}" aria-label="${override.exit ?? text.toHub}">×</button></div>
+			<div class="stage-commands">${menuTools.map(([id,icon,label]) => `<button class="button button-quiet" id="${id}" type="button"><i aria-hidden="true">${icon}</i>${label}</button>`).join('')}</div>
 			<button class="button button-primary" id="submit-stage" type="button">${submit}</button>
 			${panel}
 		</aside>
 		<dialog class="stage-dialog" id="stage-tutorial" aria-labelledby="tutorial-title">
-			<h2 id="tutorial-title" tabindex="-1">${title}</h2>
+			<header class="briefing-heading"><p class="micro">${text.tutorial}</p><h2 id="tutorial-title" tabindex="-1">${title}</h2></header>
 			<div class="stage-instructions" tabindex="0" role="region" aria-label="${text.tutorial}">
 				${override.guide ? '' : `<video class="lesson-video" controls playsinline preload="none" aria-label="${title}"
 				poster="${new URL(`./assets/${mission.id}-lesson.jpg`, import.meta.url).href}"

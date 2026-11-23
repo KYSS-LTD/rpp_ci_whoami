@@ -1,8 +1,11 @@
 // Общие тексты интерфейса. Весь отображаемый текст хранится здесь, а не в компонентах.
 
 export const commonTexts = {
+	awardsCount: "Наград получено",
 	siteName: "KyssProf",
 	documentDescription: "Мини-игры, которые помогают понять, какие профессии вам подходят",
+	skipNavigation: "Перейти к содержимому",
+	navLabel: "Основная навигация",
 	navHome: "Главная",
 	navGames: "Игры",
 	navAchievements: "Ачивки",
@@ -56,10 +59,10 @@ export const commonTexts = {
 	footerTagline: "Мини-игры, которые помогают выбрать профессию.",
 	footerNavigationLabel: "Навигация в подвале",
 	footerCredits: {
-		eventPrefix: "Данный проект был разработан в формате форума программных разработчиков",
+		eventPrefix: "Сделано на форуме разработчиков",
 		eventName: "CyberGarden XX",
 		eventUrl: "https://cybergarden.ru/",
-		caseText: "Проект создан по мотивам кейса от компании ПАО КБ «Центр-инвест» на School треке.",
+		caseText: "В основе проекта кейс ПАО КБ «Центр-инвест» для трека School.",
 		teamPrefix: "Команда разработчиков:",
 		teamName: "KYSS",
 		teamUrl: "https://github.com/KYSS-LTD",

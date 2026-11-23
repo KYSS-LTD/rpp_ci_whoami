@@ -1,444 +1,128 @@
-/* Карточка игры поверх ленты. На компьютере окно по центру, на телефоне лист снизу на всю ширину. */
-
 .backdrop {
 	position: fixed;
 	inset: 0;
-	z-index: 100;
-	width: 100%;
-	height: 100%;
-	max-width: none;
-	max-height: none;
+	inline-size: 100%;
+	block-size: 100%;
+	max-inline-size: none;
+	max-block-size: none;
 	margin: 0;
+	padding: 0;
 	border: 0;
-	color: inherit;
-	overscroll-behavior: contain;
+	color: var(--color-text);
 	background: transparent;
 }
-
-.backdrop[open] {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	padding: 24px;
-}
-
-.backdrop::backdrop {
-	background: rgb(8 20 14 / 0.6);
-	overflow: hidden;
-	overscroll-behavior: contain;
-	backdrop-filter: blur(3px);
-	-webkit-backdrop-filter: blur(3px);
-	animation: fadeIn 0.2s ease-out;
-}
-
+.backdrop[open] { display: grid; align-items: end; justify-items: center; }
+.backdrop::backdrop { background: rgb(18 24 44 / .64); backdrop-filter: blur(5px); }
 .sheet {
 	position: relative;
 	display: grid;
-	grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-	grid-template-areas:
-		"media play"
-		"media actions"
-		"about rating";
-	grid-template-rows: auto auto 1fr;
-	align-content: start;
-	gap: 20px 28px;
-	padding: 20px 28px 28px 20px;
-	width: min(980px, 100%);
-	max-height: calc(100vh - 48px);
-	overflow-y: auto;
+	gap: 1.25rem;
+	inline-size: 100%;
+	max-block-size: 94dvh;
+	overflow: auto;
 	overscroll-behavior: contain;
 	background: var(--color-surface);
-	border-radius: var(--radius-large);
+	border-radius: var(--radius-large) var(--radius-large) 0 0;
 	box-shadow: var(--shadow-raised);
-	animation: popIn 0.25s ease-out;
 }
-
-.sheet:focus-visible {
-	box-shadow: var(--shadow-raised), var(--focus-ring);
+.editorial, .controls { min-inline-size: 0; }
+.about, .controls {
+	display: grid;
+	align-content: start;
+	gap: 1.1rem;
+	padding: 1.1rem;
 }
-
-/* Кнопка закрытия: крестик из двух линий */
-.close,
-.close:hover:not(:disabled) {
+.controls {
+	padding-block-end: max(1.25rem, env(safe-area-inset-bottom));
+	border-block-start: 1px solid var(--color-border);
+	background: var(--color-surface-muted);
+}
+.sheet .close, .sheet .close:hover:not(:disabled) {
 	position: absolute;
-	z-index: 3;
-	top: 14px;
-	right: 14px;
-	width: 44px;
-	min-width: 0;
-	height: 44px;
+	z-index: 5;
+	inset-block-start: .8rem;
+	inset-inline-end: .8rem;
+	display: grid;
+	place-items: center;
+	inline-size: 44px;
+	block-size: 44px;
 	padding: 0;
-	color: #ffffff;
-	background: rgb(0 0 0 / 0.4);
-	border: none;
+	color: #fff;
+	background: #222a48;
+	border: 1px solid rgb(255 255 255 / .6);
 	border-radius: 50%;
-	backdrop-filter: blur(6px);
-	-webkit-backdrop-filter: blur(6px);
 }
-
-.close:hover:not(:disabled) {
-	background: rgb(0 0 0 / 0.6);
-}
-
-.close::before,
-.close::after {
+.close::before, .close::after {
 	content: "";
-	position: absolute;
-	width: 16px;
-	height: 2px;
+	grid-area: 1 / 1;
+	inline-size: 1.1rem;
+	block-size: 2px;
 	background: currentColor;
-	border-radius: 2px;
 	transform: rotate(45deg);
 }
-
-.close::after {
-	transform: rotate(-45deg);
-}
-
-.media {
-	grid-area: media;
-	overflow: hidden;
-	border-radius: var(--radius);
-}
-
-.about {
-	grid-area: about;
-	display: flex;
-	flex-direction: column;
-	gap: 14px;
-	padding-left: 8px;
-}
-
-/* Правая колонка: выбор сложности, кнопка старта и оценка */
-.play {
-	grid-area: play;
-	display: flex;
-	flex-direction: column;
-	gap: 18px;
-	padding-top: 44px;
-}
-
-.badges {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-}
-
-.badge {
-	padding: 3px 10px;
-	font-size: 0.8rem;
-	font-weight: 700;
+.close::after { transform: rotate(-45deg); }
+.media { overflow: clip; }
+.media > div { aspect-ratio: 16 / 9; }
+.badges, .professions ul, .meta { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.badge, .professions li {
+	padding: .32rem .64rem;
+	font-size: .78rem;
+	font-weight: 650;
 	color: var(--color-accent-soft-text);
 	background: var(--color-accent-soft);
-	border-radius: 999px;
+	border-radius: .4rem;
 }
-
-.badgeWarning {
-	color: var(--color-warning-text);
-	background: var(--color-warning-bg);
-}
-
-.title {
-	margin-top: -6px;
-	font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem);
-}
-
-.summary {
-	font-size: 1.02rem;
-	color: var(--color-text-muted);
-}
-
-.meta {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px 20px;
-	font-size: 0.92rem;
-	font-weight: 600;
-}
-
-.meta li {
-	display: inline-flex;
-	align-items: center;
-	gap: 8px;
-}
-
-.meta li::before {
-	content: "";
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	background: var(--color-accent);
-}
-
-.professions {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 8px 12px;
-}
-
-.professions h3 {
-	font-size: 0.92rem;
-	font-weight: 600;
-	color: var(--color-text-muted);
-}
-
-.professions ul {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-}
-
-.professions li {
-	padding: 4px 12px;
-	font-size: 0.88rem;
-	font-weight: 600;
-	background: var(--color-surface-muted);
-	border: 1px solid var(--color-border);
-	border-radius: 999px;
-}
-
-/* Выбор сложности: три плитки-радиокнопки */
-.difficulty legend,
-.rating legend {
-	margin-bottom: 10px;
-	font-weight: 700;
-	color: var(--color-heading);
-}
-
-.levels {
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-}
-
+.badgeWarning { color: var(--color-warning-text); background: var(--color-warning-bg); }
+.title { font-size: clamp(1.65rem, 3.15vw, 2.75rem); letter-spacing: -.045em; }
+.summary { color: var(--color-text-muted); line-height: 1.55; }
+.meta { column-gap: 1.1rem; color: var(--color-text); font-size: .85rem; font-weight: 650; }
+.meta li { display: flex; align-items: center; gap: .42rem; }
+.meta li::before { content: ""; inline-size: .36rem; block-size: .36rem; background: var(--color-accent); border-radius: 50%; }
+.professions { display: grid; gap: .55rem; }
+.professions h3 { font-size: .82rem; color: var(--color-text-muted); }
+.professions li { font-weight: 500; color: var(--color-text); background: var(--color-surface-muted); }
+.difficulty, .rating { min-inline-size: 0; padding: 0; border: 0; }
+.difficulty legend, .rating legend { margin-block-end: .7rem; font-size: 1.05rem; font-weight: 750; color: var(--color-heading); }
+.levels { display: grid; gap: .5rem; }
 .level {
-	position: relative;
 	display: grid;
-	grid-template-columns: 1fr auto auto;
-	grid-template-areas: "title status bars";
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	grid-template-areas: "radio title bars" "radio status bars";
 	align-items: center;
-	gap: 12px;
-	padding: 14px 16px;
+	gap: .12rem .8rem;
+	padding: .8rem 1rem;
 	background: var(--color-surface);
-	border: 2px solid var(--color-border);
+	border: 1px solid var(--color-border);
 	border-radius: var(--radius);
 	cursor: pointer;
-	transition:
-		border-color 0.15s,
-		background-color 0.15s;
 }
-
-.level:hover {
-	border-color: var(--color-border-strong);
-}
-
-/* Сама радиокнопка скрыта, выбор показывает рамка плитки */
-.level input {
-	position: absolute;
-	opacity: 0;
-	pointer-events: none;
-}
-
+.level input { grid-area: radio; inline-size: 1rem; block-size: 1rem; accent-color: var(--color-accent); }
 .level:has(input:checked) {
+	border-color: var(--color-accent);
+	box-shadow: inset 0 0 0 1px var(--color-accent);
 	background: var(--color-accent-soft);
-	border-color: var(--color-accent);
 }
-
-.level:has(input:focus-visible) {
-	box-shadow: var(--focus-ring);
-}
-
-.levelTitle {
-	grid-area: title;
-	font-weight: 700;
-}
-
-.bars {
-	grid-area: bars;
-	display: inline-flex;
-	align-items: flex-end;
-	gap: 3px;
-	height: 16px;
-}
-
-.bars span {
-	width: 5px;
-	border-radius: 2px;
-	background: var(--color-border-strong);
-}
-
-.bars span:nth-child(1) {
-	height: 7px;
-}
-
-.bars span:nth-child(2) {
-	height: 11px;
-}
-
-.bars span:nth-child(3) {
-	height: 16px;
-}
-
-.bars[data-difficulty="1"] span:nth-child(-n + 1),
-.bars[data-difficulty="2"] span:nth-child(-n + 2),
-.bars[data-difficulty="3"] span:nth-child(-n + 3) {
-	background: var(--color-accent);
-}
-
-.status {
-	grid-area: status;
-	justify-self: start;
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	font-size: 0.8rem;
-	font-weight: 600;
-	color: var(--color-text-muted);
-}
-
-.status::before {
-	content: "";
-	width: 7px;
-	height: 7px;
-	border-radius: 50%;
-	background: var(--color-border-strong);
-}
-
-.level[data-completed="true"] .status {
-	color: var(--color-success);
-}
-
-.level[data-completed="true"] .status::before {
-	background: var(--color-success);
-}
-
-.actions {
-	grid-area: actions;
-	display: flex;
-	align-self: start;
-	gap: .5rem;
-	flex-wrap: wrap;
-}
-
-.actions > a,
-.actions > button {
-	flex: 1;
-	min-height: 52px;
-	text-align: center;
-}
-
-.start {
-	font-size: 1.05rem;
-	border-radius: var(--radius);
-}
-
-.rating {
-	grid-area: rating;
-	align-self: start;
-	padding-top: 16px;
-	border-top: 1px solid var(--color-border);
-}
-
-.ratingButtons {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-}
-
-.ratingButtons button {
-	min-width: 40px;
-	padding: 0;
-	border-radius: 50%;
-}
-
-.ratingButtons button[aria-pressed="true"] {
-	color: var(--color-accent-contrast);
-	background: var(--color-accent);
-	border-color: var(--color-accent);
-}
-
-.ratingMessage {
-	margin-top: 10px;
-	font-size: 0.92rem;
-	font-weight: 600;
-	color: var(--color-accent-soft-text);
-}
-
-@media (max-width: 700px) {
-	.backdrop[open] {
-		align-items: flex-end;
-		padding: 0;
-	}
-
-	.sheet {
-		width: 100%;
-		max-height: 92vh;
-		border-radius: var(--radius-large) var(--radius-large) 0 0;
-		animation: slideUp 0.3s ease-out;
-	}
-
-	.sheet {
-		grid-template-columns: 1fr;
-		grid-template-areas:
-			"media"
-			"about"
-			"play"
-			"rating"
-			"actions";
-		grid-template-rows: none;
-		gap: 16px;
-		padding: 0 0 24px;
-	}
-
-	.media {
-		border-radius: 0;
-	}
-
-	.about,
-	.play,
-	.rating {
-		margin: 0 16px;
-		padding-left: 0;
-	}
-
-	.play {
-		padding-top: 0;
-	}
-
-	.level {
-		padding: 12px 14px;
-	}
-
-	/* Кнопка старта всегда видна внизу листа, даже пока игрок читает сводку */
-	.actions {
-		position: sticky;
-		z-index: 2;
-		bottom: 0;
-		margin-bottom: -24px;
-		padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-		background: var(--color-surface);
-		border-top: 1px solid var(--color-border);
-		box-shadow: 0 -8px 20px rgb(0 0 0 / 0.06);
-	}
-}
-
-@keyframes fadeIn {
-	from {
-		opacity: 0;
-	}
-}
-
-@keyframes popIn {
-	from {
-		opacity: 0;
-		transform: translateY(12px) scale(0.98);
-	}
-}
-
-@keyframes slideUp {
-	from {
-		transform: translateY(40%);
-		opacity: 0.5;
-	}
+.level:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.levelTitle { grid-area: title; font-weight: 700; line-height: 1.25; }
+.status { grid-area: status; font-size: .78rem; color: var(--color-text-muted); }
+.level[data-completed="true"] .status { color: var(--color-success); }
+.bars { grid-area: bars; display: flex; align-items: end; gap: 3px; }
+.bars span { inline-size: 4px; block-size: 7px; border-radius: 2px; background: var(--color-border-strong); }
+.bars span:nth-child(2) { block-size: 11px; }
+.bars span:nth-child(3) { block-size: 15px; }
+.bars[data-difficulty="1"] span:nth-child(1), .bars[data-difficulty="2"] span:nth-child(-n + 2), .bars[data-difficulty="3"] span { background: var(--color-accent); }
+.actions { display: grid; gap: .55rem; }
+.actions > :is(a,button) { min-block-size: 46px; text-align: center; }
+.start { font-weight: 750; }
+.rating { border-block-start: 1px solid var(--color-border); }
+.rating legend { padding-inline-end: .6rem; font-size: .85rem; }
+.ratingButtons { display: flex; flex-wrap: wrap; gap: .3rem; }
+.ratingButtons button { flex: 1; min-inline-size: 42px; min-block-size: 44px; padding: .3rem; }
+.ratingButtons button[aria-pressed="true"] { color: white; background: var(--color-accent); }
+.ratingMessage { margin-block-start: .55rem; color: var(--color-accent-soft-text); font-size: .85rem; }
+@media (min-width: 46rem) {
+	.backdrop[open] { align-items: center; padding: 1.5rem; }
+	.sheet { max-inline-size: 61rem; max-block-size: calc(100dvh - 3rem); grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 0; border-radius: var(--radius-large); }
+	.about { padding: clamp(1.35rem, 3vw, 2.2rem); }
+	.controls { padding: 4.55rem clamp(1rem, 2.6vw, 2rem) 1.75rem; border-block-start: 0; border-inline-start: 1px solid var(--color-border); }
 }

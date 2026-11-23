@@ -1,212 +1,104 @@
-/* Библиотека игр: заголовок с фильтром форматов и лента широких карточек (обложка слева, описание справа). */
-
 .header {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: flex-end;
-	justify-content: space-between;
-	gap: 16px 24px;
+	display: grid;
+	gap: 1.5rem;
 }
 
 .filters {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px;
-	padding: 4px;
-	background: var(--color-surface);
-	border: 1px solid var(--color-border);
-	border-radius: 999px;
+	gap: .375rem;
+	padding-block: 1rem;
+	border-block: 1px solid var(--color-border);
 }
 
-.filter,
-.filter:hover:not(:disabled) {
-	min-height: 34px;
-	padding: 6px 14px;
-	font-size: 0.9rem;
-	font-weight: 600;
+.filter, .filter:hover:not(:disabled) {
+	min-block-size: 44px;
+	padding: .5rem 1.1rem;
+	font-size: .9rem;
 	color: var(--color-text-muted);
 	background: transparent;
-	border: none;
+	border: 1px solid transparent;
 	border-radius: 999px;
 }
 
-.filter:hover:not(:disabled) {
-	color: var(--color-text);
-	background: var(--color-surface-muted);
-}
-
-.filter[aria-pressed="true"],
-.filter[aria-pressed="true"]:hover:not(:disabled) {
-	color: var(--color-accent-contrast);
-	background: var(--color-accent);
+.filter:hover:not(:disabled) { background: var(--color-surface-muted); }
+.filter[aria-pressed="true"], .filter[aria-pressed="true"]:hover {
+	color: white;
+	background: var(--color-heading);
 }
 
 .feed {
-	display: flex;
-	flex-direction: column;
-	gap: 20px;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+	gap: clamp(1rem, 2.4vw, 2rem);
 }
 
 .card {
-	display: grid;
-	grid-template-columns: minmax(0, 44%) minmax(0, 1fr);
-	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	block-size: 100%;
+	min-inline-size: 0;
+	container: game-card / inline-size;
+	color: var(--color-text);
 	background: var(--color-surface);
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-large);
 	box-shadow: var(--shadow-card);
-	transition:
-		transform 0.2s ease,
-		box-shadow 0.2s ease,
-		border-color 0.2s ease;
-	animation: cardIn 0.4s ease-out both;
 }
 
-.card:hover {
-	border-color: var(--color-border-strong);
-	box-shadow: var(--shadow-raised);
-	transform: translateY(-2px);
-}
-
-/* Обложка чуть приближается при наведении на карточку */
-.card:hover .cover img {
-	transform: scale(1.04);
-}
-
+.card:focus-within { border-color: var(--color-accent); }
 .cover {
 	position: relative;
-	cursor: pointer;
+	aspect-ratio: 1.65;
+	overflow: clip;
+	border-radius: var(--radius-large) var(--radius-large) 0 0;
+	background: var(--color-surface-muted);
 }
 
-.cover > div {
-	height: 100%;
-	min-height: 240px;
-}
+.cover img { object-fit: cover; }
+.cover > div { block-size: 100%; }
 
 .info {
 	display: flex;
 	flex-direction: column;
-	gap: 10px;
-	padding: 24px 26px;
+	flex: 1;
+	min-inline-size: 0;
+	gap: .9rem;
+	padding: clamp(1.1rem, 6cqi, 1.85rem);
 }
-
-.info h2 {
-	font-size: 1.45rem;
-}
-
-.badges {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-}
-
-.badge {
-	padding: 3px 10px;
-	font-size: 0.78rem;
+.info h2 { font-size: clamp(1.45rem, 6.6cqi, 2.1rem); line-height: 1.07; }
+.badges { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.badge, .duration {
+	font-size: .75rem;
 	font-weight: 700;
-	color: var(--color-accent-soft-text);
+	line-height: 1.25;
+}
+.badge {
+	padding: .35rem .55rem;
 	background: var(--color-accent-soft);
-	border-radius: 999px;
+	color: var(--color-accent-soft-text);
+	border-radius: .35rem;
 }
-
-.badgeWarning {
-	color: var(--color-warning-text);
-	background: var(--color-warning-bg);
-}
-
-.description {
-	color: var(--color-text-muted);
-}
-
+.badgeWarning { color: var(--color-warning-text); background: var(--color-warning-bg); }
+.duration { color: var(--color-text-muted); }
+.duration::before { content: "·"; margin-inline-end: .5rem; }
+.description { color: var(--color-text-muted); line-height: 1.55; }
 .footer {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	justify-content: space-between;
-	gap: 12px 16px;
-	margin-top: auto;
-	padding-top: 14px;
-	border-top: 1px solid var(--color-border);
+	gap: 1rem;
+	padding-block-start: 1.15rem;
+	margin-block-start: auto;
+	border-block-start: 1px solid var(--color-border);
 }
-
-.progress {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-	font-size: 0.88rem;
-	font-weight: 600;
-	color: var(--color-text-muted);
-}
-
-.progressDots {
-	display: flex;
-	gap: 4px;
-}
-
-.progressDots span {
-	width: 28px;
-	height: 6px;
-	border-radius: 999px;
-	background: var(--color-surface-muted);
-	border: 1px solid var(--color-border);
-}
-
-.progressDots span[data-done="true"] {
-	background: var(--color-accent);
-	border-color: var(--color-accent);
-}
-
-.play {
-	min-width: 140px;
-	min-height: 46px;
-	font-size: 1rem;
-	border-radius: var(--radius);
-}
-
-/* Карточки ленты появляются по очереди */
-.feed li:nth-child(2) .card {
-	animation-delay: 0.06s;
-}
-
-.feed li:nth-child(3) .card {
-	animation-delay: 0.12s;
-}
-
-.feed li:nth-child(n + 4) .card {
-	animation-delay: 0.18s;
-}
-
-@media (max-width: 760px) {
-	.card {
-		grid-template-columns: 1fr;
-	}
-
-	.cover > div {
-		height: auto;
-		min-height: 0;
-	}
-
-	.info {
-		padding: 18px 16px 18px;
-	}
-
-	.info h2 {
-		font-size: 1.25rem;
-	}
-
-	.play {
-		flex: 1 1 100%;
-	}
-
-	.filters {
-		width: 100%;
-		border-radius: var(--radius);
-	}
-}
-
-@keyframes cardIn {
-	from {
-		opacity: 0;
-		transform: translateY(10px);
-	}
+.progress { display: grid; gap: .45rem; color: var(--color-text-muted); font-size: .75rem; }
+.progressDots { display: flex; gap: .2rem; }
+.progressDots span { inline-size: 1.6rem; block-size: .25rem; border-radius: .15rem; background: var(--color-border); }
+.progressDots span[data-done="true"] { background: var(--color-accent); }
+.play { min-block-size: 44px; }
+.play::after { content: "→"; margin-inline-start: .5rem; }
+@container game-card (max-width: 17rem) {
+	.play { flex: 1 0 100%; }
 }

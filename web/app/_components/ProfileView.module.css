@@ -1,5 +1,22 @@
 /* Личная страница: карточка соответствия профессиям с полосками, пройденные уровни и ачивки. */
 
+.profileHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 1.75rem;
+	padding: clamp(1.35rem, 4vw, 3rem);
+	background: #262b4b;
+	color: #fff;
+	border-radius: var(--radius-large);
+}
+.profileTitle, .identity { min-inline-size: 0; }
+.profileHeader h1 { margin-block-end: 1rem; color: white; }
+.summary { display: flex; flex-wrap: wrap; gap: clamp(1rem, 3vw, 2.75rem); }
+.summary > div { display: flex; flex-direction: column-reverse; border-inline-start: 1px solid #ffffff40; padding-inline-start: 1rem; }
+.summary dt { font-size: .78rem; color: #d7d9f0; }
+.summary dd { font-size: clamp(1.85rem, 3vw, 3rem); font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .identity {
 	display: flex;
 	align-items: center;
@@ -14,8 +31,8 @@
 	align-self: flex-start;
 	padding: 6px 14px 6px 6px;
 	font-weight: 600;
-	background: var(--color-surface);
-	border: 1px solid var(--color-border);
+	background: #ffffff12;
+	border: 1px solid #ffffff40;
 	border-radius: 999px;
 	overflow-wrap: anywhere;
 	min-width: 0;
@@ -35,7 +52,9 @@
 }
 
 .analysis h2 {
-	margin-bottom: 18px;
+	padding-block-end: 1rem;
+	margin-block-end: 1.25rem;
+	border-block-end: 1px solid var(--color-border);
 }
 
 .professions {
@@ -95,7 +114,7 @@
 }
 
 .bar {
-	height: 10px;
+	height: 7px;
 	overflow: hidden;
 	background: var(--color-surface-muted);
 	border-radius: 999px;
@@ -120,7 +139,7 @@
 }
 
 .profession[data-top="true"] .barFill {
-	background: linear-gradient(90deg, var(--color-accent), var(--color-highlight));
+	background: var(--color-accent);
 }
 
 .columns {
@@ -130,8 +149,10 @@
 }
 
 .columns h2 {
-	margin-bottom: 12px;
-	font-size: 1.1rem;
+	padding-block-end: .9rem;
+	margin-block-end: 1rem;
+	border-block-end: 1px solid var(--color-border);
+	font-size: 1.25rem;
 }
 
 .columns ul {
@@ -232,6 +253,7 @@
 }
 
 .rating select {
+	min-block-size: 44px;
 	font: inherit;
 	padding: 6px 8px;
 	border: 1px solid var(--color-border-strong);

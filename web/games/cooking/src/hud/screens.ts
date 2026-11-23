@@ -100,7 +100,13 @@ export function createScreens(deps: ScreensDeps): Screens {
 	startButton.setAttribute("autofocus", "");
 	const startActions = createElement("div", { className: "hud-start-actions" });
 	startActions.append(startButton);
-	start.dialog.append(prologue, dayLabel, dayGoal, startGoal, rules, controlsSection, startActions);
+	const startHeader = createElement("header", { className: "hud-start-header" });
+	startHeader.append(dayLabel, start.title, prologue);
+	const briefing = createElement("section", { className: "hud-briefing" });
+	briefing.append(startGoal, dayGoal, rules);
+	const startBody = createElement("div", { className: "hud-start-body" });
+	startBody.append(briefing, controlsSection);
+	start.dialog.append(startHeader, startBody, startActions);
 
 	// Подсказки рецептов открываются до смены. Для reduced motion <picture> подставляет неподвижный постер вместо GIF.
 	// Картинки всех шагов начинают грузиться сразу, пока игрок читает стартовый экран (hud/tutorialPreload.ts).
@@ -183,7 +189,7 @@ export function createScreens(deps: ScreensDeps): Screens {
 	const pauseActions = createElement("div", { className: "hud-dialog__actions" });
 	const resumeButton = createButton(hudTexts.pause.resume, "hud-button--primary");
 	resumeButton.setAttribute("autofocus", "");
-	const exitButton = createButton("×", "hud-button--secondary hud-icon-button");
+	const exitButton = createButton(hudTexts.pause.exit, "hud-button--secondary");
 	exitButton.setAttribute("aria-label", hudTexts.pause.exit);
 	exitButton.title = hudTexts.pause.exit;
 	pauseActions.append(resumeButton, exitButton);

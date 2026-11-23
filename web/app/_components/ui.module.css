@@ -1,42 +1,39 @@
-/* Общие блоки страниц портала: заголовок страницы, карточка, пометка о локальных данных, пустое состояние. */
-
 .page {
 	display: flex;
 	flex-direction: column;
-	gap: 24px;
+	gap: clamp(22px, 3vw, 38px);
 }
 
 .pageHeader {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
+	display: grid;
+	gap: 10px;
 }
 
 .pageHeader h1 {
-	margin-bottom: 0;
+	margin: 0;
 }
 
 .lead {
-	max-width: 68ch;
-	font-size: 1.05rem;
+	max-width: 64ch;
+	font-size: clamp(1rem, 1.4vw, 1.14rem);
+	line-height: 1.6;
 	color: var(--color-text-muted);
 }
 
 .card {
-	padding: 24px;
+	min-width: 0;
+	padding: clamp(16px, 2.4vw, 32px);
 	background: var(--color-surface);
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius);
-	box-shadow: var(--shadow-card);
 }
 
-/* Пометка о том, что данные хранятся только в браузере */
 .note {
 	display: flex;
 	align-items: flex-start;
-	gap: 10px;
+	gap: 12px;
 	padding: 12px 16px;
-	font-size: 0.92rem;
+	font-size: .9rem;
 	color: var(--color-text-muted);
 	background: var(--color-surface-muted);
 	border-radius: var(--radius-small);
@@ -45,15 +42,15 @@
 .note::before {
 	content: "";
 	flex: none;
-	width: 8px;
-	height: 8px;
-	margin-top: 0.5em;
+	width: 7px;
+	height: 7px;
+	margin-top: .54em;
 	border-radius: 50%;
 	background: var(--color-accent);
 }
 
 .empty {
-	padding: 32px 24px;
+	padding: clamp(24px, 4vw, 48px);
 	text-align: center;
 	color: var(--color-text-muted);
 	background: var(--color-surface);
@@ -61,16 +58,5 @@
 	border-radius: var(--radius);
 }
 
-.sectionTitle {
-	margin-bottom: 12px;
-}
-
-@media (max-width: 600px) {
-	.page {
-		gap: 18px;
-	}
-
-	.card {
-		padding: 18px;
-	}
-}
+.empty h2 { margin-bottom: 8px; }
+.sectionTitle { margin-bottom: 14px; }

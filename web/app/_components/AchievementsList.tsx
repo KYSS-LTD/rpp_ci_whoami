@@ -15,16 +15,22 @@ export function AchievementsList() {
 
 	return (
 		<section className={ui.page}>
-			<div className={ui.pageHeader}>
-				<h1>{commonTexts.achievementsTitle}</h1>
-				<p className={ui.lead}>{commonTexts.achievementsIntro}</p>
+			<div className={styles.header}>
+				<div className={ui.pageHeader}>
+					<h1>{commonTexts.achievementsTitle}</h1>
+					<p className={ui.lead}>{commonTexts.achievementsIntro}</p>
+				</div>
+				<div className={styles.collectionCount}>
+					<strong>{awarded.length}<small> / {achievementDefinitions.length}</small></strong>
+					<span>{commonTexts.awardsCount}</span>
+				</div>
 			</div>
 			<ul className={styles.list}>
 				{achievementDefinitions.map((definition) => {
 					const awardedItem = awarded.find((item) => item.id === definition.id);
 					return (
 						<li key={definition.id} className={styles.item} data-awarded={Boolean(awardedItem)} data-illustrated={Boolean(definition.icon)}>
-							{definition.icon ? <Image src={definition.icon} className={styles.icon} alt="" width={56} height={56} unoptimized /> : null}
+							{definition.icon ? <Image src={definition.icon} className={styles.icon} alt="" width={80} height={80} unoptimized /> : null}
 							<h2>{definition.title}</h2>
 							<p className={styles.description}>{definition.description}</p>
 							{awardedItem ? (

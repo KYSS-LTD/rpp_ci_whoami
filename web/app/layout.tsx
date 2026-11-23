@@ -22,9 +22,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
 	return (
 		<html lang="ru" className={mainFont.variable}>
 			<body>
+				<a className="skip-link" href="#main-content">{commonTexts.skipNavigation}</a>
 				<SiteHeader />
 				<StorageWarning />
-				<main>{children}</main>
+				<main id="main-content" tabIndex={-1}>{children}</main>
 				<SiteFooter />
 			</body>
 		</html>

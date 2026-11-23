@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { create_FleetModel, fleet } from './fleet.js';
 import { text } from './text.js';
-import { bind_Click, glyphs, query } from './ui.js';
+import { bind_Click, query } from './ui.js';
 
 const copy = text.free;
 const difficulties = ['easy', 'normal', 'hard'];
@@ -14,9 +14,12 @@ export function mount_FreeMenu({ mount, signal, screen, select, start, exit, has
 	const title = block ? text.stages[current].title : options ? copy.flightSetup : copy.title;
 	const cards = text.stages.map((stage, index) => {
 		const item = copy.blocks[index];
+		const photo = stage.id === 'flight' ? new URL('./assets/map-canyon.webp', import.meta.url).href
+			: new URL(`./assets/${stage.id}-lesson.jpg`, import.meta.url).href;
 		return `<button type="button" class="free-tile" data-screen="${stage.id}">
-			<span class="free-glyph" aria-hidden="true">${glyphs[stage.id]}</span><span><strong>${item.title}</strong><small>${item.detail}</small></span>
-			<span class="free-chevron" aria-hidden="true">›</span></button>`;
+			<span class="exercise-image"><img src="${photo}" alt="" width="320" height="180"></span>
+			<span class="exercise-copy"><strong>${item.title}</strong><small>${item.detail}</small></span>
+			<span class="free-chevron" aria-hidden="true">↗</span></button>`;
 	}).join('');
 	const radio = (name, id, label, detail, selected, visual) => `<label class="free-option"><input type="radio" name="${name}" value="${id}" ${id === selected ? 'checked' : ''}>
 		<span aria-hidden="true">${visual}</span><span><strong>${label}</strong>${detail ? `<small>${detail}</small>` : ''}</span></label>`;
@@ -39,13 +42,14 @@ export function mount_FreeMenu({ mount, signal, screen, select, start, exit, has
 				${Object.entries(copy.cameras).map(([id, label]) => `<option value="${id}" ${id === freeOptions.camera ? 'selected' : ''}>${label}</option>`).join('')}
 			</select></label>
 		</div></div>`;
-	mount(`<section class="free-page">
-		<header class="free-header"><div><p class="micro">${text.brand}</p><h1 tabindex="-1">${title}</h1></div>
+	mount(`<section class="free-page" data-menu="${screen ?? 'home'}">
+		<div class="flight-brandbar"><span class="flight-brand"><i aria-hidden="true"></i>${text.brand}</span><span class="game-name">${text.game}</span>
 			<button type="button" class="button button-quiet icon-button" id="free-back" aria-label="${screen ? copy.back : text.toHub}" title="${screen ? copy.back : text.toHub}">${screen ? '‹' : '×'}</button>
-		</header>
-		${options ? optionsMarkup : block ? `<p>${copy.pickDifficulty}</p><fieldset class="free-difficulties"><legend class="sr-only">${copy.pickDifficulty}</legend>
+		</div><header class="free-header"><div><h1 tabindex="-1">${title}</h1>
+			${options ? '' : `<p>${block ? copy.pickDifficulty : copy.intro}</p>`}</div></header>
+		${options ? optionsMarkup : block ? `<fieldset class="free-difficulties"><legend class="sr-only">${copy.pickDifficulty}</legend>
 			${difficulties.map((id, index) => radio('difficulty', id, text.difficulty[id].title, '', 'easy', ['▁', '▁▃', '▁▃▆'][index])).join('')}</fieldset>` :
-			`<p>${copy.intro}</p><div class="free-blocks">${cards}</div>`}
+			`<div class="free-blocks">${cards}</div>`}
 		${screen ? `<div class="free-launch"><button type="button" class="button button-primary" id="free-start"><span aria-hidden="true">▶</span><span id="free-start-label">${copy.start}</span></button></div>` : ''}
 	</section>`);
 	bind_Click('#free-back', () => screen ? select(null) : exit(), signal);
@@ -90,11 +94,11 @@ export function mount_FreeMenu({ mount, signal, screen, select, start, exit, has
 
 function create_Selection() {
 	const scene = new THREE.Scene();
-	scene.background = new THREE.Color(0x2b3c35);
+	scene.background = new THREE.Color(0x35475a);
 	const camera = new THREE.PerspectiveCamera(37, 1, .1, 24);
 	camera.position.set(1.8, 2.0, -2.5);
 	camera.lookAt(0, .1, 0);
-	scene.add(new THREE.HemisphereLight(0xfaffec, 0x7eaaa4, 2.7));
+	scene.add(new THREE.HemisphereLight(0xe6f4ff, 0x8e9fb0, 2.7));
 	const light = new THREE.DirectionalLight(0xffead0, 3.1);
 	light.position.set(-2, 6, -3);
 	scene.add(light);

@@ -64,7 +64,7 @@ export function SiteHeader() {
 						<Image unoptimized src="/brand/logo.png" alt="" width={36} height={36} />
 						{commonTexts.siteName}
 					</Link>
-					<nav aria-label="Основная навигация" className={styles.nav}>
+					<nav aria-label={commonTexts.navLabel} className={styles.nav}>
 						{/* При cacheComponents адрес страницы уровня с неизвестными параметрами известен только при запросе,
 						    поэтому чтение адреса обёрнуто в Suspense, а до него показываются ссылки без выделения. */}
 						<Suspense fallback={<NavigationList activePath={null} />}>
@@ -74,9 +74,11 @@ export function SiteHeader() {
 					<button
 						type="button"
 						className={styles.resetButton}
+						title={commonTexts.resetButton}
 						onClick={() => setIsResetOpen(true)}
 					>
-						{commonTexts.resetButton}
+						<span aria-hidden="true" className={styles.resetIcon}>↺</span>
+						<span>{commonTexts.resetButton}</span>
 					</button>
 				</div>
 			</header>

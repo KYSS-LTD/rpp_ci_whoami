@@ -7,13 +7,11 @@
 <html lang="ru">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 		<title>Город будущего</title>
 		<link rel="stylesheet" href="style.css" />
 	</head>
 	<body>
-		<div id="scene"></div>
-
 		<div id="loading" class="loading">
 			<span class="spinner"></span>
 			<span data-text="loading"></span>
@@ -21,7 +19,7 @@
 
 		<header class="hud" hidden>
 			<div class="goal">
-				<strong id="level-title"></strong>
+				<div class="project-title"><h1 data-text="name"></h1><strong id="level-title"></strong></div>
 				<span id="goal"></span>
 			</div>
 			<dl class="stats">
@@ -31,13 +29,16 @@
 			</dl>
 		</header>
 
-		<p id="hint" class="hint" hidden></p>
+		<main id="scene"></main>
 
 		<footer class="toolbar" hidden>
+			<p id="hint" class="hint" role="status" hidden></p>
+			<div class="tool-deck">
 			<div class="tools" id="tools"></div>
 			<div class="actions">
 				<button type="button" id="exit" class="secondary" data-text="exit"></button>
 				<button type="button" id="finish" class="primary" data-text="finish"></button>
+			</div>
 			</div>
 		</footer>
 

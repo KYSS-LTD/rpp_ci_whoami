@@ -122,3 +122,8 @@
 		animation: none;
 	}
 }
+
+.note { padding: .85rem; background: #fcf6df; border: 1px solid #bcaa80; border-block-start: 5px solid #426551; border-radius: 3px 3px 8px 8px; box-shadow: 0 8px 23px #202c2499; font: .91rem/1.43 system-ui,sans-serif; }
+.noteHeader { color: #304c3c; font: 700 1rem/1.2 Georgia,serif; }
+.buttons button { min-block-size: 44px; padding-inline: .78rem; color: #fffae7; background: #315747; border: 1px solid #244538; border-radius: 4px; }
+.buttons button:hover:not(:disabled) { background: #416452; }

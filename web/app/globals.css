@@ -1,106 +1,81 @@
-/* Глобальные стили портала: цветовые переменные (светлая и тёмная тема), базовые элементы и общие кнопки.
-   Раскладка конкретных экранов лежит в CSS-модулях рядом с компонентами.
-   Переменные можно использовать и в играх: так игра выглядит в одном стиле с порталом. */
-
-/* Палитра: зелёный акцент, светлые карточки с тонкой зелёной рамкой и тёплый жёлтый как второй акцент. */
+/* Общая палитра портала и встроенных игр. */
 :root {
-	/* Фон страницы и поверхности карточек */
-	--color-bg: #f3f7f4;
+	--color-bg: #f8f7f3;
 	--color-surface: #ffffff;
-	--color-surface-muted: #ebf3ee;
-	--color-border: #d3e4d9;
-	--color-border-strong: #a9cbb5;
-
-	/* Текст: основной, второстепенный и цвет заголовков */
-	--color-text: #16241c;
-	--color-text-muted: #55675c;
-	--color-heading: #17573a;
-
-	/* Акцент (кнопки, ссылки, выделение) */
-	--color-accent: #23784a;
-	--color-accent-hover: #1b6440;
+	--color-surface-muted: #efefe9;
+	--color-border: #deded7;
+	--color-border-strong: #b8bdc8;
+	--color-text: #222b42;
+	--color-text-muted: #515b6c;
+	--color-heading: #19243d;
+	--color-accent: #374bb3;
+	--color-accent-hover: #253995;
 	--color-accent-contrast: #ffffff;
-	--color-accent-soft: #e0f0e6;
-	--color-accent-soft-text: #17573a;
-	/* Глубокий зелёный для широких цветных полос и подвала */
-	--color-accent-deep: #124a30;
-	/* Второй, тёплый акцент: монеты, медали, подсветки */
-	--color-highlight: #f0c419;
-	--gradient-brand: linear-gradient(135deg, #124a30 0%, #23784a 55%, #4aa86c 100%);
-
-	/* Статусы */
-	--color-success: #1d7a45;
-	--color-success-soft: #dcf2e4;
-	--color-danger: #b42318;
-	--color-danger-hover: #912018;
-	--color-danger-soft: #fde4e2;
-	--color-warning-bg: #fff4d1;
-	--color-warning-text: #6b4b00;
-	--color-warning-border: #f0d27a;
-
-	/* Цвета рейтинга дипломов */
-	--color-bronze: #b0703a;
-	--color-bronze-soft: #f6e6d8;
-	--color-silver: #7d8798;
-	--color-silver-soft: #e8ebf0;
-	--color-gold: #c99400;
-	--color-gold-soft: #fbf0c9;
-
-	/* Форма и глубина */
-	--radius-small: 10px;
-	--radius: 14px;
-	--radius-large: 22px;
-	--shadow-card: 0 1px 2px rgb(18 74 48 / 0.05), 0 6px 20px rgb(18 74 48 / 0.06);
-	--shadow-raised: 0 16px 44px rgb(18 74 48 / 0.2);
-	--focus-ring: 0 0 0 3px rgb(35 120 74 / 0.35);
-
-	/* Ширина контента */
-	--content-width: 1080px;
-
+	--color-accent-soft: #e7eafb;
+	--color-accent-soft-text: #34469b;
+	--color-accent-deep: #192642;
+	--color-highlight: #e6ad47;
+	--gradient-brand: linear-gradient(125deg, #1c2a49, #324b88 65%, #5368bd);
+	--color-success: #287254;
+	--color-success-soft: #e0f2e8;
+	--color-danger: #a9312f;
+	--color-danger-hover: #8d2525;
+	--color-danger-soft: #fbe7e3;
+	--color-warning-bg: #fff2d6;
+	--color-warning-text: #684714;
+	--color-warning-border: #dfc176;
+	--color-bronze: #925729;
+	--color-bronze-soft: #f7e7d7;
+	--color-silver: #5b6575;
+	--color-silver-soft: #e9ecf1;
+	--color-gold: #916b10;
+	--color-gold-soft: #faf0ca;
+	--radius-small: 9px;
+	--radius: 16px;
+	--radius-large: 24px;
+	--shadow-card: 0 4px 18px rgb(23 33 59 / 7%);
+	--shadow-raised: 0 18px 64px rgb(18 30 56 / 20%);
+	--focus-ring: 0 0 0 3px rgb(70 93 195 / 32%);
+	--content-width: 1264px;
+	--page-gutter: clamp(16px, 3.8vw, 48px);
 	color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--color-bg: #0b130f;
-		--color-surface: #121d17;
-		--color-surface-muted: #192920;
-		--color-border: #23372b;
-		--color-border-strong: #34513f;
-
-		--color-text: #e4efe8;
-		--color-text-muted: #97ab9e;
-		--color-heading: #9fdcb5;
-
-		--color-accent: #4cba78;
-		--color-accent-hover: #66c98d;
-		--color-accent-contrast: #06140c;
-		--color-accent-soft: #1a3a28;
-		--color-accent-soft-text: #a8e6bf;
-		--color-accent-deep: #0f3322;
-		--color-highlight: #f2c94c;
-		--gradient-brand: linear-gradient(135deg, #0f3322 0%, #1d6a41 60%, #3a9a5e 100%);
-
-		--color-success: #5fd08c;
-		--color-success-soft: #173323;
-		--color-danger: #f87171;
-		--color-danger-hover: #fca5a5;
-		--color-danger-soft: #3b1a1a;
-		--color-warning-bg: #3a2d0b;
-		--color-warning-text: #f8dc8a;
-		--color-warning-border: #6b5414;
-
-		--color-bronze: #d9925a;
-		--color-bronze-soft: #3a2616;
-		--color-silver: #b9c2d0;
-		--color-silver-soft: #2a2f3a;
-		--color-gold: #f2c53d;
-		--color-gold-soft: #3a3010;
-
-		--shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.25);
-		--shadow-raised: 0 16px 44px rgb(0 0 0 / 0.55);
-		--focus-ring: 0 0 0 3px rgb(76 186 120 / 0.45);
-
+		--color-bg: #151a25;
+		--color-surface: #202736;
+		--color-surface-muted: #293141;
+		--color-border: #394152;
+		--color-border-strong: #5b667a;
+		--color-text: #e4e8f4;
+		--color-text-muted: #b1bacb;
+		--color-heading: #f3f2f5;
+		--color-accent: #b4c2ff;
+		--color-accent-hover: #cdd6ff;
+		--color-accent-contrast: #192440;
+		--color-accent-soft: #303e60;
+		--color-accent-soft-text: #c4d0ff;
+		--color-accent-deep: #101826;
+		--color-highlight: #f2c574;
+		--gradient-brand: linear-gradient(125deg, #1a2741, #2b3f6f 65%, #424f92);
+		--color-success: #8bdcb0;
+		--color-success-soft: #1c3c30;
+		--color-danger: #ffaba0;
+		--color-danger-hover: #ffc9c2;
+		--color-danger-soft: #4b2b2c;
+		--color-warning-bg: #42361d;
+		--color-warning-text: #f5d79c;
+		--color-warning-border: #7d673e;
+		--color-bronze: #eab58b;
+		--color-bronze-soft: #49362d;
+		--color-silver: #c3cbda;
+		--color-silver-soft: #333d4c;
+		--color-gold: #eaca72;
+		--color-gold-soft: #433b27;
+		--shadow-card: 0 5px 20px rgb(0 0 0 / 16%);
+		--shadow-raised: 0 20px 60px rgb(0 0 0 / 42%);
+		--focus-ring: 0 0 0 3px rgb(163 182 255 / 50%);
 		color-scheme: dark;
 	}
 }
@@ -141,7 +116,7 @@ main {
 	width: 100%;
 	max-width: var(--content-width);
 	margin: 0 auto;
-	padding: 32px 20px 40px;
+	padding: clamp(24px, 3.35vw, 48px) var(--page-gutter) clamp(44px, 5.5vw, 80px);
 }
 
 /* Заголовки и текст */
@@ -155,7 +130,8 @@ h3 {
 }
 
 h1 {
-	font-size: clamp(1.75rem, 1.35rem + 1.6vw, 2.4rem);
+	font-size: clamp(2.05rem, 4.3vw, 3.7rem);
+	letter-spacing: -.055em;
 	font-weight: 800;
 	margin-bottom: 8px;
 }
@@ -185,7 +161,7 @@ button {
 	align-items: center;
 	justify-content: center;
 	gap: 8px;
-	min-height: 40px;
+	min-height: 44px;
 	padding: 8px 16px;
 	font: inherit;
 	font-size: 0.95rem;
@@ -218,8 +194,8 @@ button:disabled {
 }
 
 :focus-visible {
-	outline: none;
-	box-shadow: var(--focus-ring);
+	outline: 2px solid var(--color-accent);
+	outline-offset: 2px;
 }
 
 a:focus-visible {
@@ -268,7 +244,7 @@ fieldset {
 	align-items: center;
 	justify-content: center;
 	gap: 8px;
-	min-height: 40px;
+	min-height: 44px;
 	padding: 8px 18px;
 	font-size: 0.95rem;
 	font-weight: 600;
@@ -320,10 +296,19 @@ button.button-secondary:hover:not(:disabled) {
 	border: 0;
 }
 
-@media (max-width: 600px) {
-	main {
-		padding: 20px 16px 48px;
-	}
+.skip-link {
+	position: fixed;
+	z-index: 120;
+	inset: 8px auto auto var(--page-gutter);
+	padding: 12px 20px;
+	color: var(--color-accent-contrast);
+	background: var(--color-accent);
+	border-radius: var(--radius-small);
+	transform: translateY(-180%);
+}
+
+.skip-link:focus-visible {
+	transform: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

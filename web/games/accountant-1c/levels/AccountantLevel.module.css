@@ -129,3 +129,16 @@
 	box-shadow: 0 1px 0 #1b1512;
 	transform: translateY(3px);
 }
+
+.newspaper { padding: clamp(.8rem,2vw,1.3rem); color: #342f25; }
+.newsDate { font: .75rem/1.3 ui-monospace,Consolas,monospace; letter-spacing: .08em; text-transform: uppercase; border-color: #827962; }
+.headline { margin-block: .52rem .75rem; font: 750 clamp(1.5rem,2.7vw,2.4rem)/1.01 Georgia,Cambria,serif; letter-spacing: -.045em; text-wrap: balance; }
+.newsColumns { font: .91rem/1.42 Georgia,Cambria,serif; text-align: start; gap: .8rem; }
+.letter { padding: .85rem 1rem; color: #344034; font: .92rem/1.5 system-ui,sans-serif; }
+.letterSubject { font: 700 1.35rem/1.15 Georgia,Cambria,serif; }
+.level .bigButton { min-height: 44px; padding: .56rem .95rem; color: #fff7e0; background: #305448; border: 1px solid #213f34; border-radius: 4px; box-shadow: 0 2px #213f34; font: 650 .88rem/1.25 system-ui,sans-serif; }
+.level .bigButton:hover:not(:disabled) { background: #416655; }
+@container desk (width < 350px) {
+	.newsColumns { grid-template-columns: minmax(0,1fr); gap: .4rem; }
+	.newsColumns p + p { padding: 0; border: none; }
+}

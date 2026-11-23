@@ -1,92 +1,29 @@
-/* Ачивки: сетка карточек. Полученные с золотой медалью, закрытые приглушены и с замком. */
-
-.list {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-	gap: 16px;
-}
-
+.header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 1.25rem; }
+.collectionCount { display: grid; gap: .1rem; border-inline-start: 3px solid var(--color-accent); padding-inline-start: 1rem; }
+.collectionCount strong { font-size: 1.9rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.collectionCount small { font-size: 1.15rem; color: var(--color-text-muted); }
+.collectionCount span { font-size: .8rem; color: var(--color-text-muted); }
+.list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15.5rem), 1fr)); gap: 1rem; }
 .item {
-	display: grid;
-	grid-template-columns: auto 1fr;
-	align-content: start;
-	gap: 4px 14px;
-	padding: 18px;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: .65rem;
+	padding: clamp(1.1rem, 2.2vw, 1.65rem);
 	background: var(--color-surface);
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius);
 	box-shadow: var(--shadow-card);
 }
-
-/* Значок слева: золотая медаль у полученной ачивки */
-.item::before {
-	content: "";
-	grid-row: 1 / span 3;
-	width: 44px;
-	height: 44px;
-	border-radius: 50%;
-	background: radial-gradient(circle at 35% 30%, #fff6c8 0 16%, var(--color-gold) 58%);
-	box-shadow: 0 0 0 4px var(--color-gold-soft);
+.icon { display: block; object-fit: contain; inline-size: 4.75rem; block-size: 4.75rem; margin-block-end: .45rem; }
+.item[data-awarded="false"] .icon { filter: saturate(.6); }
+.item[data-awarded="true"] { border-color: var(--color-gold); }
+.item[data-illustrated="false"]::before {
+	content: "★"; display: grid; place-items: center; inline-size: 4.75rem; block-size: 4.75rem; border-radius: 50%;
+	color: var(--color-gold); background: var(--color-gold-soft); font-size: 2.1rem;
 }
-
-.item h2 {
-	align-self: center;
-	font-size: 1.05rem;
-}
-
-.description {
-	color: var(--color-text-muted);
-	font-size: 0.92rem;
-}
-
-.date {
-	justify-self: start;
-	margin-top: 6px;
-	padding: 2px 10px;
-	font-size: 0.8rem;
-	font-weight: 600;
-	color: var(--color-success);
-	background: var(--color-success-soft);
-	border-radius: 999px;
-}
-
-.item[data-awarded="false"] {
-	align-items: center;
-	background: transparent;
-	border-style: dashed;
-	border-color: var(--color-border-strong);
-	box-shadow: none;
-}
-
-.item[data-awarded="false"] h2 {
-	color: var(--color-text-muted);
-}
-
-/* Замок у закрытой ачивки: дужка рисуется рамкой, корпус фоном */
-.item[data-awarded="false"]::before {
-	background:
-		linear-gradient(var(--color-text-muted), var(--color-text-muted)) center 62% / 18px 13px no-repeat,
-		radial-gradient(circle at 50% 42%, transparent 0 5px, var(--color-text-muted) 5.5px 8px, transparent 8.5px) center 28% / 22px 22px no-repeat,
-		var(--color-surface-muted);
-	box-shadow: none;
-	opacity: 0.8;
-}
-
-.item[data-illustrated="true"]::before {
-	content: none;
-}
-
-.icon {
-	grid-row: 1 / span 3;
-	align-self: start;
-	object-fit: contain;
-}
-
-.item[data-awarded="false"] .icon {
-	filter: saturate(.65);
-}
-
-.locked {
-	color: var(--color-text-muted);
-	font-size: .8rem;
-}
+.item h2 { font-size: 1.18rem; }
+.description { color: var(--color-text-muted); line-height: 1.48; font-size: .94rem; }
+.date, .locked { margin-block-start: auto; padding-block-start: .7rem; inline-size: 100%; border-block-start: 1px solid var(--color-border); font-size: .78rem; font-weight: 650; }
+.date { color: var(--color-success); }
+.locked { color: var(--color-text-muted); }

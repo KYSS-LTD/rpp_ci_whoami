@@ -804,3 +804,10 @@
 .stampTray .trayCancel:hover:not(:disabled) {
 	background: rgb(255 255 255 / 0.1);
 }
+
+.formTitle { font: 700 clamp(1rem,2.2vw,1.35rem)/1.15 Georgia,Cambria,serif; color: #294d3d; }
+.monitorForm, .programForm { gap: .65rem; }
+.table { font-size: .875rem; }
+.table th, .table td { padding: .42rem .56rem; }
+.table tbody tr:nth-child(even):not([data-current="true"]) { background-color: #f8f6ea; }
+.instruction { font-size: .85rem; line-height: 1.4; }

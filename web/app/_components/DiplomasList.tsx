@@ -6,6 +6,8 @@ import { buildCertificateFileName, buildCertificateHtml, type Diploma } from "@/
 import { commonTexts } from "@/texts/common";
 import { diplomasTexts } from "@/texts/diplomas";
 import { useProgressVersion } from "../_hooks/useProgressVersion";
+import Link from "next/link";
+import { profileTexts } from "@/texts/profile";
 import { downloadTextFile } from "./downloadFile";
 import styles from "./DiplomasList.module.css";
 import ui from "./ui.module.css";
@@ -35,7 +37,13 @@ export function DiplomasList() {
 			<div className={ui.pageHeader}>
 				<h1>{diplomasTexts.title}</h1>
 			</div>
-			{diplomas.length === 0 ? <p className={ui.empty}>{diplomasTexts.empty}</p> : null}
+			{diplomas.length === 0 ? (
+				<div className={styles.empty}>
+					<span className={styles.medal} aria-hidden="true" />
+					<p>{diplomasTexts.empty}</p>
+					<Link href="/games" className="button-primary">{profileTexts.play}</Link>
+				</div>
+			) : null}
 			{gameIds.map((gameId) => {
 				const gameTitle = gameRegistry.games.find((game) => game.manifest.gameId === gameId)?.manifest.title ?? gameId;
 				const gameDiplomas = diplomas.filter((diploma) => diploma.gameId === gameId);

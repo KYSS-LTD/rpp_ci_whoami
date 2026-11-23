@@ -2,6 +2,7 @@
 
 export const profileTexts = {
 	title: "Мой профиль",
+	levelsCount: "Уровней пройдено",
 	nameMissing: "Имя не введено",
 	addName: "Добавить имя",
 	editName: "Изменить имя",

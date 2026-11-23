@@ -18,7 +18,8 @@
 .dialog::backdrop {
 	overflow: hidden;
 	overscroll-behavior: contain;
-	background: rgb(8 20 14 / 0.6);
+	background: rgb(18 24 44 / .64);
+	backdrop-filter: blur(4px);
 }
 
 .dialog p {

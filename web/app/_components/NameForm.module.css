@@ -5,7 +5,7 @@
 	flex-direction: column;
 	gap: 10px;
 	width: 100%;
-	max-width: 480px;
+	max-width: 40rem;
 	margin: 0;
 }
 
@@ -13,6 +13,13 @@
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
+}
+.form input { min-inline-size: 0; inline-size: 100%; min-block-size: 46px; }
+@media (min-width: 40rem) {
+	.form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+	.label, .hint, .error { grid-column: 1 / -1; }
+	.form input { grid-column: 1; grid-row: 3; }
+	.form .submit { grid-column: 2; grid-row: 3; margin: 0; min-block-size: 46px; }
 }
 
 .label {

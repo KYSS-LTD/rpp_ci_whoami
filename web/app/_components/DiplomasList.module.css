@@ -1,98 +1,55 @@
-/* Дипломы: группа на игру, внутри карточки с медалью цвета рейтинга (бронза, серебро, золото). */
-
-.game {
-	display: flex;
-	flex-direction: column;
-	gap: 14px;
-}
-
-.list {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-	gap: 16px;
-}
-
-.diploma {
-	/* Цвет рейтинга по умолчанию: бронза. Ниже переопределяется по data-rating. */
+.game { display: grid; gap: 1.1rem; }
+.game h2 { padding-block-end: .8rem; border-block-end: 1px solid var(--color-border); }
+.list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); gap: 1rem; }
+.diploma, .empty {
 	--rating-color: var(--color-bronze);
 	--rating-soft: var(--color-bronze-soft);
-
 	position: relative;
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
-	padding: 20px;
-	overflow: hidden;
+	align-items: flex-start;
+	gap: .65rem;
+	padding: clamp(1.45rem, 3vw, 2.5rem);
 	background: var(--color-surface);
 	border: 1px solid var(--color-border);
-	border-top: 4px solid var(--rating-color);
 	border-radius: var(--radius);
 	box-shadow: var(--shadow-card);
 }
-
-.diploma[data-rating="silver"] {
-	--rating-color: var(--color-silver);
-	--rating-soft: var(--color-silver-soft);
-}
-
-.diploma[data-rating="gold"] {
-	--rating-color: var(--color-gold);
-	--rating-soft: var(--color-gold-soft);
-}
-
-/* Мягкая подсветка цветом рейтинга в углу карточки */
-.diploma::before {
+.diploma::before, .empty::before {
 	content: "";
 	position: absolute;
-	top: -90px;
-	right: -90px;
-	width: 220px;
-	height: 220px;
-	border-radius: 50%;
-	background: radial-gradient(circle, var(--rating-soft) 0 35%, transparent 70%);
+	inset: .4rem;
+	border: 1px solid var(--rating-soft);
+	border-radius: calc(var(--radius) - .3rem);
 	pointer-events: none;
 }
-
-.diploma > * {
-	position: relative;
-}
-
-/* Медаль: круг с бликом цвета рейтинга */
+.diploma[data-rating="silver"] { --rating-color: var(--color-silver); --rating-soft: var(--color-silver-soft); }
+.diploma[data-rating="gold"], .empty { --rating-color: var(--color-gold); --rating-soft: var(--color-gold-soft); }
 .medal {
-	align-self: flex-start;
-	position: relative;
-	width: 44px;
-	height: 44px;
-	margin-bottom: 6px;
+	display: grid;
+	place-items: center;
+	inline-size: 3.4rem;
+	block-size: 3.4rem;
+	margin-block-end: .5rem;
+	background: repeating-conic-gradient(var(--rating-soft) 0deg 8deg, var(--rating-color) 8deg 11deg);
+	border: 1px solid var(--rating-color);
 	border-radius: 50%;
-	background: radial-gradient(circle at 35% 30%, rgb(255 255 255 / 0.7) 0 14%, var(--rating-color) 55%);
-	box-shadow:
-		0 0 0 4px var(--rating-soft),
-		inset 0 -3px 0 rgb(0 0 0 / 0.12);
 }
-
-.level {
-	font-size: 1.1rem;
-	font-weight: 650;
-}
-
-.detail {
-	font-size: 0.92rem;
-	color: var(--color-text-muted);
-}
-
-.rating {
-	align-self: flex-start;
-	padding: 3px 10px;
-	font-size: 0.82rem;
-	font-weight: 650;
-	color: var(--color-text);
+.medal::before {
+	content: "✦";
+	display: grid;
+	place-items: center;
+	inline-size: 2.45rem;
+	block-size: 2.45rem;
 	background: var(--rating-soft);
-	border: 1px solid color-mix(in srgb, var(--rating-color) 50%, transparent);
-	border-radius: 999px;
+	color: var(--rating-color);
+	border: 1px solid currentColor;
+	border-radius: 50%;
+	font-size: 1.5rem;
 }
-
-.certificate {
-	width: 100%;
-	margin-top: 8px;
-}
+.level { font-size: 1.22rem; font-weight: 720; }
+.detail { color: var(--color-text-muted); font-size: .92rem; overflow-wrap: anywhere; }
+.rating { font-size: .82rem; font-weight: 700; padding: .25rem .6rem; color: var(--color-text); background: var(--rating-soft); border-radius: .35rem; }
+.certificate { inline-size: 100%; min-block-size: 44px; margin-block-start: .55rem; }
+.empty { gap: 1.25rem; align-items: center; justify-content: center; min-block-size: 17rem; text-align: center; }
+.empty p { max-inline-size: 32ch; color: var(--color-text-muted); }

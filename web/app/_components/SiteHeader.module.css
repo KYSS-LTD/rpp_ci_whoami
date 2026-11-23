@@ -1,70 +1,67 @@
-/* Шапка сайта: название, навигация и кнопка сброса. На телефоне навигация переносится на вторую строку. */
-
 .header {
 	position: sticky;
 	top: 0;
 	z-index: 10;
-	background: color-mix(in srgb, var(--color-surface) 92%, transparent);
-	border-bottom: 2px solid var(--color-accent);
-	backdrop-filter: saturate(1.4) blur(10px);
-	-webkit-backdrop-filter: saturate(1.4) blur(10px);
+	border-bottom: 1px solid var(--color-border);
+	background: color-mix(in srgb, var(--color-bg) 96%, transparent);
+	backdrop-filter: blur(14px);
 }
 
 .inner {
 	display: flex;
 	align-items: center;
-	gap: 8px 24px;
+	gap: clamp(12px, 3.5vw, 54px);
 	max-width: var(--content-width);
-	margin: 0 auto;
-	padding: 12px 20px;
+	margin-inline: auto;
+	padding: 11px var(--page-gutter);
 }
 
 .brand {
 	display: inline-flex;
-	align-items: center;
-	gap: 10px;
 	flex: none;
-	font-weight: 800;
-	font-size: 1.08rem;
-	letter-spacing: -0.01em;
+	align-items: center;
+	gap: 9px;
+	min-height: 44px;
 	color: var(--color-heading);
+	font-size: 1.42rem;
+	font-weight: 800;
+	letter-spacing: -.07em;
 }
 
 .brand img {
+	width: 33px;
+	height: 33px;
 	padding: 4px;
-	border-radius: 50%;
-	background: var(--color-accent-deep);
 	object-fit: contain;
+	border-radius: 9px;
+	background: #314799;
 }
 
 .nav {
 	flex: 1;
-	min-width: 0;
 }
 
 .navList {
 	display: flex;
-	flex-wrap: wrap;
-	gap: 4px;
+	align-items: center;
+	gap: clamp(1px, .5vw, 8px);
 }
 
 .navLink {
 	display: inline-flex;
 	align-items: center;
-	min-height: 36px;
-	padding: 6px 12px;
-	font-size: 0.95rem;
-	font-weight: 600;
+	min-height: 44px;
+	padding-inline: clamp(9px, 1.2vw, 18px);
+	border-radius: 9px;
+	font-size: .94rem;
+	font-weight: 650;
+	white-space: nowrap;
 	color: var(--color-text-muted);
-	border-radius: var(--radius-small);
-	transition:
-		background-color 0.15s,
-		color 0.15s;
 }
 
 .navLink:hover {
-	color: var(--color-text);
 	background: var(--color-surface-muted);
+	color: var(--color-heading);
 }
 
 .navLink[aria-current="page"] {
@@ -73,60 +70,46 @@
 }
 
 .resetButton {
-	flex: none;
-	min-height: 36px;
-	padding: 6px 14px;
-	font-size: 0.9rem;
-	color: var(--color-danger);
+	min-height: 44px;
+	padding-inline: 12px;
+	color: var(--color-text-muted);
+	font-size: .8rem;
+	font-weight: 650;
+	border-color: transparent;
 	background: transparent;
-	border-color: var(--color-border-strong);
+}
+
+.resetIcon {
+	font: 1.4rem/1 Arial, sans-serif;
 }
 
 .resetButton:hover:not(:disabled) {
 	color: var(--color-danger);
 	background: var(--color-danger-soft);
-	border-color: var(--color-danger);
 }
 
-@media (max-width: 760px) {
-	.inner {
-		flex-wrap: wrap;
-		justify-content: space-between;
-		gap: 6px 8px;
-		padding: 10px 16px 6px;
+@media (max-width: 780px) {
+	.inner { gap: 8px; }
+	.resetButton span:last-child {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
 	}
+	.resetButton { width: 44px; padding: 0; }
+}
 
-	/* Навигация уходит на отдельную строку под названием и кнопкой */
-	.nav {
-		order: 3;
-		flex-basis: 100%;
-	}
+@media (max-width: 590px) {
+	.inner { flex-wrap: wrap; justify-content: space-between; gap: 1px 8px; padding-block: 4px; }
+	.brand { font-size: 1.25rem; }
+	.brand img { width: 29px; height: 29px; }
+	.nav { flex: 0 0 100%; order: 3; }
+	.navList { justify-content: space-between; }
+	.navLink { min-height: 44px; padding-inline: clamp(6px, 2.4vw, 12px); font-size: .84rem; }
+}
 
-	.navList {
-		gap: 0;
-		margin-inline: -6px;
-	}
-
-	.navLink {
-		min-height: 34px;
-		padding: 4px 6px;
-		font-size: 0.85rem;
-	}
-
-	.brand {
-		gap: 8px;
-		font-size: 0.9rem;
-	}
-
-	.brand img {
-		width: 24px;
-		height: 24px;
-		padding: 3px;
-	}
-
-	.resetButton {
-		min-height: 32px;
-		padding: 4px 9px;
-		font-size: 0.8rem;
-	}
+@media (max-height: 520px) {
+	.header { position: static; }
 }

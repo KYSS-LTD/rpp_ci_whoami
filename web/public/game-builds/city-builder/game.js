@@ -93,7 +93,7 @@ function fillStaticTexts() {
 // Создаёт рендерер. Без WebGL игра сообщает порталу об ошибке, и портал покажет экран с повтором.
 function createRenderer() {
 	try {
-		renderer = new THREE.WebGLRenderer({ antialias: true });
+		renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 	} catch (error) {
 		bridge.reportError(`${texts.webglError}: ${error instanceof Error ? error.message : String(error)}`);
 		return false;
@@ -107,7 +107,6 @@ function createRenderer() {
 
 function createScene() {
 	scene = new THREE.Scene();
-	scene.background = new THREE.Color(0xdcefe3);
 
 	camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
 	camera.position.set(12, 13, 12);
@@ -381,11 +380,17 @@ function buildToolbar() {
 		button.type = "button";
 		button.className = "tool";
 		button.dataset.tool = tool;
-		button.textContent = texts.tools[tool];
+		const label = document.createElement("span");
+		label.className = "tool-label";
+		label.textContent = texts.tools[tool];
+		const symbol = document.createElement("i");
+		symbol.className = "tool-icon";
+		symbol.setAttribute("aria-hidden", "true");
+		button.append(symbol,label);
 		if (buildingTypes[tool]) {
 			const price = document.createElement("small");
 			price.textContent = `${buildingTypes[tool].cost} ${texts.costSuffix}`;
-			button.appendChild(price);
+			label.appendChild(price);
 		}
 		button.addEventListener("click", () => {
 			state.tool = tool;
@@ -395,19 +400,17 @@ function buildToolbar() {
 	}
 }
 
-// Доля высоты кадра под карту: сверху панель показателей, снизу панель инструментов.
-const mapHeightShare = 0.56;
-
-// Камера охватывает всю карту при любом размере фрейма и оставляет место под панели.
-// Изометрическая карта N x N занимает примерно N * 1.42 по ширине и N * 0.82 по высоте кадра.
+// Заголовок и инструменты занимают собственные строки. Камера подстраивается под оставшееся поле.
 function resize() {
-	const width = window.innerWidth;
-	const height = window.innerHeight;
+	const area = renderer.domElement.parentElement;
+	const width = area.clientWidth;
+	const height = area.clientHeight;
+	if (!width || !height) return;
 	renderer.setSize(width, height, false);
 	const aspect = width / height;
 	const gridSize = state.settings ? state.settings.gridSize : 8;
-	const halfHeightForMap = (gridSize * 0.82) / 2 / mapHeightShare;
-	const halfWidthForMap = (gridSize * 1.42) / 2 / 0.96;
+	const halfHeightForMap = (gridSize * .86 + 2.6) / 2;
+	const halfWidthForMap = (gridSize * 1.42) / 2 / .90;
 	const halfHeight = Math.max(halfHeightForMap, halfWidthForMap / aspect);
 	camera.left = -halfHeight * aspect;
 	camera.right = halfHeight * aspect;
@@ -476,7 +479,7 @@ function init() {
 	resize();
 	renderer.setAnimationLoop(animate);
 
-	window.addEventListener("resize", resize);
+	new ResizeObserver(resize).observe(renderer.domElement.parentElement);
 	renderer.domElement.addEventListener("pointermove", handlePointerMove);
 	renderer.domElement.addEventListener("pointerdown", handlePointerDown);
 	renderer.domElement.addEventListener("pointerleave", () => {

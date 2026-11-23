@@ -37,6 +37,24 @@ afterEach(() => {
 });
 
 describe("превью игры в карточке", () => {
+	it.each([undefined, "/career/flight.webp"])("проигрывает анимацию поверх обложки %s только по отдельной кнопке", (poster) => {
+		mockMatchMedia(true);
+		const onOpen = vi.fn();
+		const animation = "/game-previews/demo/flight.webp";
+		const { container } = render(<GamePreview frames={frames} title="Демо" animation={animation}
+			variant="card" poster={poster} onOpen={onOpen} />);
+		const image = () => decodeURIComponent(container.querySelector("img")!.src);
+		expect(image()).toContain(poster ?? frames[0]);
+		expect(container.innerHTML).not.toContain(animation);
+		fireEvent.click(screen.getByRole("button", { name: gamesTexts.playPreview }));
+		expect(image()).toContain(animation);
+		fireEvent.click(screen.getByRole("button", { name: gamesTexts.pausePreview }));
+		expect(image()).toContain(poster ?? frames[0]);
+		expect(onOpen).not.toHaveBeenCalled();
+		fireEvent.click(screen.getByRole("button", { name: "Демо" }));
+		expect(onOpen).toHaveBeenCalledOnce();
+	});
+
 	it("кадры сменяются сами через время показа кадра", () => {
 		mockMatchMedia(false);
 		const { container } = render(<GamePreview frames={frames} title="Демо" variant="stage" />);

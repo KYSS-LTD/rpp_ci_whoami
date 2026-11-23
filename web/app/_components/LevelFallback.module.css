@@ -6,7 +6,8 @@
 	align-items: center;
 	gap: 14px;
 	width: 100%;
-	max-width: 560px;
+	max-width: 40rem;
+	padding: clamp(1.35rem, 4vw, 3rem);
 	margin: 24px auto 0;
 	text-align: center;
 }

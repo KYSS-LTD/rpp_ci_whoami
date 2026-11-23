@@ -1,4 +1,5 @@
 import { gameRegistry } from "@/core/registry";
+import { Suspense } from "react";
 import { ClientOnly } from "../_components/ClientOnly";
 import { GamesList } from "../_components/GamesList";
 
@@ -6,7 +7,9 @@ import { GamesList } from "../_components/GamesList";
 export default function GamesPage() {
 	return (
 		<ClientOnly>
-			<GamesList games={gameRegistry.games.map((game) => game.manifest)} />
+			<Suspense fallback={null}>
+				<GamesList games={gameRegistry.games.map((game) => game.manifest)} />
+			</Suspense>
 		</ClientOnly>
 	);
 }

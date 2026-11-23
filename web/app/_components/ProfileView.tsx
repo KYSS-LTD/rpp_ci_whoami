@@ -8,6 +8,7 @@ import { readAwardedAchievements, readGameRatings, readLevelResults, readPlayerN
 import { bestCompletedAttempts, bestPracticeAttempts, computeProfessionScores, isValidRating } from "@/core/analysis";
 import { uavTexts } from "@/games/uav-operator/texts";
 import { profileTexts } from "@/texts/profile";
+import { commonTexts } from "@/texts/common";
 import { professionNames } from "@/texts/professions";
 import { useProgressVersion } from "../_hooks/useProgressVersion";
 import { NameForm } from "./NameForm";
@@ -39,24 +40,30 @@ export function ProfileView() {
 
 	return (
 		<section className={ui.page}>
-			<div className={ui.pageHeader}>
-				<h1>{profileTexts.title}</h1>
-				<div className={styles.identity}>
-					<p className={styles.player}>{playerName || profileTexts.nameMissing}</p>
-					<button ref={editNameButton} type="button" className="button-secondary" aria-expanded={editingName} onClick={() => {
-						setNameSaved(false);
-						setEditingName(!editingName);
-					}}>
-						{editingName ? profileTexts.cancelNameEdit : playerName ? profileTexts.editName : profileTexts.addName}
-					</button>
-					<p className="visually-hidden" role="status">{nameSaved ? profileTexts.nameSaved : ""}</p>
+			<div className={styles.profileHeader}>
+				<div className={styles.profileTitle}>
+					<h1>{profileTexts.title}</h1>
+					<div className={styles.identity}>
+						<p className={styles.player}>{playerName || profileTexts.nameMissing}</p>
+						<button ref={editNameButton} type="button" className="button-secondary" aria-expanded={editingName} onClick={() => {
+							setNameSaved(false);
+							setEditingName(!editingName);
+						}}>
+							{editingName ? profileTexts.cancelNameEdit : playerName ? profileTexts.editName : profileTexts.addName}
+						</button>
+						<p className="visually-hidden" role="status">{nameSaved ? profileTexts.nameSaved : ""}</p>
+					</div>
 				</div>
-				{editingName ? <NameForm initialName={playerName} onSaved={() => {
-					setEditingName(false);
-					setNameSaved(true);
-					editNameButton.current?.focus();
-				}} /> : null}
+				<dl className={styles.summary}>
+					<div><dt>{profileTexts.levelsCount}</dt><dd>{completedAttempts.length}</dd></div>
+					<div><dt>{commonTexts.awardsCount}</dt><dd>{awarded.length}</dd></div>
+				</dl>
 			</div>
+			{editingName ? <NameForm initialName={playerName} onSaved={() => {
+				setEditingName(false);
+				setNameSaved(true);
+				editNameButton.current?.focus();
+			}} /> : null}
 			<p role="note" className={ui.note}>
 				{profileTexts.localAnalysisNotice}
 			</p>

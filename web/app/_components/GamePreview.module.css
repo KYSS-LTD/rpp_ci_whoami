@@ -31,12 +31,24 @@
 
 @media (prefers-reduced-motion: reduce) {
 	.stage .frame[data-active="true"] img { animation: none; }
-	.motionToggle { display: none !important; }
 }
 
 .card .frame img {
 	transition: transform 0.6s ease;
 }
+
+.card .coverAction, .card .coverAction:hover:not(:disabled) {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	inline-size: 100%;
+	block-size: 100%;
+	padding: 0;
+	background: transparent;
+	border: 0;
+	box-shadow: none;
+}
+.coverAction:focus-visible { outline-offset: -5px; }
 
 .motionToggle, .motionToggle:hover:not(:disabled) {
 	position: absolute;
@@ -46,7 +58,7 @@
 	height: 44px;
 	padding: 0;
 	border-color: rgb(255 255 255 / 0.38);
-	background: rgb(15 24 19 / 0.83);
+	background: rgb(24 30 50 / .9);
 	color: white;
 	border-radius: 50%;
 }
@@ -63,11 +75,11 @@
 	position: absolute;
 	z-index: 2;
 	left: 50%;
-	bottom: 12px;
+	bottom: 8px;
 	display: flex;
-	gap: 6px;
-	padding: 6px 8px;
-	background: rgb(0 0 0 / 0.35);
+	gap: 0;
+	padding: 0 4px;
+	background: rgb(22 27 44 / .8);
 	border-radius: 999px;
 	transform: translateX(-50%);
 	backdrop-filter: blur(6px);
@@ -76,12 +88,14 @@
 
 .dot,
 .dot:hover:not(:disabled) {
-	width: 8px;
+	display: grid;
+	place-items: center;
+	width: 44px;
 	min-width: 0;
-	height: 8px;
+	height: 44px;
 	min-height: 0;
 	padding: 0;
-	background: rgb(255 255 255 / 0.5);
+	background: transparent;
 	border: none;
 	border-radius: 999px;
 	transition:
@@ -89,7 +103,15 @@
 		background-color 0.25s;
 }
 
-.dot[aria-pressed="true"] {
+.dot::before {
+	content: "";
+	width: 8px;
+	height: 8px;
+	background: rgb(255 255 255 / .55);
+	border-radius: 1rem;
+}
+
+.dot[aria-pressed="true"]::before {
 	width: 22px;
 	background: #ffffff;
 }

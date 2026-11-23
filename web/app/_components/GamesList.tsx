@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { readGameRatings, readLevelResults, saveGameRating } from "@/core/progress";
 import { gameFormats, type GameFormat, type GameManifest, type LevelId } from "@/core/contract/types";
 import { gamesTexts } from "@/texts/games";
@@ -17,6 +18,12 @@ interface GamesListProps {
 // Значение фильтра: все игры или один формат.
 type FormatFilter = "all" | GameFormat;
 
+const covers: Record<string, string> = {
+	"uav-operator": "/career/flight.webp",
+	"accountant-1c": "/career/finance.webp",
+	cooking: "/career/kitchen.webp",
+};
+
 // Библиотека игр: лента карточек с фильтром по формату. Кнопка "Играть" открывает карточку игры
 // с превью, сводкой и выбором сложности.
 export function GamesList({ games }: GamesListProps) {
@@ -25,12 +32,18 @@ export function GamesList({ games }: GamesListProps) {
 	const ratings = readGameRatings();
 	const [formatFilter, setFormatFilter] = useState<FormatFilter>("all");
 	const [openGameId, setOpenGameId] = useState<string | null>(null);
+	const linkedGame = useSearchParams()?.get("game");
 	const [ratingMessage, setRatingMessage] = useState("");
 
 	// Стабильная ссылка на функцию закрытия: от неё зависит эффект внутри карточки игры.
 	const closeSheet = useCallback(() => {
 		setOpenGameId(null);
 		setRatingMessage("");
+		const url = new URL(window.location.href);
+		if (url.searchParams.has("game")) {
+			url.searchParams.delete("game");
+			window.history.replaceState(null, "", url);
+		}
 	}, []);
 
 	const completedLevelIds = (gameId: string): LevelId[] =>
@@ -51,7 +64,7 @@ export function GamesList({ games }: GamesListProps) {
 	// Фильтр показывается, только если в библиотеке есть игры разных форматов. Порядок форматов как в контракте.
 	const presentFormats = gameFormats.filter((format) => games.some((game) => game.format === format));
 	const visibleGames = formatFilter === "all" ? games : games.filter((game) => game.format === formatFilter);
-	const openGame = games.find((game) => game.gameId === openGameId);
+	const openGame = games.find((game) => game.gameId === (openGameId ?? linkedGame));
 
 	return (
 		<section data-progress-version={progressVersion} className={ui.page}>
@@ -85,13 +98,15 @@ export function GamesList({ games }: GamesListProps) {
 					return (
 						<li key={game.gameId}>
 							<article className={styles.card} data-in-development={game.inDevelopment ? "true" : "false"}>
-								{/* Клик по обложке тоже открывает карточку игры; с клавиатуры для этого есть кнопка "Играть" */}
-								<div className={styles.cover} onClick={() => setOpenGameId(game.gameId)}>
-									<GamePreview animation={game.preview?.animation} frames={game.preview?.frames ?? []} title={game.title} variant="card" priority={gameIndex < 2} />
+								<div className={styles.cover}>
+									<GamePreview frames={game.preview?.frames ?? []} animation={game.preview?.animation}
+										poster={covers[game.gameId]} title={game.title} variant="card" priority={gameIndex < 3}
+										onOpen={() => setOpenGameId(game.gameId)} />
 								</div>
 								<div className={styles.info}>
 									<div className={styles.badges}>
 										{game.format ? <span className={styles.badge}>{gamesTexts.formats[game.format]}</span> : null}
+										{game.estimatedMinutes ? <span className={styles.duration}>{game.estimatedMinutes} {gamesTexts.minutesSuffix}</span> : null}
 										{game.inDevelopment ? (
 											<span className={`${styles.badge} ${styles.badgeWarning}`}>{gamesTexts.inDevelopment}</span>
 										) : null}
@@ -122,6 +137,7 @@ export function GamesList({ games }: GamesListProps) {
 
 			{openGame ? (
 				<GameSheet
+					key={openGame.gameId}
 					game={openGame}
 					completedLevelIds={completedLevelIds(openGame.gameId)}
 					rating={ratings[openGame.gameId]}

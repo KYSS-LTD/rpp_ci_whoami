@@ -451,3 +451,29 @@
 		transition: none;
 	}
 }
+
+.window {
+	--acc-bg: #fffcf2;
+	--acc-panel: #f1eddb;
+	--acc-panel-strong: #e1d7ae;
+	--acc-border: #bfb497;
+	--acc-text: #283a30;
+	--acc-muted: #535e4e;
+	--acc-accent: #993d30;
+	--acc-yellow: #f3cd7a;
+	--acc-yellow-strong: #d5a454;
+	--acc-highlight-soft: #fff1c5;
+}
+.titleBar { color: #fff6df; background: #28493e; border-block-end: 2px solid #b7a16b; gap: .6rem; padding: .38rem .65rem; }
+.appTitle { color: #fff6df; font: 650 1rem/1.2 system-ui,sans-serif; }
+.appMark { inline-size: .9rem; block-size: .9rem; border-radius: 2px; background: #e2bd75; border: 0; box-shadow: inset 0 -3px #b59252; }
+.window .closeWindow { border-radius: 4px; background: #3a584c; border: 1px solid #a6b09d; }
+.tabs { background: #eee8d4; }
+.tabActive { color: #274637; box-shadow: inset 0 2px #a85735; }
+.section[aria-current="page"] { background: #dfdfc2; box-shadow: inset 3px 0 #3c6554; }
+.form { scroll-padding: .75rem; }
+.window[data-open="true"] .form { padding: clamp(.6rem,1.7vw,1.25rem); }
+.window[data-open="true"] .form :is(button,input,select) { border-radius: 4px; }
+@media (pointer:coarse) {
+	.window[data-open="true"] :is(button,select,input) { min-block-size: 44px; }
+}
