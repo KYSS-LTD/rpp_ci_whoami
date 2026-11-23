@@ -1,6 +1,6 @@
 import { MathUtils, Quaternion, Vector3 } from 'three';
 
-export function create_ChaseCamera(drone, center, distance, obstructed, groundAt = () => -Infinity) {
+export function create_ChaseCamera(drone, center, distance, obstructed, groundAt = () => -Infinity, collision) {
 	const target = new Vector3();
 	const boom = new Vector3();
 	const sample = new Vector3();
@@ -23,12 +23,14 @@ export function create_ChaseCamera(drone, center, distance, obstructed, groundAt
 		boom.set(Math.sin(yaw) * Math.cos(elevation), Math.sin(elevation), Math.cos(yaw) * Math.cos(elevation)).multiplyScalar(distance);
 		// Оставляем зазор для камеры у земли, даже когда игрок поднимает взгляд со стартовой площадки.
 		boom.y = Math.max(boom.y, groundAt(target.x + boom.x, target.z + boom.z) + .28 - target.y);
-		let available = 1;
+		const meshHit = collision?.sweep(target, sample.copy(target).add(boom), .1);
+		let available = meshHit ? Math.max(.001, meshHit.time - .002) : 1;
 		for (let step = 1; step <= 12; step++) {
 			const fraction = step / 12;
+			if (fraction > available) break;
 			sample.copy(target).addScaledVector(boom, fraction);
-			if (sample.y < groundAt(sample.x, sample.z) + fraction * .13 || obstructed(sample.x, sample.y, sample.z)) {
-				available = Math.max(.12, (step - 1) / 12);
+			if (sample.y < groundAt(sample.x, sample.z) + fraction * .13 || obstructed?.(sample.x, sample.y, sample.z)) {
+				available = Math.min(available, Math.max(.12, (step - 1) / 12));
 				break;
 			}
 		}

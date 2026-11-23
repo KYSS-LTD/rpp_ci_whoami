@@ -3,6 +3,7 @@ import { create_BoughGeometry, pine_Material, seeded_Random } from './coast.js';
 import { create_FlightAtmosphere } from './atmosphere.js';
 import { create_Landscape } from './landscape.js';
 import { batch_Scenery } from './scenery-batches.js';
+import { create_SceneryCollision } from './scenery-collision.js';
 import { box, cylinder, group, ring } from './models.js';
 import { text } from './text.js';
 
@@ -44,24 +45,28 @@ function ground_Texture(asset, repeat, colorSpace) {
 }
 
 function add_Terrain(scene, waypoints, race) {
-	const geometry = new THREE.PlaneGeometry(830, 830, 184, 184);
+	const geometry = new THREE.PlaneGeometry(830, 830, 252, 252);
 	geometry.rotateX(-Math.PI / 2);
 	const points = geometry.attributes.position;
 	const color = new THREE.Color();
 	const colors = [];
+	const trackDistance = [];
 	for (let index = 0; index < points.count; index++) {
 		const x = points.getX(index);
 		const z = points.getZ(index);
 		points.setY(index, elevation(x, z));
 		const serviceRoad = Math.exp(-Math.pow((x + 36 + 6 * Math.sin(z * .025)) / 3.2, 2)) * .59;
 		// Цвет маршрута записан в сам рельеф. Дополнительной плоскости поверх травы нет.
-		const lane = (1 - THREE.MathUtils.smoothstep(route_Distance(x, z, waypoints), 2.4, 6.5)) * (race ? .8 : .33);
+		const distance = route_Distance(x, z, waypoints);
+		trackDistance.push(distance);
+		const lane = (1 - THREE.MathUtils.smoothstep(distance, 2.4, 6.5)) * (race ? .8 : .33);
 		const tracks = Math.max(lane, serviceRoad);
 		const patches = .5 + .5 * Math.sin(x * .074 + Math.cos(z * .095) * 2.7) * Math.cos(z * .045 - x * .032);
 		color.setHSL(.22 - tracks * .16, .25 - tracks * .15, .56 + patches * .13 + tracks * .12);
 		colors.push(color.r, color.g, color.b);
 	}
 	geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+	geometry.setAttribute('trackDistance', new THREE.Float32BufferAttribute(trackDistance, 1));
 	geometry.computeVertexNormals();
 	// Grass Ground (Poly Haven, CC0): https://polyhaven.com/a/grass_ground
 	const land = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
@@ -69,18 +74,42 @@ function add_Terrain(scene, waypoints, race) {
 		normalMap: ground_Texture(new URL('./assets/field-grass-normal.webp', import.meta.url).href, 92, THREE.NoColorSpace),
 		normalScale: new THREE.Vector2(.6, .6), vertexColors: true, roughness: .94,
 	}));
+	// Gravel Floor, фотограмметрия Poly Haven (CC0): https://polyhaven.com/a/gravel_floor
+	const gravel = ground_Texture(new URL('./assets/gravel-color.webp', import.meta.url).href, 1, THREE.SRGBColorSpace);
+	const gravelNormal = ground_Texture(new URL('./assets/gravel-normal.webp', import.meta.url).href, 1, THREE.NoColorSpace);
+	land.material.addEventListener('dispose', () => {
+		gravel.dispose();
+		gravelNormal.dispose();
+	});
 	land.material.onBeforeCompile = shader => {
-		shader.vertexShader = 'varying vec2 meadow;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n meadow = position.xz;');
-		shader.fragmentShader = 'varying vec2 meadow;\n' + shader.fragmentShader.replace('#include <map_fragment>', `
+		shader.uniforms.gravel = { value: gravel };
+		shader.uniforms.gravelNormal = { value: gravelNormal };
+		shader.vertexShader = 'attribute float trackDistance; varying float pathDistance; varying vec2 meadow;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n meadow = position.xz; pathDistance = trackDistance;');
+		shader.fragmentShader = 'varying float pathDistance; varying vec2 meadow; uniform sampler2D gravel; uniform sampler2D gravelNormal;\n' + shader.fragmentShader.replace('#include <map_fragment>', `
 			#include <map_fragment>
-			float luma = dot(diffuseColor.rgb, vec3(.22,.68,.10));
-			float variation = sin(meadow.x*.27 + sin(meadow.y*.13)) * cos(meadow.y*.21 + meadow.x*.08);
-			diffuseColor.rgb = mix(diffuseColor.rgb, luma * vec3(.78,1.23,.60), .66 + variation*.18);
-			float lane = abs(meadow.x + 36. + 6. * sin(meadow.y*.025));
-			float wheel = 1. - smoothstep(.16,.47,abs(lane - .91) + variation*.08);
-			diffuseColor.rgb = mix(diffuseColor.rgb, (.07+luma*.8)*vec3(1.25,.99,.68), wheel*.88);
+			float service = abs(meadow.x + 36. + 6. * sin(meadow.y*.025));
+			float wheel = 1. - smoothstep(.18,.60,abs(service - .91));
+			vec2 gravelUv = meadow * vec2(.31,-.31);
+			vec3 aggregate = texture2D(gravel,gravelUv).rgb;
+			float edgeNoise = dot(aggregate, vec3(.5,.36,.14)) * 2.0 + .23*sin(meadow.y*1.9 + meadow.x);
+			float roadway = ${race ? '1.0-smoothstep(2.45,4.15,pathDistance+edgeNoise)' : '0.0'};
+			float roadMix = max(roadway,wheel*.93);
+			float path = 1. - smoothstep(3.0,5.6,pathDistance);
+			float cut = cos(meadow.x*.91 + .06*meadow.y + .5*sin(meadow.y*.03));
+			float pasture = smoothstep(23.,31.,abs(meadow.x+4.))*(1.0-smoothstep(65.,85.,abs(meadow.y+48.)));
+			vec3 fieldColor = mix(vec3(.85,1.27,1.03),vec3(1.64,1.41,.87),pasture*(.65+.16*cut));
+			diffuseColor.rgb *= fieldColor * (1.0 + .10*path*cut);
+			${race ? '' : `vec2 parcel = abs(vec2(meadow.x + 38.0 - .13*(meadow.y-29.),meadow.y-41.8));
+			float grain = (1.-smoothstep(9.8,10.2,parcel.x))*(1.-smoothstep(12.7,13.1,parcel.y));
+			diffuseColor.rgb = mix(diffuseColor.rgb,vec3(.31,.23,.095)*(.85+.13*cut),grain*.84);`}
+			diffuseColor.rgb = mix(diffuseColor.rgb,aggregate*vec3(1.12,.97,.81), roadMix);
+		`).replace('#include <normal_fragment_maps>', `
+			#include <normal_fragment_maps>
+			vec3 gravelRelief = texture2D(gravelNormal,gravelUv).xyz * 2.0 - 1.0;
+			normal = normalize(mix(normal, normalize(tbn * vec3(gravelRelief.xy*.63,gravelRelief.z)), roadMix));
 		`);
 	};
+	land.material.customProgramCacheKey = () => race ? 'gravel-circuit' : 'cut-pasture';
 	land.receiveShadow = true;
 	scene.add(land);
 }
@@ -102,7 +131,7 @@ function add_Windbreak(scene, random, obstacles) {
 		const width = .8 + random() * .56;
 		const angle = random() * Math.PI;
 		const lean = (random() - .5) * .15;
-		obstacles.push({ x, z, radius: 1.62 * scale * width, height: 5.7 * scale, tree: true });
+		obstacles.push({ x, z, radius: 1.62 * scale * width, height: 5.7 * scale });
 		instance.scale.set(scale * width, scale, scale * width);
 		instance.rotation.set(0, angle, lean);
 		instance.position.set(x, y + 2.4 * scale, z);
@@ -126,7 +155,7 @@ function add_Windbreak(scene, random, obstacles) {
 	scene.add(branches, boughs, silhouettes);
 }
 
-function add_Shed(scene, x, z) {
+function add_Shed(scene, x, z, collision) {
 	const shed = group(scene, x, elevation(x, z) - .12, z);
 	box(shed, 0x81614a, 9, 3.0, 6, 0, 1.5);
 	for (const side of [-1, 1]) {
@@ -140,18 +169,19 @@ function add_Shed(scene, x, z) {
 	for (let slat = -8; slat <= 8; slat++) {
 		box(shed, 0x66513e, .048, 2.9, .035, slat * .52, 1.5, -3.01);
 	}
+	collision.add(shed);
 }
 
-function add_FieldLandmarks(scene, obstacles, waypoints, race) {
-	function place(x, z, radius, height) {
+function add_FieldLandmarks(scene, obstacles, waypoints, race, collision) {
+	function place(x, z, radius) {
 		if (route_Distance(x, z, waypoints) < radius + 8 || Math.hypot(x - home.x, z - home.z) < radius + padSize + 3
 			|| obstacles.some(item => Math.hypot(item.x - x, item.z - z) < (item.radius ?? Math.hypot(item.width, item.depth)) + radius + .6)) return null;
-		obstacles.push({ x, z, radius, height });
+		obstacles.push({ x, z, radius });
 		return group(scene, x, elevation(x, z), z);
 	}
 
 	for (const [x, z] of race ? [[-15, 6], [45, -34], [-47, -101], [32, -164]] : [[-13, 8], [26, -14], [-23, -42], [27, -72], [3, -120]]) {
-		const station = place(x, z, 1.4, 6);
+		const station = place(x, z, 1.4);
 		if (!station) continue;
 		cylinder(station, 0x4b514e, .36, .48, .36, 0, .12, 0);
 		cylinder(station, 0xe2dfce, .063, .12, 5.6, 0, 2.8, 0, 8);
@@ -160,10 +190,11 @@ function add_FieldLandmarks(scene, obstacles, waypoints, race) {
 			const wide = .4 - stripe * .039;
 			cylinder(sleeve, stripe % 2 ? 0xffe5ab : 0xda512a, wide, wide - .039, .30, stripe * .30, -stripe * .052, 0, 10).rotation.z = 1.4;
 		}
+		collision.add(station);
 	}
 
 	for (const [x, z, turn] of race ? [[-23, 16, .2], [43, -80, -.35], [-17, -163, .3]] : [[16, 16, -.3], [-33, -26, .3], [38, -61, .5]]) {
-		const shelter = place(x, z, 4, 3.6);
+		const shelter = place(x, z, 4);
 		if (!shelter) continue;
 		shelter.rotation.y = turn;
 		for (const side of [-1, 1]) {
@@ -173,11 +204,12 @@ function add_FieldLandmarks(scene, obstacles, waypoints, race) {
 			box(shelter, 0xc89c59, 1.16, .73, .84, side * 1.28, .35, -.6);
 			box(shelter, 0x836746, 1.24, .1, .91, side * 1.28, .76, -.6);
 		}
+		collision.add(shelter);
 	}
 
 	for (const [x, z] of race ? [[-16, -23], [49, -53], [31, -96], [-51, -138], [26, -142]]
 		: [[-21, 0], [20, -16], [18, -45], [-16, -92], [29, -106], [-31, -116]]) {
-		const station = place(x, z, 2.1, 2.3);
+		const station = place(x, z, 2.1);
 		if (!station) continue;
 		if (race) {
 			for (const side of [-1, 1]) {
@@ -192,6 +224,7 @@ function add_FieldLandmarks(scene, obstacles, waypoints, race) {
 				for (const col of [-1, 0, 1]) box(panel, 0x284c72, .52, .055, 1.46, col * .545, .09);
 			}
 		}
+		collision.add(station);
 	}
 
 	const markers = [];
@@ -209,14 +242,16 @@ function add_FieldLandmarks(scene, obstacles, waypoints, race) {
 		if (obstacles.some(item => Math.hypot(item.x - x, item.z - z) < (item.radius ?? Math.hypot(item.width, item.depth)) + .6)) continue;
 		const y = elevation(x, z);
 		const color = race ? 0xf47732 : 0x5d9db2;
-		box(scene, 0x313c37, .51, .14, .51, x, y + .07, z);
-		cylinder(scene, color, .106, .22, .36, x, y + .32, z, 8);
-		cylinder(scene, 0xffebba, .081, .106, .08, x, y + .54, z, 8);
-		cylinder(scene, color, .045, .081, .12, x, y + .64, z, 8);
+		const cone = group(scene, x,y,z);
+		box(cone, 0x313c37, .51,.14,.51, 0,.07,0);
+		cylinder(cone, color, .106,.22,.36, 0,.32,0, 8);
+		cylinder(cone, 0xffebba, .081,.106,.08, 0,.54,0, 8);
+		cylinder(cone, color, .045,.081,.12, 0,.64,0, 8);
+		collision.add(cone);
 	}
 }
 
-function add_Bales(scene, details, obstacles) {
+function add_Bales(scene, details, obstacles, collision) {
 	const paper = document.createElement('canvas');
 	paper.width = 256;
 	paper.height = 256;
@@ -244,17 +279,81 @@ function add_Bales(scene, details, obstacles) {
 		shape.rotation.z = Math.PI / 2;
 		shape.castShadow = true;
 		bale.add(shape);
+		collision.add(shape);
 		for (const side of [-1, 1]) {
 			for (let radius = .2; radius < .82; radius += .145) {
 				const stripe = ring(bale, 0x937a39, radius, .015, side * .646, 0, 0);
 				stripe.rotation.set(0, Math.PI / 2, 0);
 			}
 		}
-		obstacles.push({ x, z, radius: .9, height: 1.68 });
+		obstacles.push({ x, z, radius: .9 });
 	}
 }
 
-function add_Gate(scene, x, z, height, width, yaw, index, race, finish) {
+function add_GrainField(scene) {
+	const random = seeded_Random(3243);
+	const canvas = document.createElement('canvas');
+	canvas.width = 192;
+	canvas.height = 224;
+	const ctx = canvas.getContext('2d');
+	for (let i=0; i<43; i++) {
+		const foot = 8 + random()*176, height = 116 + random()*91;
+		const head = foot + 6 + random()*13;
+		const y = 223-height;
+		ctx.strokeStyle = i%3 ? '#b39b52' : '#7d813e';
+		ctx.lineWidth = 1.6;
+		ctx.beginPath();
+		ctx.moveTo(foot,224);
+		ctx.quadraticCurveTo(foot+2,140,head,y+22);
+		ctx.stroke();
+		for (const side of [-1,1]) {
+			ctx.fillStyle = i%4 ? '#bda25c' : '#d4b674';
+			for (let grain=0; grain<5; grain++) {
+				const px = head + grain*.3, py = y+grain*3;
+				ctx.beginPath();
+				ctx.ellipse(px+side*1.8,py+1,1.6,4,-side*.46,0,Math.PI*2);
+				ctx.fill();
+				ctx.lineWidth = .65;
+				ctx.beginPath();
+				ctx.moveTo(px+side*2,py);
+				ctx.lineTo(px+side*5,py-10);
+				ctx.stroke();
+			}
+		}
+		ctx.fillStyle = '#8f8d4b';
+		ctx.beginPath();
+		ctx.moveTo(foot+3,183);
+		ctx.quadraticCurveTo(foot-10,163,foot-10,142);
+		ctx.quadraticCurveTo(foot+1,162,foot+3,183);
+		ctx.fill();
+	}
+	const grain = new THREE.CanvasTexture(canvas);
+	grain.colorSpace = THREE.SRGBColorSpace;
+	const straw = new THREE.MeshLambertMaterial({ map: grain, side: THREE.DoubleSide, alphaTest: .37, alphaToCoverage: true });
+	const rows = matchMedia('(pointer: coarse)').matches ? 21 : 30, columns = 32;
+	const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.5,.91), straw, rows*columns*2);
+	const blade = new THREE.Object3D();
+	let index = 0;
+	for (let row=0; row<rows; row++) {
+		for (let col=0; col<columns; col++) {
+			const z = 29 + col*.82 + random()*.16;
+			const x = -48 + row/rows*20 + .13*(z-29) + random()*.13;
+			const h = .80 + .21*random() + .1*Math.cos(col*.5+row*.3);
+			blade.position.set(x,elevation(x,z)+.455*h,z);
+			blade.scale.set(1,h,1);
+			for (let cross=0; cross<2; cross++) {
+				blade.rotation.y = .18 + cross*Math.PI/2 + .16*random();
+				blade.updateMatrix();
+				mesh.setMatrixAt(index++,blade.matrix);
+			}
+		}
+	}
+	mesh.name = 'Ripe wheat';
+	mesh.receiveShadow = true;
+	scene.add(mesh);
+}
+
+function add_Gate(scene, x, z, height, width, yaw, index, race, finish, collision) {
 	const y = elevation(x, z);
 	const gate = group(scene, x, y, z);
 	gate.rotation.y = yaw;
@@ -266,6 +365,27 @@ function add_Gate(scene, x, z, height, width, yaw, index, race, finish) {
 		}
 	}
 	box(gate, accent, width + .29, .32, .29, 0, height);
+	if (race) {
+		const steel = 0xaeb5af;
+		const trussHeight = .48, bays = Math.ceil(width/.7), bay = width/bays;
+		const diagonal = Math.hypot(trussHeight,bay);
+		for (const depth of [-.19,.19]) {
+			for (const rise of [.11, .11 + trussHeight]) {
+				box(gate, steel, width+.4,.075,.075, 0,height+rise,depth);
+			}
+			for (let i=0; i<bays; i++) {
+				const x = (i+.5)*bay-width/2;
+				box(gate,steel,diagonal,.045,.045,x,height+.11+trussHeight*.5,depth).rotation.z = (i%2 ? 1 : -1)*Math.atan2(trussHeight,bay);
+			}
+		}
+		for (const side of [-1,1]) {
+			for (let i=0; i<4; i++) {
+				const curb = box(gate, i%2 ? 0xe1d6b9 : 0xad4128,.56,.13,1.02,side*(width/2+.72),.06,(i-1.5)*1.01);
+				const corner = gate.localToWorld(curb.position.clone());
+				curb.position.y = elevation(corner.x,corner.z)-y+.06;
+			}
+		}
+	}
 	const banner = document.createElement('canvas');
 	banner.width = 192;
 	banner.height = 64;
@@ -292,8 +412,9 @@ function add_Gate(scene, x, z, height, width, yaw, index, race, finish) {
 	const texture = new THREE.CanvasTexture(banner);
 	texture.colorSpace = THREE.SRGBColorSpace;
 	const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.34, .47), new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }));
-	sign.position.set(0, height + .34, 0);
+	sign.position.set(0, height + .34, race ? .24 : 0);
 	gate.add(sign);
+	collision.add(gate);
 	return { x, y, z, height, width, yaw, label: String(index + 1) };
 }
 
@@ -307,10 +428,12 @@ export function gate_Crossing(gate, previous, position, heightOffset = 0) {
 	const x = THREE.MathUtils.lerp(previous.x, position.x, t) - gate.x;
 	const z = THREE.MathUtils.lerp(previous.z, position.z, t) - gate.z;
 	const y = THREE.MathUtils.lerp(previous.y, position.y, t) - gate.y + heightOffset;
-	return Math.abs(x * cosine - z * sine) < gate.width / 2 - .15 && y > .4 && y < gate.height - .16;
+	const span = x * cosine - z * sine;
+	if (gate.contains) return gate.contains(span,y);
+	return Math.abs(span) < gate.width / 2 - .15 && y > .4 && y < gate.height - .16;
 }
 
-function add_Lookout(scene, race) {
+function add_Lookout(scene, race, collision) {
 	const x = race ? 46 : -50, z = race ? -66 : -39;
 	const frame = group(scene, x, elevation(x,z)-.12, z);
 	const height = race ? 5.5 : 11.3, width = race ? 2.1 : 1.55;
@@ -347,23 +470,14 @@ function add_Lookout(scene, race) {
 		beam(0,height,0,2.84,height+.39,-1.4,.1);
 		box(frame,0x90523b,1.24,.88,.06,2.6,height+.72,-1.34);
 	}
-	// Проверяем каждый элемент в его локальных осях, чтобы сохранялись просветы под сооружением.
-	frame.updateMatrixWorld(true);
-	const volumes = [];
-	frame.traverse(mesh => {
-		if (!mesh.isMesh) return;
-		mesh.geometry.computeBoundingBox();
-		volumes.push({ inverse: mesh.matrixWorld.clone().invert(), bounds: mesh.geometry.boundingBox.clone().expandByScalar(.09) });
-	});
-	const probe = new THREE.Vector3();
-	return (px,py,pz) => Math.abs(px-x)<6 && Math.abs(pz-z)<6 &&
-		volumes.some(v=>v.bounds.containsPoint(probe.set(px,py,pz).applyMatrix4(v.inverse)));
+	collision.add(frame);
 }
 
-function add_PracticeLandscape(scene, waypoints, obstacles, race) {
-	const land = create_Landscape(scene, elevation, race ? 3209 : 475);
+function add_PracticeLandscape(scene, waypoints, obstacles, race, collision) {
+	const land = create_Landscape(scene, elevation, race ? 3209 : 475, collision);
 	const random = seeded_Random(race ? 542 : 714);
 	const occupied = [{x:race?46:-50, z:race?-66:-39, r:6}];
+	if (race) occupied.push({x:-22.5,z:-20,r:6.4});
 	const clear = (x,z,r) => route_Distance(x,z,waypoints) > r + (race ? 4.9 : 5.8)
 		&& Math.hypot(x-home.x,z-home.z) > r + 6
 		&& obstacles.every(o => Math.hypot(o.x-x,o.z-z) > r + (o.radius ?? Math.hypot(o.width,o.depth)))
@@ -422,9 +536,7 @@ function add_PracticeLandscape(scene, waypoints, obstacles, race) {
 		land.log(x,z,xx,zz,.32 + random()*.22);
 	}
 	if (race) {
-		land.rock(-19,-20,4.3,3.9,4.6,.2);
-		land.rock(-26,-20,4.7,4.4,4.2,-.3);
-		land.rock(-22.5,-20,10.0,1.32,3.45,0,4.15);
+		land.arch(-22.5,-20,0);
 	}
 	for (let i=0;i<2300;i++) {
 		const x=-100+200*random(), z=-182+246*random();
@@ -437,47 +549,44 @@ function add_PracticeLandscape(scene, waypoints, obstacles, race) {
 
 export function create_Field(race) {
 	const scene = new THREE.Scene();
+	const collision = create_SceneryCollision();
 	const sun = create_FlightAtmosphere(scene, race ? 'race' : 'field');
 	const course = race ? courses.race : courses.field;
 	const waypoints = [[home.x, home.z], ...course];
 	add_Terrain(scene, waypoints, race);
+	if (!race) add_GrainField(scene);
 	const obstacles = [];
 	add_Windbreak(scene, seeded_Random(race ? 88 : 27), obstacles);
+	const windbreak = obstacles.slice();
 	for (const [x, z] of [[-41, -58], [70, -102]]) {
-		add_Shed(scene, x, z);
-		obstacles.push({ x, z, width: 4.5, depth: 3.0, height: 4.5 });
+		add_Shed(scene, x, z, collision);
+		obstacles.push({ x, z, width: 4.5, depth: 3.0 });
 	}
 	add_Bales(scene, race
 		? [[-8, -28], [-10, -28], [30, -57], [28, -57], [5, -88], [7, -88], [-38, -118], [-40, -118]]
-		: [[15, 1], [18, 4], [-18, -17], [-19, -19], [26, -34], [28, -41], [-21, -65], [-25, -62], [6, -81], [4, -83]], obstacles);
-	add_FieldLandmarks(scene, obstacles, waypoints, race);
-	const touchesLookout = add_Lookout(scene,race);
-	const land = add_PracticeLandscape(scene, waypoints, obstacles, race);
+		: [[15, 1], [18, 4], [-18, -17], [-19, -19], [26, -34], [28, -41], [-21, -65], [-25, -62], [6, -81], [4, -83]], obstacles, collision);
+	add_FieldLandmarks(scene, obstacles, waypoints, race, collision);
+	add_Lookout(scene,race,collision);
+	const land = add_PracticeLandscape(scene, waypoints, obstacles, race, collision);
 	const pad = group(scene, home.x, .02, home.z);
 	cylinder(pad, 0x4a5450, padSize, padSize + .06, .14, 0, .03, 0, 36);
 	ring(pad, 0xe6debd, padSize - .22, .045, 0, .105, 0);
 	for (const side of [-1, 1]) box(pad, 0xe6debd, .17, .025, 1.6, side * .49, .105);
 	box(pad, 0xe6debd, .81, .025, .17, 0, .105);
-	const gates = course.map((gate, index) => add_Gate(scene, ...gate, index, race, race && index === course.length - 1));
+	const gates = course.map((gate, index) => add_Gate(scene, ...gate, index, race, race && index === course.length - 1, collision));
 	batch_Scenery(scene);
 	const onPad = (x, z) => Math.hypot(x - home.x, z - home.z) <= padSize;
 	return {
-		scene, sun, gates, limits: bounds, base: home, padRadius: padSize, onPad,
+		scene, sun, gates, collision, limits: bounds, base: home, padRadius: padSize, onPad,
 		flightGround: (x, z) => elevation(x, z) + (onPad(x, z) ? .12 : 0),
 		touchesTree(x, y, z) {
-			if (land.touches(x,y,z) || touchesLookout(x,y,z)) return true;
-			if (obstacles.some(obstacle => {
+			if (land.touches(x,y,z)) return true;
+			return windbreak.some(obstacle => {
 				const dx = Math.abs(x - obstacle.x), dz = Math.abs(z - obstacle.z);
-				if (obstacle.radius ? Math.hypot(dx, dz) > obstacle.radius : dx > obstacle.width || dz > obstacle.depth) return false;
+				const distance = Math.hypot(dx, dz);
+				if (distance > obstacle.radius) return false;
 				const localY = y - elevation(obstacle.x, obstacle.z);
-				return localY > 0 && localY < obstacle.height && (!obstacle.tree || localY > obstacle.height * .47 || Math.hypot(dx, dz) < .42);
-			})) return true;
-			return gates.some(gate => {
-				const dx = x - gate.x, dz = z - gate.z, dy = y - gate.y;
-				const sine = Math.sin(gate.yaw), cosine = Math.cos(gate.yaw);
-				const span = Math.abs(dx * cosine - dz * sine);
-				if (Math.abs(dx * sine + dz * cosine) > .27 || dy < 0 || dy > gate.height + .2) return false;
-				return Math.abs(span - gate.width / 2) < .28 || (span < gate.width / 2 && Math.abs(dy - gate.height) < .23);
+				return localY > 0 && localY < obstacle.height && (localY > obstacle.height * .47 || distance < .42);
 			});
 		},
 	};

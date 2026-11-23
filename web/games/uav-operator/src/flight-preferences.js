@@ -3,7 +3,7 @@ import { query } from './ui.js';
 
 const defaults = { menu: 'KeyP', restart: 'KeyR', map: 'KeyM', action: 'Space' };
 const allowed = ['KeyP', 'KeyR', 'KeyM', 'Space', 'KeyE', 'KeyQ', 'KeyF', 'KeyG', 'KeyH', 'KeyT', 'KeyU', 'KeyX', 'KeyZ', 'Enter'];
-export const flightPreferences = { indicators: true, touchSticks: false, fov: 60, chaseTilt: 0, fpvTilts: new Map(), filter: '6', feeds: { fpv: '1', chase: '0' }, bindings: { ...defaults } };
+export const flightPreferences = { indicators: true, touchSticks: false, fov: 60, chaseTilt: 0, fpvTilts: new Map(), filter: '6', feeds: { fpv: '0', story: '1', chase: '0' }, bindings: { ...defaults } };
 const copy = text.flight;
 
 function keyLabel(code) {
@@ -29,7 +29,7 @@ export function preference_Markup() {
 		</details>`;
 }
 
-export function bind_Preferences(signal, setFov, cameraMode, tiltKey, defaultTilt, onTouchChange) {
+export function bind_Preferences(signal, setFov, cameraMode, tiltKey, defaultTilt, onTouchChange, story) {
 	const checkbox = query('#show-indicators');
 	const fov = query('#camera-fov');
 	const fovValue = query('#camera-fov-value');
@@ -88,7 +88,7 @@ export function bind_Preferences(signal, setFov, cameraMode, tiltKey, defaultTil
 		tilt.min = chase ? '-25' : '-20';
 		tilt.max = chase ? '25' : '60';
 		tilt.value = getTilt();
-		feed.value = flightPreferences.feeds[mode];
+		feed.value = flightPreferences.feeds[story && mode === 'fpv' ? 'story' : mode];
 		syncTilt();
 	}
 	tilt.addEventListener('input', () => {
@@ -96,7 +96,7 @@ export function bind_Preferences(signal, setFov, cameraMode, tiltKey, defaultTil
 		else flightPreferences.fpvTilts.set(tiltKey, tilt.valueAsNumber);
 		syncTilt();
 	}, { signal });
-	feed.addEventListener('change', () => { flightPreferences.feeds[mode] = feed.value; }, { signal });
+	feed.addEventListener('change', () => { flightPreferences.feeds[story && mode === 'fpv' ? 'story' : mode] = feed.value; }, { signal });
 	selectCamera(cameraMode);
 	sync();
 	return { getTilt, selectCamera };

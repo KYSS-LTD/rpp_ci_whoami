@@ -84,7 +84,7 @@ export interface LevelResult {
 	durationSec: number;
 }
 
-export type PracticeActivity = "assembly" | "survey" | "beach" | "field" | "race";
+export type PracticeActivity = "assembly" | "survey" | "beach" | "field" | "race" | "canyon" | "alpine";
 
 export interface PracticeAttempt {
 	gameId: string;

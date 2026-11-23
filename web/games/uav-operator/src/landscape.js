@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { add_StoneArch, create_StoneSurface } from './weathered-stone.js';
 
 const up = new THREE.Vector3(0, 1, 0);
 const tau = Math.PI * 2;
@@ -23,24 +24,12 @@ function limb(from, to, bottom, top, color) {
 	return tint(geometry.translate(center.x, center.y, center.z), color);
 }
 
+// Грозди листьев собраны из атласа Tree Small 02 (Poly Haven, CC0).
 function leaf_Texture() {
-	const paper = document.createElement('canvas');
-	paper.width = paper.height = 192;
-	const ctx = paper.getContext('2d'), random = random_Stream(6219);
-	for (let i = 0; i < 570; i++) {
-		const a = random() * tau;
-		const r = Math.sqrt(random()) * (73 + Math.sin(3 * a) * 8 + Math.cos(5 * a) * 5);
-		const x = 96 + r * Math.cos(a), y = 95 + r * Math.sin(a);
-		const len = 2.8 + random() * 5.2;
-		const value = Math.round(162 + random() * 82 + (98 - y) * .12);
-		ctx.fillStyle = `rgb(${value},${value},${Math.floor(value * .89)})`;
-		ctx.beginPath();
-		ctx.ellipse(x, y, len, len * .52, a + random() * 1.25, 0, tau);
-		ctx.fill();
-	}
-	const texture = new THREE.CanvasTexture(paper);
-	texture.colorSpace = THREE.SRGBColorSpace;
-	return texture;
+	const map = new THREE.TextureLoader().load(new URL('./assets/broadleaf-spray.webp', import.meta.url).href);
+	map.colorSpace = THREE.SRGBColorSpace;
+	map.anisotropy = 4;
+	return map;
 }
 
 function tree_Model(birch, seed) {
@@ -84,7 +73,7 @@ function tree_Model(birch, seed) {
 				leaf.attributes.normal.setXYZ(v,vertex.x,vertex.y,vertex.z);
 			}
 			// Наружная часть кроны лучше освещена, в глубине виден более тёмный второй план.
-			const color = new THREE.Color().setHSL((birch ? .218 : .265) + random() * .033, .29 + random() * .12, .215 + level * .073 + random() * .097);
+			const color = new THREE.Color(birch ? 0xe1d9ae : 0xc7d6c1).multiplyScalar(.70 + level * .24 + random() * .15);
 			leaves.push(tint(leaf, color));
 		}
 	}
@@ -99,7 +88,7 @@ function boulder_Model(seed) {
 		const x = vertices.getX(i), y = vertices.getY(i), z = vertices.getZ(i);
 		const rough = .92 + .095 * Math.sin(5 * x + 3 * z + phase) + .034 * Math.cos(y * 8 - phase);
 		vertices.setXYZ(i, x * rough + .09 * y, Math.max(-.91, Math.min(.85, y * rough)), z * rough - .1 * y);
-		painted.set(y > .42 ? 0x999a79 : 0x858481).multiplyScalar(.77 + .19 * y + .17 * rough);
+		painted.set(y > .42 ? 0xd5d5b5 : 0xe4dbcf).multiplyScalar(.92 + .13 * y + .1 * rough);
 		rgb.push(painted.r, painted.g, painted.b);
 	}
 	shape.computeVertexNormals();
@@ -126,7 +115,7 @@ function grass_Model() {
 	return geometry;
 }
 
-export function create_Landscape(scene, elevation, seed) {
+export function create_Landscape(scene, elevation, seed, collision) {
 	const random = random_Stream(seed), cells = new Map(), parts = new Map(), solids = new Map();
 	const mobile = matchMedia('(pointer: coarse)').matches;
 	let grassIndex = 0;
@@ -148,7 +137,8 @@ export function create_Landscape(scene, elevation, seed) {
 	part('rail', tint(new THREE.BoxGeometry(1, 1, 1), 0x9c825f));
 	part('bark', tint(new THREE.CylinderGeometry(.86, 1, 1, 9), 0x756049));
 	part('cut', tint(new THREE.CylinderGeometry(1, 1, 1, 9), 0xc6a674));
-	part('stone', boulder_Model(seed));
+	const stoneSurface = create_StoneSurface();
+	part('stone', boulder_Model(seed), stoneSurface);
 	part('grass', grass_Model(), grassSurface);
 	const dummy = new THREE.Object3D(), turn = new THREE.Quaternion(), unit = new THREE.Vector3();
 	function instance(name, x, y, z, sx, sy, sz, rotation, shade = 1) {
@@ -226,11 +216,9 @@ export function create_Landscape(scene, elevation, seed) {
 		rock(x,z,w,h,d=w,yaw=0,lift=0) {
 			const y = elevation(x,z) + lift, rx = w*.5, rz = d*.5, ry = h/.94;
 			instance('stone',x,y+h*.09,z,rx,ry,rz,yaw,.8+random()*.35);
-			const bound = Math.max(rx,rz)+.18, cos = Math.cos(yaw), sin = Math.sin(yaw);
-			collider(x-bound,z-bound,x+bound,z+bound, (px,py,pz) => {
-				const dx=px-x, dz=pz-z;
-				return py<=y+h+.14 && ((dx*cos-dz*sin)/(rx+.12))**2 + ((dx*sin+dz*cos)/(rz+.12))**2 + ((py-y-h*.09)/(ry+.12))**2 < 1;
-			});
+		},
+		arch(x,z,yaw,shore = false) {
+			add_StoneArch(scene, elevation, collision, stoneSurface, x,z,yaw,shore);
 		},
 		grass(x,z,size=1) {
 			if (mobile && ++grassIndex % 2 === 0) return;
@@ -254,6 +242,7 @@ export function create_Landscape(scene, elevation, seed) {
 				mesh.castShadow = name !== 'grass';
 				mesh.receiveShadow = true;
 				scene.add(mesh);
+				if (name === 'stone') collision.add(mesh);
 			}
 			cells.clear();
 		},

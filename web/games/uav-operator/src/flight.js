@@ -10,6 +10,7 @@ import { bind_FlightInputs, bind_Joystick } from './inputs.js';
 import { add_Beacon, create_GroundShadow } from './scenes.js';
 import { dispose_Scene, palette } from './models.js';
 import { create_Field, gate_Crossing } from './training-field.js';
+import { create_GeologyMap } from './geology-maps.js';
 import { bind_Click, close_StageMenu, query, scene_Frame, set_Status, show_CompletePrompt, stage_OverlayOpen, stage_Shell, toggle_StageMenu, vibrate_Device } from './ui.js';
 import { text } from './text.js';
 import { create_AnalogFeed } from './video.js';
@@ -17,24 +18,43 @@ import { create_AnalogFeed } from './video.js';
 const launchHeading = -Math.PI * .34;
 const directionArrows = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
 const groundHeight = .72;
-const modelOffset = .66;
 
-function draw_Map(context, x, z, heading, scanned, { limits, points, beach }) {
-	const width = context.canvas.width;
-	const height = context.canvas.height;
+function relief_Image(context, { limits, groundAt, map }) {
+	const { width, height } = context.canvas;
+	const dx = (limits.maxX - limits.minX) / (width - 22);
+	const dz = (limits.maxZ - limits.minZ) / (height - 22);
+	const image = context.createImageData(width, height);
+	const terrain = map === 'canyon' ? [149,105,75] : map === 'alpine' ? [112,123,115] : [100,117,83];
+	for (let row = 0; row < height; row++) {
+		const z = limits.minZ + (row - 11) * dz;
+		for (let col = 0; col < width; col++) {
+			const x = limits.minX + (col - 11) * dx;
+			const h = groundAt(x, z);
+			const west = groundAt(x - dx, z), north = groundAt(x, z - dz);
+			const water = map === 'beach' ? x > shore(z) : map === 'alpine' && h < -.7;
+			const shade = THREE.MathUtils.clamp(.85 + .22 * (h - west) / dx + .27 * (h - north) / dz, .51, 1.25);
+			const contour = Math.floor(h / 4) !== Math.floor(north / 4) || Math.floor(h / 4) !== Math.floor(west / 4);
+			const i = 4 * (row * width + col);
+			const color = water ? [53,95,101] : terrain;
+			for (let k = 0; k < 3; k++) image.data[i + k] = color[k] * (water ? 1 : shade * (contour ? .74 : 1));
+			image.data[i + 3] = 255;
+		}
+	}
+	return image;
+}
+
+function draw_Map(context, x, z, heading, scanned, mapData) {
+	const { limits, points, beach } = mapData;
+	const { width, height } = context.canvas;
 	const plotX = world => 11 + (world - limits.minX) / (limits.maxX - limits.minX) * (width - 22);
 	const plotZ = world => 11 + (world - limits.minZ) / (limits.maxZ - limits.minZ) * (height - 22);
-	context.fillStyle = beach ? '#234346' : '#485643';
-	context.fillRect(0, 0, width, height);
-	if (beach) {
-		context.fillStyle = '#596054';
+	context.putImageData(mapData.relief ??= relief_Image(context, mapData), 0, 0);
+	if (!beach) {
+		context.strokeStyle = '#ccdbbd';
+		context.setLineDash([2, 3]);
 		context.beginPath();
-		context.moveTo(0, 0);
-		for (let y = 0; y <= height; y += 2) {
-			context.lineTo(plotX(shore(limits.minZ + (y - 11) / (height - 22) * (limits.maxZ - limits.minZ))), y);
-		}
-		context.lineTo(0, height);
-		context.fill();
+		for (const point of points) context.lineTo(plotX(point.x), plotZ(point.z));
+		context.stroke();
 	}
 	context.setLineDash([3, 4]);
 	context.strokeStyle = '#a9b8ad';
@@ -73,9 +93,15 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	const story = !practice;
 	const beach = story || practice.map === 'beach';
 	const race = practice?.map === 'race';
-	const field = beach ? null : create_Field(race);
-	const world = field ?? coast;
-	const { scene, seaTime, touchesTree } = world;
+	const geology = practice?.map === 'canyon' || practice?.map === 'alpine';
+	const world = beach ? coast : geology ? create_GeologyMap(practice.map) : create_Field(race);
+	const courseComplete = geology ? text.free.archesDone : race ? text.free.raceDone : text.free.fieldDone;
+	const { scene, seaTime, collision, touchesTree } = world;
+	const pendingMasks = new Set();
+	scene.traverse(object => {
+		const material = object.material;
+		if (object.castShadow && material?.alphaTest > 0 && material.map && !material.map.image) pendingMasks.add(material.map);
+	});
 	const base = world.base ?? coastBase;
 	const limits = world.limits ?? coastLimits;
 	const onPad = world.onPad ?? on_Pad;
@@ -83,20 +109,32 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 	const groundAt = world.flightGround ?? flight_Ground;
 	const sectors = world.gates ?? beachSectors;
 	const points = [base, ...sectors];
-	const mapData = { limits, points, beach };
+	const mapData = { limits, points, beach, groundAt, map: practice?.map ?? 'beach' };
 	const droneKey = practice?.drone;
 	const kit = droneKey ? fleet[droneKey] : fpvKit;
 	const fieldDrone = droneKey ? create_FleetModel(scene, droneKey) : world.fieldDrone;
 	if (droneKey && beach) coast.fieldDrone.drone.visible = false;
 	let chase = (restoredState?.camera ?? practice?.camera ?? storyCamera) === 'chase';
 	let cameraChanged = true;
+	// Берег переиспользуется при перезапуске. Размеры измеряем до разворота и переноса на площадку.
+	fieldDrone.drone.position.set(0,0,0);
+	fieldDrone.drone.quaternion.identity();
+	for (const propeller of fieldDrone.propellers) propeller.rotation.y = 0;
+	// Корпус учебного F5 собран в единицах демонстрационной модели; в полёте размах около 32 см.
+	if (story) fieldDrone.drone.scale.setScalar(.08);
 	const droneBounds = new THREE.Box3().setFromObject(fieldDrone.drone);
-	const droneCenter = fieldDrone.drone.worldToLocal(droneBounds.getCenter(new THREE.Vector3()));
-	const bodyOffset = droneCenter.y - modelOffset;
+	const center = droneBounds.getCenter(new THREE.Vector3());
+	const modelOffset = groundHeight + droneBounds.min.y;
+	const bodyOffset = center.y - modelOffset;
+	const droneCenter = fieldDrone.drone.worldToLocal(center);
+	const droneSize = droneBounds.getSize(new THREE.Vector3());
+	const bodyRadius = .5 * Math.max(droneSize.x, droneSize.z);
+	const sweepStart = new THREE.Vector3(), sweepEnd = new THREE.Vector3();
+	const impactVelocity = new THREE.Vector3();
 	const groundShadow = create_GroundShadow(scene, world.sun, droneBounds.max.x - droneBounds.min.x, groundAt);
 	fieldDrone.drone.traverse(object => { object.castShadow = false; });
 	const chaseDistance = Math.max(1.4, (kit.length ?? .32) * 5.5);
-	const updateChase = create_ChaseCamera(fieldDrone.drone, droneCenter, chaseDistance, touchesTree, groundAt);
+	const updateChase = create_ChaseCamera(fieldDrone.drone, droneCenter, chaseDistance, touchesTree, groundAt, collision);
 	const camera = new THREE.PerspectiveCamera(flightPreferences.fov, 1, .07, 620);
 	const touchdownCamera = create_TouchdownCamera(camera);
 	const profile = practice ? { ...settings.flight, mode: practice.mode, drain: .7 } : settings.flight;
@@ -294,7 +332,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			flightControls.dataset.sticks = showSticks ? 'visible' : 'floating';
 			attitudeStick.reset();
 			throttleStick.reset();
-		});
+		}, story);
 	function select_Camera(mode) {
 		chase = mode === 'chase';
 		cameraChanged = true;
@@ -501,28 +539,44 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			}
 			if (powered) battery = acro.power(delta * profile.drain, .48 + .17 * Math.hypot(motion.vx, motion.vz) / maxSpeed);
 		}
-		const travel = Math.hypot(motion.x - previous.x, motion.y - previous.y, motion.z - previous.z);
-		const samples = Math.max(1, Math.ceil(travel / .28));
-		let obstacle = false;
-		for (let sample = 1; sample <= samples && !obstacle; sample++) {
-			const timeAlongPath = sample / samples;
-			obstacle = touchesTree(
-				THREE.MathUtils.lerp(previous.x, motion.x, timeAlongPath),
-				THREE.MathUtils.lerp(previous.y, motion.y, timeAlongPath) + bodyOffset,
-				THREE.MathUtils.lerp(previous.z, motion.z, timeAlongPath),
-			);
+		sweepStart.set(previous.x, previous.y + bodyOffset, previous.z);
+		sweepEnd.set(motion.x, motion.y + bodyOffset, motion.z);
+		const travel = sweepStart.distanceTo(sweepEnd);
+		let hit = collision?.sweep(sweepStart, sweepEnd, bodyRadius);
+		let stopTime = hit?.time ?? 1;
+		let obstacle = Boolean(hit);
+		if (touchesTree) {
+			const samples = Math.max(1, Math.ceil(travel * stopTime / .28));
+			for (let sample = 1; sample <= samples; sample++) {
+				const t = stopTime * sample / samples;
+				if (!touchesTree(
+					THREE.MathUtils.lerp(sweepStart.x, sweepEnd.x, t),
+					THREE.MathUtils.lerp(sweepStart.y, sweepEnd.y, t),
+					THREE.MathUtils.lerp(sweepStart.z, sweepEnd.z, t),
+				)) continue;
+				stopTime = stopTime * (sample - 1) / samples;
+				obstacle = true;
+				hit = null;
+				break;
+			}
 		}
 		const side = motion.vx * Math.cos(motion.heading) - motion.vz * Math.sin(motion.heading);
 		const fore = motion.vx * Math.sin(motion.heading) + motion.vz * Math.cos(motion.heading);
 		if (obstacle) {
-			if (!previousObstacle) impact = Math.max(impact, Math.hypot(motion.vx, motion.vz, stabilized ? motion.vy : acro.velocity.y));
-			motion.x = previous.x;
-			motion.z = previous.z;
-			motion.y = previous.y;
+			impactVelocity.set(motion.vx, stabilized ? motion.vy : acro.velocity.y, motion.vz);
+			const impactSpeed = hit ? Math.max(0, -impactVelocity.dot(hit.normal)) : impactVelocity.length();
+			if (!previousObstacle) impact = Math.max(impact, impactSpeed);
+			const clearance = Math.max(0, stopTime - .002 / Math.max(travel, .002));
+			motion.x = THREE.MathUtils.lerp(previous.x, motion.x, clearance);
+			motion.z = THREE.MathUtils.lerp(previous.z, motion.z, clearance);
+			motion.y = Math.max(groundAt(motion.x, motion.z) + groundHeight, THREE.MathUtils.lerp(previous.y, motion.y, clearance));
 			motion.height = motion.y - groundAt(motion.x, motion.z);
-			motion.vx *= -.24;
-			motion.vz *= -.24;
-			acro.velocity.multiplyScalar(-.24);
+			if (hit) impactVelocity.addScaledVector(hit.normal, 1.24 * impactSpeed);
+			else impactVelocity.multiplyScalar(-.24);
+			motion.vx = impactVelocity.x;
+			motion.vy = impactVelocity.y;
+			motion.vz = impactVelocity.z;
+			acro.velocity.copy(impactVelocity);
 		}
 		previousObstacle = obstacle;
 		impactCooldown = Math.max(0, impactCooldown - delta);
@@ -558,7 +612,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			raceFinish = Math.max(.01, flightSeconds - raceStart);
 		}
 		record_Completion();
-		announce_Completion(race ? text.free.raceDone : text.free.fieldDone);
+		announce_Completion(courseComplete);
 	}
 
 	function lose_Signal() {
@@ -609,7 +663,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 		}
 		if (landed) button.hidden = true;
 		if (completion || landed) {
-			const notice = beach ? (freeMode ? text.free.beachDone : copy.completeNotice) : race ? text.free.raceDone : text.free.fieldDone;
+			const notice = beach ? (freeMode ? text.free.beachDone : copy.completeNotice) : courseComplete;
 			announce_Completion(notice);
 		}
 	}
@@ -637,6 +691,11 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			camera.updateProjectionMatrix();
 		},
 		update(delta, time, elapsed = delta) {
+			for (const mask of pendingMasks) {
+				if (!mask.image) continue;
+				world.sun.shadow.needsUpdate = true;
+				pendingMasks.delete(mask);
+			}
 			const axes = flightInputs.axes();
 			const overlayOpen = resetting || stage_OverlayOpen();
 			if (overlayOpen && !paused) flightInputs.reset();
@@ -672,13 +731,13 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 			if (chase) {
 				updateChase(camera, heading, tilt, Math.min(.07, elapsed), cameraChanged || reduceMotion.matches);
 			} else if (!stabilized) {
-				camera.position.set(x, y + .20, z);
+				camera.position.set(x, y + bodyOffset, z);
 				camera.quaternion.copy(acro.attitude);
 				camera.rotateX(THREE.MathUtils.degToRad(tilt));
 				if (!grounded && !reduceMotion.matches && armed && damage.thrust < .99) camera.rotateX(Math.sin(time * 97) * (1 - damage.thrust) * .028);
 			} else {
-				camera.position.set(x, y + .20, z);
-				camera.lookAt(x - backX * 20, y + .20, z - backZ * 20);
+				camera.position.set(x, y + bodyOffset, z);
+				camera.lookAt(x - backX * 20, y + bodyOffset, z - backZ * 20);
 				camera.rotateX(THREE.MathUtils.degToRad(tilt));
 				if (!grounded && !reduceMotion.matches) camera.rotateZ(-(motion.vx * backZ - motion.vz * backX) * .009);
 			}
@@ -705,7 +764,7 @@ export function start_Flight({ mount, coast, renderer, signal, settings, restart
 				if (ring) ring.visible = visible;
 				label.hidden = !visible;
 				if (label.hidden) continue;
-				trackedPosition.set(point.x, ring ? ring.position.y + 1.7 : point.y + point.height + .95, point.z).project(camera);
+				trackedPosition.set(point.x, ring ? ring.position.y + 1.7 : point.y + (geology ? point.height * .52 : point.height + .95), point.z).project(camera);
 				label.hidden = scanned.has(point) || Math.abs(trackedPosition.x) > .92 || Math.abs(trackedPosition.y) > .83 || Math.abs(trackedPosition.z) > 1;
 				label.style.left = `${50 + trackedPosition.x * 50}%`;
 				label.style.top = `${50 - trackedPosition.y * 50}%`;

@@ -97,7 +97,7 @@ export function parseGameMessage(data: unknown): ParsedGameMessage {
 		case "practice-result": {
 			const { activity, difficulty, score, completed, durationSec } = raw;
 			const isolatedStage = activity === "assembly" || activity === "survey";
-			const flight = activity === "beach" || activity === "field" || activity === "race";
+			const flight = activity === "beach" || activity === "field" || activity === "race" || activity === "canyon" || activity === "alpine";
 			const knownDifficulty = difficulty === "easy" || difficulty === "medium" || difficulty === "hard";
 			if ((!isolatedStage && !flight) || (isolatedStage ? !knownDifficulty : difficulty !== null)
 				|| typeof score !== "number" || !Number.isInteger(score) || score < 0 || score > 100

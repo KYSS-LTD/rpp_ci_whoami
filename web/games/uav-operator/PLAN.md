@@ -16,4 +16,16 @@
 
 ## Графические материалы
 
-Фототекстура берега и панорама неба хранятся в сборке локально. Источники под лицензией CC0: [Coast Sand 01](https://polyhaven.com/a/coast_sand_01) и [Kloofendal 48d Partly Cloudy Pure Sky](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky).
+Для каждой карты из HDR-панорамы подготовлены фон и компактная карта освещения. Обе загружаются из сборки игры. Панорамы Poly Haven доступны по лицензии CC0.
+
+| Карта | Панорама |
+|---|---|
+| Побережье | [Aristea Wreck Pure Sky](https://polyhaven.com/a/aristea_wreck_puresky) |
+| Поле | [Alps Field](https://polyhaven.com/a/alps_field) |
+| Гонка | [Belfast Sunset Pure Sky](https://polyhaven.com/a/belfast_sunset_puresky) |
+| Каньон песчаных арок | [Goegap](https://polyhaven.com/a/goegap) |
+| Ледниковый цирк | [Pizzo Pernice](https://polyhaven.com/a/pizzo_pernice) |
+
+Для покрытия берега, камня, гравия и древесины использованы фотоматериалы Poly Haven. Хвоя и листва собраны из фрагментов атласов деревьев. [Coast Sand 01](https://polyhaven.com/a/coast_sand_01), [Rock Boulder Dry](https://polyhaven.com/a/rock_boulder_dry), [Gravel Floor](https://polyhaven.com/a/gravel_floor), [Weathered Plank Siding](https://polyhaven.com/a/weathered_plank_siding), [Fir Tree 01](https://polyhaven.com/a/fir_tree_01), [Tree Small 02](https://polyhaven.com/a/tree_small_02).
+
+Для валунов в каньоне и ледниковом цирке упрощены две фотограмметрические модели. Их фактическая геометрия участвует в столкновениях. [Boulder 01](https://polyhaven.com/a/boulder_01), [Namaqualand Boulder 04](https://polyhaven.com/a/namaqualand_boulder_04).

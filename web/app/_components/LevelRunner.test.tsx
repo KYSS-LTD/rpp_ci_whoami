@@ -213,6 +213,8 @@ describe("запуск iframe-игры", () => {
 		{ activity: "race", award: "gate-streak" },
 		{ activity: "field", award: "field-explorer" },
 		{ activity: "beach", award: null },
+		{ activity: "canyon", award: null },
+		{ activity: "alpine", award: null },
 	])("завершённый свободный полёт ($activity) показывает диплом и сохраняет результат", ({ activity, award }) => {
 		render(<LevelRunner gameId="uav-operator" levelId="free" />);
 		const frameWindow = (screen.getByTitle("Оператор БПЛА") as HTMLIFrameElement).contentWindow as Window;

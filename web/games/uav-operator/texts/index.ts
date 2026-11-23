@@ -14,5 +14,7 @@ export const uavTexts = {
 		beach: "Фото на пляже",
 		field: "Поле",
 		race: "Гонка",
+		canyon: "Каньон песчаных арок",
+		alpine: "Ледниковый цирк",
 	},
 };

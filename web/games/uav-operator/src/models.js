@@ -61,8 +61,13 @@ export function dispose_Scene(scene) {
 		}
 		object.shadow?.dispose();
 	});
+	if (scene.background?.isTexture) textures.add(scene.background);
+	if (scene.environment?.isTexture) textures.add(scene.environment);
+	if (scene.isScene) {
+		scene.background = null;
+		scene.environment = null;
+	}
 	textures.forEach(texture => texture.dispose());
-	if (scene.background?.isTexture) scene.background.dispose();
 }
 
 export function group(parent, x = 0, y = 0, z = 0) {

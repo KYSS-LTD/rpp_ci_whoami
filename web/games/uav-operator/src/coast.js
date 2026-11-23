@@ -1,8 +1,10 @@
 import * as THREE from 'three';
+import { add_Water } from './water.js';
 import { box, cylinder, group, ring, palette, create_Drone } from './models.js';
 import { create_FlightAtmosphere } from './atmosphere.js';
 import { create_Landscape } from './landscape.js';
 import { batch_Scenery } from './scenery-batches.js';
+import { create_SceneryCollision } from './scenery-collision.js';
 
 export const base = { x: -15, z: 37, label: 'H' };
 export const padRadius = 4.4;
@@ -59,8 +61,8 @@ function create_Terrain(scene) {
 	geometry.rotateX(-Math.PI / 2);
 	const position = geometry.attributes.position;
 	const colors = [];
-	const sand = new THREE.Color(0xf3dbab);
-	const wet = new THREE.Color(0xc3af96);
+	const sand = new THREE.Color(0xfff1d7);
+	const wet = new THREE.Color(0xe2d5c0);
 	const scrub = new THREE.Color(0x88a27b);
 	const forest = new THREE.Color(0x4f815d);
 	const random = seeded_Random(21);
@@ -77,131 +79,44 @@ function create_Terrain(scene) {
 	}
 	geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 	geometry.computeVertexNormals();
-	const terrain = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, map: beach_Texture(65, 74) }));
-	terrain.material.map.repeat.y = 144;
+	const normalMap = new THREE.TextureLoader().load(new URL('./assets/coast-sand-normal.webp', import.meta.url).href);
+	normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
+	normalMap.repeat.set(65, 144);
+	normalMap.anisotropy = 4;
+	const terrain = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+		vertexColors: true, roughness: .87, map: beach_Texture(65, 144), normalMap, normalScale: new THREE.Vector2(.65, .65),
+	}));
 	terrain.material.onBeforeCompile = shader => {
-		shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `
+		shader.vertexShader = 'varying vec2 sandPoint;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n sandPoint = position.xz;');
+		shader.fragmentShader = 'varying vec2 sandPoint;\n' + shader.fragmentShader.replace('#include <map_fragment>', `
 			#include <map_fragment>
-			float grain = dot(diffuseColor.rgb,vec3(.25,.62,.13));
-			diffuseColor.rgb = vec3(.18 + .80 * grain) * vec3(1.05,1.,.94);
+			float strand = 13.0 + 6.0*cos(sandPoint.y*.044) - 6.0*sin(sandPoint.y*.069) - sandPoint.x;
+			float plume = sin(sandPoint.y*.36 + sin(sandPoint.x*.64));
+			float wet = 1.0-smoothstep(1.1,5.8,strand + plume*.7);
+			float grains = dot(diffuseColor.rgb,vec3(.28,.59,.13));
+			diffuseColor.rgb = mix(diffuseColor.rgb,grains*vec3(1.15,1.03,.85),.59);
+			diffuseColor.rgb *= mix(vec3(1.92,1.86,1.64), vec3(.92,.98,1.02), wet);
+		`).replace('#include <roughnessmap_fragment>', `
+			#include <roughnessmap_fragment>
+			roughnessFactor = mix(.91,.31,wet);
 		`);
 	};
 	terrain.receiveShadow = true;
 	scene.add(terrain);
 }
 
-function create_Sea(scene) {
-	const uniforms = { time: { value: 0 }, sky: { value: scene.background }, skyTurn: { value: scene.backgroundRotation.y } };
-	const material = new THREE.ShaderMaterial({ uniforms, vertexShader: `
-		varying vec2 world;
-		void main() {
-			vec4 point = modelMatrix * vec4(position, 1.0);
-			world = point.xz;
-			gl_Position = projectionMatrix * viewMatrix * point;
-		}`, fragmentShader: `
-		uniform float time;
-		uniform float skyTurn;
-		uniform sampler2D sky;
-		varying vec2 world;
-		void main() {
-			float shore = 13.0 + 6.0 * cos(world.y * .044) - 6.0 * sin(world.y * .069);
-			float depth = world.x - shore;
-			vec3 view = normalize(cameraPosition - vec3(world.x, 0.0, world.y));
-			float swell = sin(dot(world, vec2(.58, .19)) + time * 1.05 + .9*sin(world.y*.16));
-			float chop = sin(dot(world, vec2(1.72, -.69)) - time * 1.9 + swell * 1.4);
-			float ripples = sin(dot(world, vec2(3.19, .82)) + time * 2.2 + chop * 1.6);
-			float range = distance(world, cameraPosition.xz);
-			float detail = 1.0 - smoothstep(40.0, 185.0, range);
-			vec3 normal = normalize(vec3((.064 * swell + .047 * chop)*detail, 1.0, (.060 * chop + .036 * ripples)*detail));
-			float fresnel = .07 + .85 * pow(1.0 - clamp(dot(view, normal), 0.0, 1.0), 4.0);
-			float shoal = .5 + .5*sin(world.x*.48 + sin(world.y*.31)*2.)*cos(world.y*.43);
-			vec3 col = mix(mix(vec3(.22,.49,.37),vec3(.17,.40,.30),shoal), vec3(.012,.13,.16), smoothstep(-1.0, 32.0, depth+shoal*3.));
-			vec3 reflectedDir = reflect(-view, normal);
-			vec2 skyUv = vec2(.5 + (atan(reflectedDir.z,reflectedDir.x) + skyTurn)/6.2831853, .5 + asin(clamp(reflectedDir.y,.0,1.))/3.14159);
-			vec3 reflected = textureLod(sky, vec2(fract(skyUv.x),skyUv.y), 5.).rgb;
-			reflected = mix(reflected,vec3(.35,.49,.59),.52);
-			col = mix(col, reflected*.80, fresnel) + detail * (.005 * ripples + .007 * chop);
-			float glint = pow(max(dot(reflect(-normalize(vec3(-.83,.95,-.45)),normal),view),0.),64.);
-			col += vec3(1.,.82,.55) * glint * .8 * detail;
-			float surf = sin(depth * 1.11 + time * 1.35 + .44 * sin(world.y * .48) + .24 * chop);
-			float foam = smoothstep(.84, 1.0, surf) * (1.0 - smoothstep(1.0, 12.0, depth));
-			foam *= smoothstep(-.68, .75, ripples * .55 + swell * .62) * detail;
-			col = mix(col, vec3(.76, .82, .76), clamp(foam * .51 + .48 * exp(-abs(depth - .24 + .17 * chop) * 3.1), 0.0, 1.0));
-			col = mix(col,vec3(.48,.63,.66),smoothstep(150.,420.,range));
-			gl_FragColor = vec4(col, 1.0);
-			#include <tonemapping_fragment>
-			#include <colorspace_fragment>
-		}`,
-	});
-	const sea = new THREE.Mesh(new THREE.PlaneGeometry(740, 800), material);
-	sea.rotation.x = -Math.PI / 2;
-	sea.position.set(200, -.012, 0);
-	scene.add(sea);
-	return uniforms.time;
+function create_Sea(scene, sun) {
+	return add_Water(scene, sun, new THREE.PlaneGeometry(740, 800, 128, 152),
+		new THREE.Vector3(200, -.012, 0), terrain_Height, true);
 }
 
+// Фотография хвои Fir Tree 01 (Poly Haven, CC0) используется и для ближних веток, и для силуэтов.
 export function pine_Material(spray = false) {
-	const canvas = document.createElement('canvas');
-	canvas.width = 360;
-	canvas.height = 512;
-	const ink = canvas.getContext('2d');
-	ink.scale(2, 2);
-	const random = seeded_Random(589);
-	if (spray) {
-		// Прозрачная текстура отдельной ветви с хвоей и мелкими побегами.
-		for (let twig = 0; twig < 54; twig++) {
-			const start = twig / 54;
-			const side = twig % 2 ? -1 : 1;
-			const reach = (1 - start) * (.55 + random() * .44);
-			const endX = 90 + side * 86 * reach;
-			const endY = 252 - start * 222 - reach * 80;
-			ink.strokeStyle = '#695640';
-			ink.lineWidth = 1.3;
-			ink.beginPath();
-			ink.moveTo(90, 252 - start * 222);
-			ink.lineTo(endX, endY);
-			ink.stroke();
-			for (let needle = 0; needle < 32; needle++) {
-				const t = needle / 32;
-				const x = 90 + (endX - 90) * t;
-				const y = 252 - start * 222 + (endY - 252 + start * 222) * t;
-				ink.strokeStyle = 'hsl(' + (86 + random() * 42) + ' 30% ' + (21 + random() * 22) + '%)';
-				ink.lineWidth = .95 + random() * 1.9;
-				ink.beginPath();
-				ink.moveTo(x, y);
-				ink.lineTo(x + (random() - .5) * 16 * reach, y - 3 - random() * 21 * reach);
-				ink.stroke();
-			}
-		}
-		const texture = new THREE.CanvasTexture(canvas);
-		texture.colorSpace = THREE.SRGBColorSpace;
-		texture.anisotropy = 4;
-		return new THREE.MeshStandardMaterial({ map: texture, alphaTest: .35, side: THREE.DoubleSide, roughness: 1 });
-	}
-	ink.fillStyle = '#6d5944';
-	ink.fillRect(87, 22, 5, 230);
-	for (let row = 0; row < 68; row++) {
-		const level = 224 - row * 3.15;
-		const span = 5 + (67 - row) * .98;
-		for (const side of [-1, 1]) {
-			const reach = span * (.73 + random() * .35);
-			for (let spray = 0; spray < 28; spray++) {
-				const t = spray / 28;
-				const x = 90 + side * reach * t;
-				const y = level + (14 + span * .13) * t - 8 * t * t;
-				const light = 19 + random() * 12 + (side < 0 ? 7 : 0);
-				ink.fillStyle = `hsl(145 23% ${light}%)`;
-				ink.beginPath();
-				ink.moveTo(x - 3, y + 4);
-				ink.lineTo(x + side * (3 + random() * 9), y - 4 - random() * 9);
-				ink.lineTo(x + 4, y + 2);
-				ink.fill();
-			}
-		}
-	}
-	const texture = new THREE.CanvasTexture(canvas);
-	texture.colorSpace = THREE.SRGBColorSpace;
-	return new THREE.MeshStandardMaterial({ map: texture, alphaTest: .42, side: THREE.DoubleSide, roughness: 1 });
+	const url = spray ? new URL('./assets/fir-spray.webp', import.meta.url) : new URL('./assets/fir-crown.webp', import.meta.url);
+	const map = new THREE.TextureLoader().load(url.href);
+	map.colorSpace = THREE.SRGBColorSpace;
+	map.anisotropy = 4;
+	return new THREE.MeshStandardMaterial({ map, alphaTest: .30, alphaToCoverage: true, side: THREE.DoubleSide, roughness: .93 });
 }
 
 // Группы ветвей образуют ярусы вокруг ствола, чтобы крона сохраняла объём при облёте.
@@ -233,7 +148,7 @@ export function create_BoughGeometry(seed) {
 	return geometry;
 }
 
-function create_Vegetation(scene) {
+function create_Vegetation(scene, collision) {
 	const random = seeded_Random(197);
 	const stock = new THREE.Object3D();
 	const cells = new Map();
@@ -315,6 +230,7 @@ function create_Vegetation(scene) {
 	}
 	rocks.castShadow = rocks.receiveShadow = true;
 	scene.add(rocks);
+	collision.add(rocks);
 	return (x, y, z) => {
 		for (let dx = -1; dx <= 1; dx++) {
 			for (let dz = -1; dz <= 1; dz++) {
@@ -330,8 +246,8 @@ function create_Vegetation(scene) {
 	};
 }
 
-function add_Dunes(scene) {
-	const land = create_Landscape(scene, terrain_Height, 1459);
+function add_Dunes(scene, collision) {
+	const land = create_Landscape(scene, terrain_Height, 1459, collision);
 	const random = seeded_Random(837);
 	const safe = (x,z,r) => site_Distance(x,z)>4+r && sectors.every(p=>Math.hypot(x-p.x,z-p.z)>10+r)
 		&& Math.hypot(x-5,z+54)>3+r
@@ -370,9 +286,7 @@ function add_Dunes(scene) {
 		if (safe(x,z,2.9)) land.log(x-1.6,z-2.2,x+1.4,z+2.6,.27+random()*.18);
 	}
 	const archX=shore(8)+1;
-	land.rock(archX,4.8,3.7,4.5,4.6,-.12);
-	land.rock(archX,11.4,4.1,4.4,4.2,.25);
-	land.rock(archX,8,3.25,1.24,9.2,0,4.45);
+	land.arch(archX,8,Math.PI/2,true);
 	for (let i=0;i<1850;i++) {
 		const z=-172+283*random(), x=shore(z)-7-31*random();
 		if (!safe(x,z,.2)) continue;
@@ -382,17 +296,42 @@ function add_Dunes(scene) {
 	return land;
 }
 
-function create_Lighthouse(scene) {
+function create_Lighthouse(scene, collision) {
 	const x = 5;
 	const z = -54;
 	const lighthouse = group(scene, x, terrain_Height(x, z), z);
 	cylinder(lighthouse, 0x9b927c, 3.08, 3.67, .67, 0, .22, 0);
-	for (let index = 0; index < 6; index++) {
-		const radius = 1.36 - index * .062;
-		cylinder(lighthouse, index % 2 ? 0xf6e6ca : 0xd5654f, radius - .062, radius, 1.31, 0, 1.01 + index * 1.31, 0, 24);
+	const plaster = document.createElement('canvas');
+	plaster.width = 640;
+	plaster.height = 768;
+	const brush = plaster.getContext('2d'), random = seeded_Random(2046);
+	for (let band=0; band<6; band++) {
+		brush.fillStyle = band%2 ? '#a94e37' : '#d8ceba';
+		brush.fillRect(0,band*128,640,128);
 	}
+	for (let streak=0; streak<6500; streak++) {
+		const x=random()*640, y=random()*768;
+		brush.fillStyle = streak%5 ? 'rgba(60,47,34,.054)' : 'rgba(239,223,193,.24)';
+		brush.fillRect(x,y,.7+random()**3*5,1+random()**4*45);
+	}
+	for (let row=1; row<44; row++) {
+		brush.fillStyle = 'rgba(73,60,48,.16)';
+		brush.fillRect(0,row*17.5,640,.85);
+		for(let i=0;i<22;i++) brush.fillRect((i+row%2*.5)*31,row*17.5,.8,17.5);
+	}
+	const wallTexture = new THREE.CanvasTexture(plaster);
+	wallTexture.colorSpace = THREE.SRGBColorSpace;
+	wallTexture.anisotropy = 4;
+	const tower = new THREE.Mesh(new THREE.CylinderGeometry(.99,1.36,7.86,48),
+		new THREE.MeshStandardMaterial({ map: wallTexture, roughness: .92 }));
+	tower.position.y = 4.285;
+	tower.castShadow = tower.receiveShadow = true;
+	lighthouse.add(tower);
 	cylinder(lighthouse, 0x3e4648, 1.51, 1.29, .35, 0, 8.32, 0, 24);
-	cylinder(lighthouse, 0x447c88, .82, .85, 1.26, 0, 9.05, 0, 12);
+	const lantern = new THREE.Mesh(new THREE.CylinderGeometry(.82,.85,1.26,12),
+		new THREE.MeshStandardMaterial({ color: 0x31505c, metalness: .54, roughness: .17 }));
+	lantern.position.y = 9.05;
+	lighthouse.add(lantern);
 	for (let index = 0; index < 6; index++) {
 		const angle = index * Math.PI / 3;
 		box(lighthouse, 0x2b3434, .06, 1.26, .06, .83 * Math.cos(angle), 9.05, .83 * Math.sin(angle));
@@ -400,12 +339,74 @@ function create_Lighthouse(scene) {
 	cylinder(lighthouse, 0xbf5843, .09, 1.18, .76, 0, 10.03, 0, 16);
 	cylinder(lighthouse, palette.ink, .055, .055, .39, 0, 10.53, 0);
 	box(lighthouse, 0x574538, .66, 1.19, .14, 0, 1.07, 1.28);
+	for (const [height,angle] of [[3.1,.50],[5.63,2.14],[6.81,-.45]]) {
+		const radius = 1.36 - (height-.36)*.047;
+		const casement = group(lighthouse, radius*Math.sin(angle),height,radius*Math.cos(angle));
+		casement.rotation.y=angle;
+		box(casement,0xd8c9b1,.47,.71,.13);
+		box(casement,0x334246,.32,.52,.06,0,0,.073);
+		box(casement,0x948b76,.35,.033,.06,0,0,.10);
+	}
+	for (let post = 0; post < 16; post++) {
+		const angle = post * Math.PI / 8;
+		cylinder(lighthouse, 0x434b48, .035, .045, .78, 1.44*Math.cos(angle), 8.84, 1.44*Math.sin(angle), 6);
+	}
+	for (const level of [8.64, 9.20]) ring(lighthouse, 0x515653, 1.44, .038, 0, level, 0);
+	collision.add(lighthouse);
 }
 
-function create_Station(scene) {
+function add_Workboat(scene, x, z, heading, color, collision) {
+	const boat = group(scene,x,.12,z);
+	boat.rotation.y = heading;
+	const vertices = [], colors = [], indices = [];
+	const paint = new THREE.Color();
+	// Поперечные сечения корпуса сужаются к форштевню и сходятся под ватерлинией.
+	const sections = [[-2.06,.026,.49],[-1.66,.41,.37],[-1.05,.66,.32],[-.18,.76,.30],[.98,.71,.29],[1.68,.60,.28]];
+	for (let section=0; section<sections.length; section++) {
+		const [depth,beam,sheer] = sections[section];
+		for (const [span,y,finish] of [[-.88,sheer-.18,0x849294],[-1,sheer,color],[-.89,sheer+.035,0xcbbda0],[-.82,.14,0x887e69],[.82,.14,0x887e69],[.89,sheer+.035,0xcbbda0],[1,sheer,color],[.88,sheer-.18,0x849294],[.46,-.20,0x3d5556],[-.46,-.20,0x3d5556]]) {
+			vertices.push(beam*span,y,depth);
+			paint.set(finish);
+			colors.push(paint.r,paint.g,paint.b);
+		}
+		for (let j=0; section>0 && j<10; j++) {
+			const a=(section-1)*10+j, b=(section-1)*10+(j+1)%10;
+			indices.push(a,b,b+10,a,b+10,a+10);
+		}
+	}
+	for (let j=1; j<9; j++) indices.push(50,50+j+1,50+j,0,j,j+1);
+	const geometry = new THREE.BufferGeometry();
+	geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+	geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+	geometry.setIndex(indices);
+	geometry.computeVertexNormals();
+	const hull = new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({vertexColors:true,side:THREE.DoubleSide,roughness:.57}));
+	hull.castShadow = hull.receiveShadow = true;
+	boat.add(hull);
+	box(boat,0xcfc7b5,1.03,.57,.96,0,.45,.29);
+	for (const side of [-1,1]) {
+		box(boat,0x314a51,.045,.30,.68,side*.52,.64,.26);
+		for (const post of [-.5,1.15]) cylinder(boat,0xc2bca7,.08,.09,.34,side*.71,.20,post,8);
+	}
+	box(boat,0x33525b,.84,.29,.05,0,.64,-.205);
+	box(boat,0xa1a092,.045,.30,.06,0,.64,-.221);
+	box(boat,color,1.14,.07,1.10,0,.795,.28);
+	box(boat,0x876d51,1,.08,.29,0,.31,-.90);
+	box(boat,0x3a4143,.28,.4,.32,.08,.32,1.7);
+	collision.add(boat);
+}
+
+function create_Station(scene, collision) {
 	const station = group(scene, stationSite.x, terraceHeight, stationSite.z);
 	box(station, 0xd7b189, 7.8, .54, 6.2, 0, .2, 0);
-	box(station, 0xf2d9a6, 6.6, 2.65, 4.8, 0, 1.6);
+	// Weathered Plank Siding, скан Poly Haven (CC0): https://polyhaven.com/a/weathered_plank_siding
+	const timber = new THREE.TextureLoader().load(new URL('./assets/weathered-wood.webp', import.meta.url).href);
+	timber.wrapS = timber.wrapT = THREE.RepeatWrapping;
+	timber.repeat.set(2,1);
+	timber.colorSpace = THREE.SRGBColorSpace;
+	timber.anisotropy = 4;
+	const siding = box(station, 0xf2d9a6, 6.6, 2.65, 4.8, 0, 1.6);
+	siding.material = new THREE.MeshStandardMaterial({map:timber,roughness:.94});
 	// Нижняя грань цельной двускатной крыши лежит на верхней плоскости стен.
 	const roofProfile = new THREE.Shape();
 	roofProfile.moveTo(-3.68, 0);
@@ -422,26 +423,32 @@ function create_Station(scene) {
 	box(station, 0x736052, .86, 2.19, .14, 1.9, 1.29, -2.41);
 	box(station, 0x48757c, 2.4, .98, .13, -.91, 1.81, -2.43);
 	box(station, 0xf0e7ca, .09, 1.08, .15, -.91, 1.81, -2.45);
+	for (const side of [-1,1]) {
+		for (let i=0; i<7; i++) {
+			box(station, 0xbfa784, .09,.065,4.83, side*3.31,.65+i*.34,0);
+		}
+	}
+	collision.add(station);
 	const pier = group(scene, shore(25) + 6.9, .65, 25);
-	for (let index = 0; index < 22; index++) box(pier, index % 3 ? 0xb58b60 : 0x9e784e, .68, .2, 3.4, index * .71 - 7.1);
+	const deck = new THREE.Mesh(new THREE.BoxGeometry(15.62,.20,3.4), siding.material);
+	// Разворачиваем доски поперёк настила.
+	const uv = deck.geometry.attributes.uv;
+	for (let i=0; i<uv.count; i++) uv.setXY(i,uv.getY(i),uv.getX(i)*3.4);
+	deck.position.x = .355;
+	deck.castShadow = deck.receiveShadow = true;
+	pier.add(deck);
 	for (let index = -1; index < 3; index++) {
 		for (const side of [-1, 1]) cylinder(pier, 0x715b49, .17, .2, 1.8, index * 4.4 - 2, -.46, side * 1.35, 8);
 	}
-	for (const [x, z, angle] of [[23, 29, .49], [29, 21, -.15]]) {
-		const boat = group(scene, x, .13, z);
-		boat.rotation.y = angle;
-		box(boat, 0xefe5cc, 1.4, .46, 3.45);
-		box(boat, 0xe88956, 1.25, .23, 3.1, 0, .33);
-		const bow = cylinder(boat, 0xefebe0, .84, .61, .42, 0, 0, -1.81, 3);
-		bow.rotation.y = Math.PI;
-		box(boat, 0x397e84, 1.1, .61, 1.14, 0, .56, .42);
-	}
+	collision.add(pier);
+	add_Workboat(scene,23,29,.49,0x9b523e,collision);
+	add_Workboat(scene,29,21,-.15,0x41656a,collision);
 	const landing = group(scene, base.x, terraceHeight + padThickness - .08, base.z);
 	cylinder(landing, 0x728274, padRadius, padRadius + .19, 1.22, 0, -.56, 0, 32);
 	cylinder(landing, 0x39494a, padRadius, padRadius + .12, .16, 0, 0, 0, 32);
-	ring(landing, 0xb5baae, padRadius - .33, .035, 0, .085, 0);
-	for (const side of [-1, 1]) box(landing, palette.shell, .22, .035, 1.73, side * .53, .107, 0);
-	box(landing, palette.shell, 1.04, .035, .22, 0, .107, 0);
+	ring(landing, 0xb5baae, padRadius - .33, .035, 0, .081, 0).scale.z = .05;
+	for (const side of [-1, 1]) box(landing, palette.shell, .22, .002, 1.73, side * .53, .081, 0);
+	box(landing, palette.shell, 1.04, .002, .22, 0, .081, 0);
 }
 
 function create_SectorDetails(scene) {
@@ -483,17 +490,18 @@ export function create_Lighting(scene, span = 42) {
 
 export function create_Coast() {
 	const scene = new THREE.Scene();
+	const collision = create_SceneryCollision();
 	const sun = create_FlightAtmosphere(scene, 'beach');
 	create_Terrain(scene);
-	const seaTime = create_Sea(scene);
-	const pines = create_Vegetation(scene);
-	const dunes = add_Dunes(scene);
+	const seaTime = create_Sea(scene, sun);
+	const pines = create_Vegetation(scene, collision);
+	const dunes = add_Dunes(scene, collision);
 	const touchesTree = (x,y,z) => dunes.touches(x,y,z) || pines(x,y,z);
-	create_Lighthouse(scene);
-	create_Station(scene);
+	create_Lighthouse(scene, collision);
+	create_Station(scene, collision);
 	create_SectorDetails(scene);
 	batch_Scenery(scene);
 	const fieldDrone = create_Drone(scene);
 	fieldDrone.drone.traverse(object => { object.castShadow = false; });
-	return { scene, fieldDrone, seaTime, touchesTree, sun };
+	return { scene, fieldDrone, seaTime, touchesTree, sun, collision };
 }
